@@ -1,5 +1,32 @@
- <template>
-   <div v-if="!proxyInstalled || showConfigurationWizard" class="wizard-container">
+  <template>
+    <div v-if="showInstallButton && !proxyInstalled" class="install-instance-container">
+      <div class="empty-state">
+        <div class="empty-state-content">
+          <div class="app-header">
+            <div class="app-icon">
+              <i class="icon icon-gear"></i>
+            </div>
+            <div class="app-info">
+              <h2>SUSE AI Universal Proxy</h2>
+            </div>
+          </div>
+
+          <div class="empty-message">
+            <h3>Install SUSE AI Universal Proxy</h3>
+            <p>Get started by installing the SUSE AI Universal Proxy to manage your MCP endpoints.</p>
+          </div>
+
+          <div class="install-action">
+            <button class="btn btn-primary install-button" @click="startInstallProcess">
+              <i class="icon icon-plus"></i>
+              Install Instance
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="!proxyInstalled || showConfigurationWizard" class="wizard-container">
      <!-- Wizard Header -->
      <div class="wizard-header">
         <h1>Install Universal Proxy</h1>
@@ -594,10 +621,10 @@ export default defineComponent({
     const checkForExistingService = async () => {
       checkingService.value = true;
       try {
-        await MCPService.getAdapters();
-        serviceFound.value = true;
-        serviceUrl.value = 'http://localhost:8911';
-        logger.info('Existing SUSE AI Universal Proxy service found');
+        const isResponding = await MCPService.ping();
+        serviceFound.value = isResponding;
+        serviceUrl.value = isResponding ? 'http://localhost:8911' : '';
+        logger.info(isResponding ? 'Existing SUSE AI Universal Proxy service found' : 'No existing SUSE AI Universal Proxy service found');
       } catch (err) {
         serviceFound.value = false;
         serviceUrl.value = '';
@@ -614,6 +641,12 @@ export default defineComponent({
 
     const selectInstallNew = () => {
       useExistingService.value = false;
+    };
+
+    const startInstallProcess = async () => {
+      showInstallButton.value = false;
+      await checkForExistingService();
+      showConfigurationWizard.value = true;
     };
 
     // Handle next button
@@ -850,9 +883,6 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
 
     // Lifecycle
     onMounted(async () => {
-      // Check for existing service first
-      await checkForExistingService();
-
       if (hasSelectedServices.value) {
         loadData();
         // Start polling for updates every 30 seconds
@@ -918,7 +948,9 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
        canProceed,
        checkForExistingService,
        // Configuration mode
-       showConfigurationWizard
+       showConfigurationWizard,
+       showInstallButton,
+       startInstallProcess
     };
   }
 });
@@ -1640,6 +1672,87 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
 }
 
 .installed-section .install-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Install Instance Container */
+.install-instance-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  width: 100%;
+}
+
+.install-instance-container .empty-state {
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+}
+
+.install-instance-container .empty-state-content {
+  padding: 40px 20px;
+}
+
+.install-instance-container .app-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.install-instance-container .app-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--accent-btn);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+}
+
+.install-instance-container .app-icon i {
+  font-size: 24px;
+  color: var(--primary);
+}
+
+.install-instance-container .app-info h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.install-instance-container .empty-message {
+  margin-bottom: 32px;
+}
+
+.install-instance-container .empty-message h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.install-instance-container .empty-message p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.install-instance-container .install-action {
+  display: flex;
+  justify-content: center;
+}
+
+.install-instance-container .install-button {
   display: flex;
   align-items: center;
   gap: 8px;
