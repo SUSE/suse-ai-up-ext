@@ -4,21 +4,21 @@ export class RancherAppsService {
   // Stub
 }
 
-export function discoverExistingInstall() {}
-export function getClusters() {}
-export function listCatalogApps() {}
-export function getInstalledAppDetails() {}
-export function deleteApp() {}
-export function findChartInRepo() {}
-export function ensureNamespace() {}
-export function createOrUpgradeApp() {}
-export function listChartVersions() {}
-export function fetchChartDefaultValues() {}
-export function ensureRegistrySecretSimple() {}
-export function ensureServiceAccountPullSecret() {}
-export function ensurePullSecretOnAllSAs() {}
-export function waitForSecretReady() {}
-export function waitForAppInstall() {}
-export function appExists() {}
-export function getInstalledHelmDetails() {}
-export function inferClusterRepoForChart() {}
+export function discoverExistingInstall(store: any, slug: string, chartName: string, cluster: string): Promise<any> { return Promise.resolve(null); }
+export function getClusters(store: any): Promise<any[]> { return Promise.resolve([]); }
+export function listCatalogApps(store: any, clusterId: string): Promise<any[]> { return Promise.resolve([]); }
+export function getInstalledAppDetails(store: any, cluster: string, namespace: string, release: string): Promise<any> { return Promise.resolve(null); }
+export function deleteApp(store: any, clusterId: string, namespace: string, releaseName: string): Promise<void> { return Promise.resolve(); }
+export function findChartInRepo(store: any, cluster: string, repo: string, slug: string): Promise<any> { return Promise.resolve(null); }
+export function ensureNamespace(store: any, cluster: string, namespace: string): Promise<void> { return Promise.resolve(); }
+export function createOrUpgradeApp(store: any, clusterId: string, namespace: string, release: string, chart: any, values: any, action: string): Promise<any> { return Promise.resolve(null); }
+export function listChartVersions(store: any, cluster: string, repo: string, chartName: string): Promise<any[]> { return Promise.resolve([]); }
+export function fetchChartDefaultValues(store: any, cluster: string, repo: string, chartName: string, version: string): Promise<string> { return Promise.resolve(''); }
+export function ensureRegistrySecretSimple(store: any, clusterId: string, namespace: string, registryHost: string, secretName: string, username: string, password: string): Promise<string> { return Promise.resolve(''); }
+export function ensureServiceAccountPullSecret(store: any, cluster: string, namespace: string, sa: string, secretName: string): Promise<void> { return Promise.resolve(); }
+export function ensurePullSecretOnAllSAs(store: any, cluster: string, namespace: string, secretName: string): Promise<void> { return Promise.resolve(); }
+export function waitForSecretReady(): Promise<void> { return Promise.resolve(); }
+export function waitForAppInstall(store: any, cluster: string, namespace: string, release: string, timeout: number): Promise<void> { return Promise.resolve(); }
+export function appExists(store: any, clusterId: string, namespace: string, release: string): Promise<boolean> { return Promise.resolve(false); }
+export function getInstalledHelmDetails(store: any, cluster: string, namespace: string, release: string): Promise<any> { return Promise.resolve(null); }
+export function inferClusterRepoForChart(store: any, chartName: string, chartVersion?: string): Promise<string | null> { return Promise.resolve(null); }

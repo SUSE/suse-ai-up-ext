@@ -2,74 +2,13 @@
   <div v-if="isVisible" class="modal-overlay" @click="closeModal">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h3>{{ props.manualMode ? 'Manual MCP Scan' : 'Schedule MCP Scan' }}</h3>
+        <h3>MCP Discovery Scan</h3>
         <button class="btn btn-sm btn-secondary" @click="closeModal">&times;</button>
       </div>
       <div class="modal-body">
-        <div v-if="!props.manualMode" class="form-group">
-          <label for="scheduleType">Schedule Type:</label>
-          <select id="scheduleType" v-model="scheduleType" class="form-control">
-            <option value="once">Run Once</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="custom">Custom Cron</option>
-          </select>
-        </div>
-
-        <div v-if="!props.manualMode && scheduleType === 'once'" class="form-group">
-          <label for="runDateTime">Run Date & Time:</label>
-          <input
-            type="datetime-local"
-            id="runDateTime"
-            v-model="runDateTime"
-            class="form-control"
-            :min="minDateTime"
-          />
-        </div>
-
-        <div v-if="!props.manualMode && scheduleType === 'daily'" class="form-group">
-          <label for="dailyTime">Time (HH:MM):</label>
-          <input
-            type="time"
-            id="dailyTime"
-            v-model="dailyTime"
-            class="form-control"
-          />
-        </div>
-
-        <div v-if="!props.manualMode && scheduleType === 'weekly'" class="form-group">
-          <label for="weeklyDay">Day of Week:</label>
-          <select id="weeklyDay" v-model="weeklyDay" class="form-control">
-            <option value="0">Sunday</option>
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6">Saturday</option>
-          </select>
-        </div>
-
-        <div v-if="!props.manualMode && scheduleType === 'weekly'" class="form-group">
-          <label for="weeklyTime">Time (HH:MM):</label>
-          <input
-            type="time"
-            id="weeklyTime"
-            v-model="weeklyTime"
-            class="form-control"
-          />
-        </div>
-
-        <div v-if="!props.manualMode && scheduleType === 'custom'" class="form-group">
-          <label for="cronExpression">Cron Expression:</label>
-          <input
-            type="text"
-            id="cronExpression"
-            v-model="cronExpression"
-            class="form-control"
-            placeholder="0 0 * * * (daily at midnight)"
-          />
-          <small class="form-help">Format: minute hour day month day-of-week</small>
+        <div class="form-group">
+          <label>Discovery Scan Configuration:</label>
+          <p class="form-description">Configure the parameters for discovering MCP servers on your network.</p>
         </div>
 
         <div class="form-group">
@@ -157,7 +96,7 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="closeModal">Cancel</button>
         <button class="btn btn-primary" @click="scheduleScan" :disabled="!isValid || scanning">
-          {{ scanning ? (props.manualMode ? 'Scanning...' : 'Scheduling...') : (props.manualMode ? 'Start Scan' : 'Schedule Scan') }}
+          {{ scanning ? 'Scanning...' : 'Start' }}
         </button>
       </div>
     </div>
@@ -165,35 +104,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref } from 'vue';
 import { MCPService, type ScanConfig } from '../../services/mcp-service';
 import { logger } from '../../utils/logger';
-
-// Props
-interface Props {
-  manualMode?: boolean;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  manualMode: false
-});
 
 // Emits
 const emit = defineEmits<{
   scanStarted: [];
+  close: [];
 }>();
+
 
 const isVisible = ref(false);
 const scanning = ref(false);
 const error = ref<string>('');
 
-// Schedule configuration
-const scheduleType = ref<'once' | 'daily' | 'weekly' | 'custom'>('once');
-const runDateTime = ref('');
-const dailyTime = ref('00:00');
-const weeklyDay = ref('1'); // Monday
-const weeklyTime = ref('00:00');
-const cronExpression = ref('0 0 * * *');
+
 
 // Scan configuration
 const scanConfig = ref<ScanConfig>({
@@ -204,31 +130,11 @@ const scanConfig = ref<ScanConfig>({
 } as ScanConfig);
 
 // Computed properties
-const minDateTime = computed(() => {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() + 1); // At least 1 minute from now
-  return now.toISOString().slice(0, 16);
-});
-
 const isValid = computed(() => {
-  if (props.manualMode) {
-    // For manual scans, only require scan configuration
-    return true;
-  }
-
-  if (scheduleType.value === 'once') {
-    return runDateTime.value && new Date(runDateTime.value) > new Date();
-  }
-  if (scheduleType.value === 'daily') {
-    return dailyTime.value;
-  }
-  if (scheduleType.value === 'weekly') {
-    return weeklyDay.value && weeklyTime.value;
-  }
-  if (scheduleType.value === 'custom') {
-    return cronExpression.value.trim().length > 0;
-  }
-  return false;
+  // Validate scan configuration
+  return scanConfig.value.scanRanges.length > 0 &&
+         scanConfig.value.ports.length > 0 &&
+         scanConfig.value.maxConcurrent > 0;
 });
 
 // Methods
@@ -240,20 +146,14 @@ const openModal = () => {
 const closeModal = () => {
   isVisible.value = false;
   reset();
+  emit('close');
 };
 
 const reset = () => {
   error.value = '';
-  // In manual mode, default to immediate execution
-  scheduleType.value = props.manualMode ? 'once' : 'once';
-  runDateTime.value = props.manualMode ? '' : '';
-  dailyTime.value = '00:00';
-  weeklyDay.value = '1';
-  weeklyTime.value = '00:00';
-  cronExpression.value = '0 0 * * *';
   scanConfig.value = {
     maxConcurrent: 10,
-    ports: [8000, 3000, 5000],
+    ports: [8911],
     scanRanges: ['192.168.1.0/24'],
     timeout: '30s'
   };
@@ -292,16 +192,9 @@ const scheduleScan = async () => {
 
     await MCPService.startScan(scanConfig.value);
 
-    if (props.manualMode) {
-      // For manual scans, emit event and show different message
-      logger.info('Manual scan started', { data: { config: scanConfig.value } });
-      alert('Manual scan started! Check discovered servers in a few moments.');
-      emit('scanStarted');
-    } else {
-      // For scheduled scans, show success message
-      logger.info('Scan scheduled successfully', { data: { scheduleType: scheduleType.value, config: scanConfig.value, runAt: runDateTime.value } });
-      alert('Scan scheduled successfully!');
-    }
+    logger.info('Discovery scan started', { data: { config: scanConfig.value } });
+    alert('Discovery scan started! Check discovered servers in a few moments.');
+    emit('scanStarted');
 
     closeModal();
   } catch (err) {
@@ -314,8 +207,7 @@ const scheduleScan = async () => {
 
 // Expose methods to parent component
 defineExpose({
-  openModal,
-  closeModal
+  openModal
 });
 </script>
 

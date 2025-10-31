@@ -222,10 +222,17 @@ export default defineComponent({
         const clusterSummaries = await getAllClusterResourceMetrics(store);
         
         // Check compatibility for each cluster
-        const clustersWithCompatibility = clusterSummaries.map(cluster => 
+        const compatibilityPromises = clusterSummaries.map(cluster =>
           checkAppCompatibility(props.appSlug, cluster, props.appName)
         );
-        
+        const compatibilityResults = await Promise.all(compatibilityPromises);
+
+        // Combine cluster summaries with compatibility results
+        const clustersWithCompatibility = clusterSummaries.map((cluster, index) => ({
+          ...cluster,
+          compatible: compatibilityResults[index]
+        }));
+
         clusters.value = clustersWithCompatibility;
         console.log('[SUSE-AI] ClusterResourceTable: Loaded', clusters.value.length, 'clusters');
         

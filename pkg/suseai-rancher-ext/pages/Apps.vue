@@ -301,7 +301,7 @@ export default defineComponent({
     const selectedRepo = ref('suse-ai-apps');
     const selectedCategory = ref('all');
     const viewMode = ref('tiles'); // Default to tiles view
-    const items = ref<AppCollectionItem[]>([]);
+    const items = ref<any[]>([]);
     const clusters = ref<Array<{id: string; name: string}>>([]);
     const repositories = ref<AppRepository[]>([]);
     const allRepositoryApps = ref<{ [repoName: string]: AppCollectionItem[] }>({});
@@ -310,7 +310,7 @@ export default defineComponent({
 
     // Computed properties - using local data for now until store is fully integrated
     const filteredApps = computed(() => {
-      let arr: AppCollectionItem[] = [];
+      let arr: any[] = [];
 
       // Select apps based on repository
       if (selectedRepo.value === 'suse-ai-apps') {
@@ -320,7 +320,7 @@ export default defineComponent({
         const appMap = new Map<string, AppCollectionItem>();
 
         // Add SUSE AI apps first
-        items.value.forEach((app: AppCollectionItem) => {
+        items.value.forEach((app: any) => {
           appMap.set(app.slug_name, app);
         });
 

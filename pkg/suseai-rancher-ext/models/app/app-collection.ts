@@ -496,4 +496,5 @@ export interface AppRepository {
   name: string;
   url: string;
   displayName: string;
+  type?: string;
 }

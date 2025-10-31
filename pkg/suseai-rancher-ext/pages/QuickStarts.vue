@@ -297,7 +297,7 @@ export default defineComponent({
     const selectedRepo = ref('');
     const selectedCategory = ref('all');
     const viewMode = ref('tiles'); // Default to tiles view
-    const items = ref<AppCollectionItem[]>([]);
+    const items = ref<any[]>([]);
     const repoLoading = ref(false);
     const clusters = ref<Array<{id: string; name: string}>>([]);
     const repositories = ref<AppRepository[]>([]);
@@ -306,7 +306,7 @@ export default defineComponent({
 
     // Computed properties
     const filteredApps = computed(() => {
-      let arr: AppCollectionItem[] = [];
+      let arr: any[] = [];
 
       // Select apps based on repository
       if (selectedRepo.value) {
@@ -317,7 +317,7 @@ export default defineComponent({
 
       // Apply category filter
       if (selectedCategory.value !== 'all') {
-        arr = arr.filter((app: AppCollectionItem) => app.packaging_format === selectedCategory.value);
+        arr = arr.filter((app: any) => app.packaging_format === selectedCategory.value);
       }
 
       // Apply search filter
@@ -448,7 +448,7 @@ export default defineComponent({
         if (!allRepositoryApps.value[repoName]) {
           if (repoName === 'suseai-bundles') {
             // Mock data for suseai-bundles
-            const repoApps: AppCollectionItem[] = [
+            const repoApps: any[] = [
               {
                 name: 'AI Assistant Bundle',
                 slug_name: 'ai-assistant-bundle',

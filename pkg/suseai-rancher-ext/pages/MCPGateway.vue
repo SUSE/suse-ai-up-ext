@@ -267,142 +267,143 @@
           <span class="metric-value" v-if="!loading">{{ errorRate }}</span>
           <span class="metric-value" v-else>...</span>
         </div>
-      </div>
+       </div>
 
-      <div class="action-buttons">
-        <button
-          class="btn role-primary"
-          @click="handleManualScan"
-          :disabled="scanning"
-        >
-          <i v-if="scanning" class="icon icon-spinner icon-spin mr-5"></i>
-          {{ scanning ? 'Scanning...' : 'Manual MCP scan' }}
-        </button>
-        <button class="btn role-secondary" @click="handleScheduleScan">
-          Schedule MCP Scan
-        </button>
-        <button class="btn role-secondary" @click="handleCreateAdapter">
-          Create Adapter
-        </button>
-        <button class="btn role-secondary" @click="handleSecurityCheck">
-          MCP Security Check
-        </button>
-      </div>
 
-      <div class="endpoints-section">
-       <h2>Endpoint Status</h2>
-       <table class="endpoints-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Requests/min</th>
-              <th>Errors</th>
-              <th>Last Activity</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="loading">
-              <td colspan="6" class="loading-row">Loading adapters...</td>
-            </tr>
-            <tr v-else-if="error">
-              <td colspan="6" class="error-row">{{ error }}</td>
-            </tr>
-            <tr v-else-if="adapters.length === 0">
-              <td colspan="6" class="empty-row">No adapters found</td>
-            </tr>
-            <tr v-else v-for="adapter in adapters" :key="adapter.id">
-              <td>{{ adapter.name }}</td>
-              <td>
-                <span :class="adapter.replicaCount && adapter.replicaCount > 0 ? 'status-active' : 'status-inactive'">
-                  {{ adapter.replicaCount && adapter.replicaCount > 0 ? 'Active' : 'Inactive' }}
-                </span>
-              </td>
-              <td>-</td>
-              <td>0</td>
-              <td>{{ adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleString() : 'Unknown' }}</td>
-              <td>
-                <div class="action-buttons">
-                  <button class="btn btn-sm role-secondary" @click="viewAdapterDetails(adapter)" title="View Details">
-                    <i class="icon icon-info"></i>
-                  </button>
-                  <button class="btn btn-sm role-secondary" @click="viewAdapterLogs(adapter)" title="View Logs">
-                    <i class="icon icon-file"></i>
-                  </button>
-                  <button class="btn btn-sm role-secondary" @click="editAdapter(adapter)" title="Edit">
-                    <i class="icon icon-edit"></i>
-                  </button>
-                  <button class="btn btn-sm role-secondary" @click="deleteAdapter(adapter)" title="Delete">
-                    <i class="icon icon-trash"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
 
-      <div class="discovered-servers-section">
-        <h2>Discovered MCP Servers</h2>
-        <table class="discovered-servers-table">
-          <thead>
-            <tr>
-              <th>Address</th>
-              <th>Protocol</th>
-              <th>Connection</th>
-              <th>Status</th>
-              <th>Last Seen</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="loading">
-              <td colspan="6" class="loading-row">Loading discovered servers...</td>
-            </tr>
-            <tr v-else-if="discoveredServers.length === 0">
-              <td colspan="6" class="empty-row">No servers discovered yet. Run a scan to find MCP servers.</td>
-            </tr>
-            <tr v-else v-for="server in discoveredServers" :key="server.id">
-              <td>{{ server.address }}</td>
-              <td>{{ server.protocol || 'MCP' }}</td>
-              <td>{{ server.connection || 'StreamableHttp' }}</td>
-              <td>
-                <span :class="server.status === 'healthy' ? 'status-active' : 'status-inactive'">
-                  {{ server.status || 'unknown' }}
-                </span>
-              </td>
-              <td>{{ server.lastSeen ? new Date(server.lastSeen).toLocaleString() : 'Never' }}</td>
-              <td>
-                <button
-                  class="btn btn-sm role-primary"
-                  @click="registerServer(server)"
-                  :disabled="server.status !== 'healthy'"
-                >
-                  Register
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <div class="endpoints-section">
+        <h2>Registered MCP Adapters</h2>
+        <table class="endpoints-table">
+           <thead>
+             <tr>
+               <th>Name</th>
+               <th>Status</th>
+               <th>Protocol</th>
+               <th>Endpoint</th>
+               <th>Errors</th>
+               <th>Last Active</th>
+               <th>Actions</th>
+             </tr>
+           </thead>
+           <tbody>
+             <tr v-if="loading">
+               <td colspan="7" class="loading-row">Loading adapters...</td>
+             </tr>
+             <tr v-else-if="error">
+               <td colspan="7" class="error-row">{{ error }}</td>
+             </tr>
+             <tr v-else-if="adapters.length === 0">
+               <td colspan="7" class="empty-row">No adapters registered</td>
+             </tr>
+             <tr v-else v-for="adapter in adapters" :key="adapter.id">
+               <td>{{ adapter.name }}</td>
+               <td>
+                 <span :class="adapter.status === 'active' || adapter.status === 'healthy' ? 'status-active' : 'status-inactive'">
+                   {{ adapter.status || 'unknown' }}
+                 </span>
+               </td>
+               <td>{{ adapter.protocol || 'MCP' }}</td>
+               <td>{{ adapter.endpoint || '-' }}</td>
+               <td>{{ adapter.errorCount || 0 }}</td>
+               <td>{{ adapter.lastActive ? new Date(adapter.lastActive).toLocaleString() : 'Never' }}</td>
+               <td>
+                 <div class="action-buttons">
+                   <button class="btn btn-sm role-secondary" @click="viewAdapterDetails(adapter)" title="View Details">
+                     <i class="icon icon-info"></i>
+                   </button>
+                   <button class="btn btn-sm role-secondary" @click="viewAdapterLogs(adapter)" title="View Logs">
+                     <i class="icon icon-file"></i>
+                   </button>
+                   <button class="btn btn-sm role-secondary" @click="editAdapter(adapter)" title="Edit">
+                     <i class="icon icon-edit"></i>
+                   </button>
+                   <button class="btn btn-sm role-secondary" @click="deleteAdapter(adapter)" title="Delete">
+                     <i class="icon icon-trash"></i>
+                   </button>
+                 </div>
+               </td>
+             </tr>
+           </tbody>
+         </table>
+       </div>
 
-      <!-- Schedule Scan Modal -->
-      <ScheduleScanModal ref="scheduleScanModal" :manual-mode="isManualScanMode" @scan-started="onScanStarted" />
+       <div class="discovered-servers-section">
+         <h2>Discovered MCP Servers</h2>
+          <table class="discovered-servers-table">
+            <thead>
+              <tr>
+                <th>Risk Status</th>
+                <th>Address</th>
+                <th>Port</th>
+                <th>Protocol</th>
+                <th>Connection</th>
+                <th>Status</th>
+                <th>Discovered At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+           <tbody>
+              <tr v-if="loading">
+                <td colspan="8" class="loading-row">Loading discovered servers...</td>
+              </tr>
+              <tr v-else-if="discoveredServers.length === 0">
+                <td colspan="8" class="empty-row">No servers discovered yet.</td>
+              </tr>
+              <tr v-else v-for="server in discoveredServers" :key="server.id">
+                <td>
+                  <span
+                    v-if="server.vulnerability_score"
+                    :class="getRiskBadgeClass(server.vulnerability_score)"
+                  >
+                    {{ getRiskLabel(server.vulnerability_score) }}
+                  </span>
+                  <span v-else class="badge badge-secondary">Unknown</span>
+                </td>
+                <td>{{ getAddressWithoutPort(server.address) }}</td>
+                <td>{{ getPortFromAddress(server.address) || server.port || '8911' }}</td>
+                <td>{{ server.protocol || 'MCP' }}</td>
+                <td>HTTP</td>
+                <td>
+                  <span :class="['badge', getStatusBadgeClass(server.status)]">
+                    {{ getStatusLabel(server.status) }}
+                  </span>
+                </td>
+                <td>{{ server.discoveredAt ? new Date(server.discoveredAt).toLocaleString() : (server.lastSeen ? new Date(server.lastSeen).toLocaleString() : 'Unknown') }}</td>
+                <td>
+                  <div class="action-buttons">
+                    <button
+                      class="btn btn-sm role-secondary"
+                      @click="viewServerScanResults(server)"
+                      title="View Scan Results"
+                    >
+                      <i class="icon icon-info"></i>
+                      View
+                    </button>
+                    <button
+                      class="btn btn-sm role-primary"
+                      @click="registerServer(server)"
+                      :disabled="server.status !== 'healthy' && server.status !== 'active'"
+                    >
+                      Register
+                    </button>
+                  </div>
+                </td>
+              </tr>
+           </tbody>
+         </table>
+       </div>
 
-      <!-- Create Adapter Modal -->
-      <CreateAdapterModal ref="createAdapterModal" />
-    </div>
-  </template>
+
+     </div>
+   </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, getCurrentInstance, onMounted, onUnmounted } from 'vue';
+import { defineComponent, computed, ref, getCurrentInstance, onMounted, onUnmounted, nextTick } from 'vue';
 import { useStore } from 'vuex';
 import { logger } from '../utils/logger';
 import { MCPService } from '../services/mcp-service';
 import type { AdapterResource, DiscoveredServer } from '../services/mcp-service';
-import ScheduleScanModal from '../components/shared/ScheduleScanModal.vue';
-import CreateAdapterModal from '../components/shared/CreateAdapterModal.vue';
+
 
 interface Service {
   id: string;
@@ -434,23 +435,19 @@ export default defineComponent({
 
     // Configuration mode
     const showConfigurationWizard = ref(false);
+    const showInstallButton = ref(true);
 
     // MCP Gateway state
     const discoveredServers = ref<DiscoveredServer[]>([]);
     const adapters = ref<AdapterResource[]>([]);
     const loading = ref(false);
     const error = ref<string | null>(null);
-    const scanning = ref(false);
+
 
     // Polling
     let pollInterval: number | null = null;
 
-    // Modal refs
-    const scheduleScanModal = ref<any>(null);
-    const createAdapterModal = ref<any>(null);
 
-    // Modal state
-    const isManualScanMode = ref(false);
 
     // Services data
     const services: Service[] = [
@@ -604,7 +601,7 @@ export default defineComponent({
       } catch (err) {
         serviceFound.value = false;
         serviceUrl.value = '';
-        logger.debug('No existing SUSE AI Universal Proxy service found');
+        logger.info('No existing SUSE AI Universal Proxy service found');
       } finally {
         checkingService.value = false;
       }
@@ -643,7 +640,8 @@ export default defineComponent({
     // MCP Gateway methods
     const fetchDiscoveredServers = async () => {
       try {
-        discoveredServers.value = await MCPService.getDiscoveredServers();
+        const servers = await MCPService.getDiscoveredServers();
+        discoveredServers.value = servers;
       } catch (err) {
         logger.error('Failed to fetch discovered servers', err);
         // Continue - this is not critical
@@ -652,7 +650,8 @@ export default defineComponent({
 
     const fetchAdapters = async () => {
       try {
-        adapters.value = await MCPService.getAdapters();
+        const adaptersData = await MCPService.getAdapters();
+        adapters.value = adaptersData;
       } catch (err) {
         logger.error('Failed to fetch adapters', err);
         error.value = 'Failed to load MCP adapters';
@@ -674,60 +673,9 @@ export default defineComponent({
       }
     };
 
-    const handleManualScan = () => {
-      isManualScanMode.value = true;
-      scheduleScanModal.value?.openModal();
-    };
 
-    const handleScheduleScan = () => {
-      isManualScanMode.value = false;
-      scheduleScanModal.value?.openModal();
-    };
 
-    const handleCreateAdapter = () => {
-      createAdapterModal.value?.openModal();
-    };
 
-    const onScanStarted = async () => {
-      // Refresh discovered servers after a manual scan
-      await fetchDiscoveredServers();
-    };
-
-    const handleSecurityCheck = async () => {
-      try {
-        // Perform basic security checks on adapters
-        const securityIssues: string[] = [];
-
-        for (const adapter of adapters.value) {
-          // Check for insecure configurations
-          if (!adapter.useWorkloadIdentity) {
-            securityIssues.push(`${adapter.name}: Not using workload identity`);
-          }
-
-          if (adapter.connectionType === 'StreamableHttp') {
-            // Additional checks for HTTP connections
-            securityIssues.push(`${adapter.name}: Using HTTP connection (consider SSE for better security)`);
-          }
-
-          // Check replica count
-          if (!adapter.replicaCount || adapter.replicaCount < 1) {
-            securityIssues.push(`${adapter.name}: No replicas configured`);
-          }
-        }
-
-        if (securityIssues.length === 0) {
-          alert('Security check passed: No issues found');
-        } else {
-          alert(`Security check found ${securityIssues.length} issue(s):\n\n${securityIssues.join('\n')}`);
-        }
-
-        logger.info('Security check completed', { data: { issues: securityIssues.length } });
-
-      } catch (err) {
-        logger.error('Failed to perform security check', err);
-        error.value = 'Failed to perform security check';
-      }
-    };
 
     const registerServer = async (server: DiscoveredServer) => {
       try {
@@ -777,7 +725,7 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
     const viewAdapterLogs = async (adapter: AdapterResource) => {
       try {
         const logsResponse = await MCPService.getAdapterLogs(adapter.name);
-        alert(`Logs for ${adapter.name}:\n\n${logsResponse.logs}`);
+        alert(`Logs for ${adapter.name}:\n\n${logsResponse}`);
       } catch (err) {
         logger.error('Failed to fetch adapter logs', err);
         alert('Failed to fetch adapter logs');
@@ -802,17 +750,102 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
       }
     };
 
+    const getRiskBadgeClass = (score: string) => {
+      switch (score) {
+        case 'high':
+          return 'badge badge-danger';
+        case 'medium':
+          return 'badge badge-warning';
+        case 'low':
+          return 'badge badge-success';
+        default:
+          return 'badge badge-secondary';
+      }
+    };
+
+    const getRiskLabel = (score: string) => {
+      switch (score) {
+        case 'high':
+          return 'High Risk';
+        case 'medium':
+          return 'Medium Risk';
+        case 'low':
+          return 'Low Risk';
+        default:
+          return 'Unknown';
+      }
+    };
+
+    const getAddressWithoutPort = (address: string) => {
+      if (!address) return '';
+      const colonIndex = address.lastIndexOf(':');
+      if (colonIndex > 0) {
+        return address.substring(0, colonIndex);
+      }
+      return address;
+    };
+
+    const getPortFromAddress = (address: string) => {
+      if (!address) return null;
+      const colonIndex = address.lastIndexOf(':');
+      if (colonIndex > 0) {
+        const port = address.substring(colonIndex + 1);
+        return port;
+      }
+      return null;
+    };
+
+    const getStatusBadgeClass = (status: string) => {
+      switch (status) {
+        case 'healthy':
+        case 'active':
+          return 'badge-success';
+        case 'error':
+        case 'failed':
+          return 'badge-danger';
+        case 'warning':
+          return 'badge-warning';
+        default:
+          return 'badge-secondary';
+      }
+    };
+
+    const getStatusLabel = (status: string) => {
+      switch (status) {
+        case 'healthy':
+        case 'active':
+          return 'Available';
+        case 'error':
+        case 'failed':
+          return 'Not Available';
+        case 'warning':
+          return 'Warning';
+        default:
+          return 'Unknown';
+      }
+    };
+
+    const viewServerScanResults = (server: DiscoveredServer) => {
+      if (server.scan_results) {
+        const results = JSON.stringify(server.scan_results, null, 2);
+        alert(`Scan Results for ${server.address}:${server.port || '8911'}\n\n${results}`);
+      } else {
+        alert(`No scan results available for ${server.address}:${server.port || '8911'}`);
+      }
+    };
+
     // Computed metrics
     const discoveredCount = computed(() => discoveredServers.value.length);
     const registeredCount = computed(() => adapters.value.length);
     const availableCount = computed(() => {
-      // For now, assume all adapters are available
-      // TODO: Check actual status from adapter status endpoint
-      return adapters.value.length;
+      return adapters.value.filter(adapter => adapter.status === 'active' || adapter.status === 'healthy').length;
     });
     const errorRate = computed(() => {
-      // TODO: Calculate actual error rate from adapter metrics
-      return '0.1%';
+      const totalErrors = adapters.value.reduce((sum, adapter) => sum + (adapter.errorCount || 0), 0);
+      const totalRequests = adapters.value.reduce((sum, adapter) => sum + (adapter.requestCount || 0), 0);
+      if (totalRequests === 0) return '0%';
+      const rate = (totalErrors / totalRequests) * 100;
+      return rate.toFixed(2) + '%';
     });
 
     // Lifecycle
@@ -824,7 +857,7 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
         loadData();
         // Start polling for updates every 30 seconds
         pollInterval = window.setInterval(() => {
-          if (!loading.value && !scanning.value) {
+          if (!loading.value) {
             fetchDiscoveredServers();
             fetchAdapters();
           }
@@ -861,40 +894,31 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
       adapters,
       loading,
       error,
-      scanning,
       discoveredCount,
       registeredCount,
       availableCount,
       errorRate,
       // MCP Gateway methods
       loadData,
-      handleManualScan,
-      handleScheduleScan,
-      handleCreateAdapter,
-      handleSecurityCheck,
       registerServer,
       viewAdapterDetails,
       viewAdapterLogs,
       editAdapter,
       deleteAdapter,
-      selectExistingService,
-      selectInstallNew,
-      handleNext,
-      canProceed,
-      checkForExistingService,
-      onScanStarted,
-      // Modal refs
-      scheduleScanModal,
-      createAdapterModal,
-      // Modal state
-      isManualScanMode,
-      // Service discovery
-      serviceFound,
-      serviceUrl,
-      checkingService,
-      useExistingService,
-      // Configuration mode
-      showConfigurationWizard
+      getRiskBadgeClass,
+      getRiskLabel,
+      getAddressWithoutPort,
+      getPortFromAddress,
+      getStatusBadgeClass,
+       getStatusLabel,
+       viewServerScanResults,
+       selectExistingService,
+       selectInstallNew,
+       handleNext,
+       canProceed,
+       checkForExistingService,
+       // Configuration mode
+       showConfigurationWizard
     };
   }
 });
@@ -1774,6 +1798,43 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
   color: var(--muted, #6b7280);
   font-style: italic;
   padding: 20px;
+}
+
+/* Badges (matching VirtualMCP styles) */
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.badge-success {
+  background: #28a745;
+  color: white;
+}
+
+.badge-warning {
+  background: #ffc107;
+  color: #212529;
+  animation: pulse 1s infinite;
+}
+
+.badge-danger {
+  background: #dc3545;
+  color: white;
+}
+
+.badge-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
 
 .btn-sm {

@@ -246,19 +246,11 @@
 
 <script lang="ts">
 import { defineComponent, computed, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue';
-import type { AppInstallationSummary } from '../types/app-types';
+import type { AppInstallationSummary, InstanceData } from '../types/app-types';
 import type { AppCollectionItem } from '../services/app-collection';
 import { fetchSuseAiApps } from '../services/app-collection';
 import { discoverExistingInstall, getClusters, listCatalogApps, getInstalledAppDetails, deleteApp } from '../services/rancher-apps';
 import { PRODUCT } from '../config/suseai';
-
-interface InstanceData extends AppInstallationSummary {
-  instanceName?: string;
-  description?: string;
-  clusterName?: string;
-  chartVersion?: string;
-  appVersion?: string;
-}
 
 export default defineComponent({
   name: 'AppInstances',
@@ -590,7 +582,7 @@ export default defineComponent({
                   chartVersion: spec?.chart?.metadata?.version || spec?.version || '',
                   appVersion: spec?.chart?.metadata?.version || '', // AppVersion is usually same as chart version
                   lastDeployed: meta?.annotations?.['cattle.io/timestamp'] || '',
-                  ready,
+                  ready: instanceStatus === 'deployed',
                   error: errorMessage
                 };
 

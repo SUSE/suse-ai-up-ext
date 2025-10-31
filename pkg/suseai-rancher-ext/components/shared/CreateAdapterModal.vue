@@ -139,6 +139,12 @@ import { ref, computed, watch } from 'vue';
 import { MCPService, type AdapterData } from '../../services/mcp-service';
 import { logger } from '../../utils/logger';
 
+// Emits
+const emit = defineEmits<{
+  adapterCreated: [];
+  close: [];
+}>();
+
 const isVisible = ref(false);
 const creating = ref(false);
 const error = ref<string>('');
@@ -226,11 +232,8 @@ const createAdapter = async () => {
   try {
     await MCPService.createAdapter(adapterData.value);
     logger.info('Adapter created successfully', { data: { adapterName: adapterData.value.name } });
+    emit('adapterCreated');
     closeModal();
-
-    // Emit event to parent component to refresh data
-    // This would need to be handled by the parent component
-
   } catch (err) {
     logger.error('Failed to create adapter', err);
     error.value = 'Failed to create adapter. Please try again.';

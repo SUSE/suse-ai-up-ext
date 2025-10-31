@@ -16,4 +16,5 @@ export interface InstanceData extends AppInstallationSummary {
   clusterName?: string;
   chartVersion?: string;
   appVersion?: string;
+  ready?: boolean;
 }
