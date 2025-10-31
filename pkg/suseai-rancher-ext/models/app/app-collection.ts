@@ -489,3 +489,11 @@ export class AppCollection {
     return this.apps.map(app => app.toJSON());
   }
 }
+
+export type AppCollectionItem = AppResource;
+
+export interface AppRepository {
+  name: string;
+  url: string;
+  displayName: string;
+}

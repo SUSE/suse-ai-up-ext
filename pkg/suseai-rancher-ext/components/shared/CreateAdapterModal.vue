@@ -93,7 +93,7 @@
         <div class="form-group">
           <label>Environment Variables:</label>
           <div class="env-vars">
-            <div v-for="(value, key, index) in adapterData.environmentVariables" :key="index" class="env-var-item">
+            <div v-for="(item, index) in envVarKeys" :key="index" class="env-var-item">
               <input
                 type="text"
                 v-model="envVarKeys[index]"
@@ -137,7 +137,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { MCPService, type AdapterData } from '../../services/mcp-service';
-import { log as logger } from '../../utils/logger';
+import { logger } from '../../utils/logger';
 
 const isVisible = ref(false);
 const creating = ref(false);

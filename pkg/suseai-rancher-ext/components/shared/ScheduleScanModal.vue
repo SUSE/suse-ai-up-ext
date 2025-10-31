@@ -167,7 +167,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { MCPService, type ScanConfig } from '../../services/mcp-service';
-import { log as logger } from '../../utils/logger';
+import { logger } from '../../utils/logger';
 
 // Props
 interface Props {

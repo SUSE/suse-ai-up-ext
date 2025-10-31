@@ -74,7 +74,7 @@
 <script lang="ts">
 import { defineComponent, computed } from 'vue';
 import type { PropType } from 'vue';
-import type { AppCollectionItem, AppRepository } from '../../services/app-collection';
+import type { AppCollectionItem, AppRepository } from '../../models/app/app-collection';
 
 export default defineComponent({
   name: 'AppResourceTable',

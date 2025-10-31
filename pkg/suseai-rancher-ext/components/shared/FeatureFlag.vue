@@ -6,8 +6,8 @@
 
 <script lang="ts">
 import { defineComponent, computed, getCurrentInstance } from 'vue';
-import { featureEnabled, getClusterVersion } from '../../utils/feature-flags';
-import type { FeatureFlag } from '../../utils/feature-flags';
+import { featureEnabled, getClusterVersion } from '../../config/feature-flags';
+import type { FeatureFlag } from '../../config/feature-flags';
 
 export default defineComponent({
   name: 'FeatureFlag',

@@ -11,7 +11,7 @@
 <script lang="ts">
 import { defineComponent, computed } from 'vue';
 import type { PropType } from 'vue';
-import type { AppCollectionItem } from '../../services/app-collection';
+import type { AppCollectionItem } from '../../models/app/app-collection';
 
 type InstallInfo = {
   installed: boolean;

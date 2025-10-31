@@ -96,20 +96,20 @@ export interface StandardLabels {
   [STANDARD_LABELS.APP_COMPONENT]?: string;
   [STANDARD_LABELS.APP_PART_OF]?: string;
   [STANDARD_LABELS.APP_MANAGED_BY]?: string;
-  [STANDARD_LABELS.SUSEAI_MANAGED]?: string;
-  [STANDARD_LABELS.SUSEAI_APP_ID]?: string;
-  [STANDARD_LABELS.SUSEAI_REPOSITORY]?: string;
-  [STANDARD_LABELS.SUSEAI_CATEGORY]?: string;
+  'suseai/managed'?: string;
+  'suseai/app-id'?: string;
+  'suseai/repository'?: string;
+  'suseai/category'?: string;
   [key: string]: string | undefined;
 }
 
 export interface StandardAnnotations {
   [STANDARD_ANNOTATIONS.DESCRIPTION]?: string;
-  [STANDARD_ANNOTATIONS.SUSEAI_CHART_VERSION]?: string;
-  [STANDARD_ANNOTATIONS.SUSEAI_INSTALLATION_TIME]?: string;
-  [STANDARD_ANNOTATIONS.SUSEAI_INSTALLATION_CONFIG]?: string;
-  [STANDARD_ANNOTATIONS.SUSEAI_LAST_UPDATED]?: string;
-  [STANDARD_ANNOTATIONS.SUSEAI_UPDATE_STRATEGY]?: string;
+  'suseai/chart-version'?: string;
+  'suseai/installation-time'?: string;
+  'suseai/installation-config'?: string;
+  'suseai/last-updated'?: string;
+  'suseai/update-strategy'?: string;
   [key: string]: string | undefined;
 }
 

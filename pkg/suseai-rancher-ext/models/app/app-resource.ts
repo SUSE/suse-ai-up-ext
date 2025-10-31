@@ -55,6 +55,7 @@ export default class AppResource extends SuseaiResource {
   public logo_url?: string;
   public changelog_url?: string;
   public last_updated_at?: string;
+  public version?: string;
   public packaging_format?: 'HELM_CHART' | 'CONTAINER';
   public installations?: InstallationInfo[];
 

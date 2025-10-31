@@ -5,7 +5,6 @@
  */
 
 import { FEATURE_FLAGS } from '../utils/constants';
-import type { FeatureFlag } from '../utils/constants';
 import type { FeatureCategory } from './suseai';
 import { FEATURE_CATEGORIES } from './suseai';
 
@@ -233,5 +232,19 @@ export function getFeatureConflicts(flag: FeatureFlag): FeatureFlag[] {
   const feature = FEATURE_DEFINITIONS[flag];
   return feature?.conflictsWith || [];
 }
+
+// === Feature Flag Utility Functions ===
+
+export function featureEnabled(feature: FeatureFlag, clusterVersion?: string, store?: any): boolean {
+  const definition = FEATURE_DEFINITIONS[feature];
+  if (!definition) return false;
+  return definition.defaultEnabled;
+}
+
+export function getClusterVersion(): string {
+  return 'v1.0.0'; // Stub
+}
+
+export type FeatureFlag = typeof FEATURE_FLAGS[keyof typeof FEATURE_FLAGS];
 
 export default FEATURE_DEFINITIONS;
