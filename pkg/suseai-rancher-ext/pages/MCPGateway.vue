@@ -19,7 +19,7 @@
           <div class="install-action">
             <button class="btn btn-primary install-button" @click="startInstallProcess">
               <i class="icon icon-plus"></i>
-              Install Instance
+              Start
             </button>
           </div>
         </div>
@@ -71,59 +71,45 @@
                   </div>
                </div>
 
-                 <div class="empty-message">
-                   <h3 v-if="checkingService">Checking for existing service...</h3>
-                   <h3 v-else-if="serviceFound">Found 1 SUSE AI Universal Proxy at: {{ serviceUrl }}</h3>
-                   <h3 v-else-if="!installed">No instances found</h3>
-                   <h3 v-else>1 instance of SUSE AI Universal Proxy found</h3>
-                   <p v-if="checkingService">Please wait while we check for existing services.</p>
-                   <p v-else-if="serviceFound">An existing SUSE AI Universal Proxy service was detected. You can use this instance or install a new one.</p>
-                   <p v-else-if="!installed">This application has not been installed yet.</p>
-                   <p v-else>Your SUSE AI Universal Proxy is ready to use.</p>
-                 </div>
+                  <div class="empty-message">
+                    <h3 v-if="checkingService">Checking for existing service...</h3>
+                    <h3 v-else-if="!serviceFound && !installed">No instances found</h3>
+                    <h3 v-else-if="!serviceFound && installed">1 instance of SUSE AI Universal Proxy found</h3>
+                    <p v-if="checkingService">Please wait while we check for existing services.</p>
+                    <p v-else-if="!serviceFound && !installed">This application has not been installed yet.</p>
+                    <p v-else-if="!serviceFound && installed">Your SUSE AI Universal Proxy is ready to use.</p>
+                  </div>
 
-                 <!-- Service selection when existing service is found -->
-                 <div v-if="serviceFound && !checkingService" class="service-selection">
-                   <div class="service-cards">
-                     <!-- Existing Service Card -->
-                     <div
-                       class="service-card"
-                       :class="{ selected: useExistingService }"
-                       @click="selectExistingService"
-                     >
-                       <div class="card-header">
-                         <div class="service-icon">
-                           <i class="icon icon-server"></i>
-                         </div>
-                         <div class="service-info">
-                           <h4>Use Existing Service</h4>
-                           <p>Connect to the discovered SUSE AI Universal Proxy</p>
-                         </div>
-                         <div class="selection-indicator">
-                           <i v-if="useExistingService" class="icon icon-checkmark"></i>
-                         </div>
-                       </div>
-                       <div class="card-details">
-                         <div class="service-url">{{ serviceUrl }}</div>
-                         <div class="service-status">
-                           <span class="status-dot status-active"></span>
-                           Service Available
-                         </div>
-                       </div>
-                     </div>
-                   </div>
-
-                   <!-- Install New Button -->
-                   <div class="install-new-section">
-                     <button
-                       class="btn btn-secondary install-new-button"
-                       @click="selectInstallNew"
-                     >
-                       <i class="icon icon-plus"></i>
-                       Install New Universal Proxy
-                     </button>
-                   </div>
-                 </div>
+                  <!-- Service card when existing service is found -->
+                  <div v-if="serviceFound && !checkingService" class="service-selection">
+                    <div class="service-cards">
+                      <!-- Existing Service Card -->
+                      <div
+                        class="service-card"
+                        :class="{ selected: useExistingService }"
+                        @click="selectExistingService"
+                      >
+                        <div class="card-header">
+                          <div class="service-icon">
+                            <i class="icon icon-server"></i>
+                          </div>
+                          <div class="service-info">
+                            <h4>SUSE AI Universal Proxy found at</h4>
+                            <p>{{ serviceUrl }}</p>
+                          </div>
+                          <div class="selection-indicator">
+                            <i v-if="useExistingService" class="icon icon-checkmark"></i>
+                          </div>
+                        </div>
+                        <div class="card-details">
+                          <div class="service-status">
+                            <span class="status-dot status-active"></span>
+                            Service Available
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
 
              </div>
@@ -618,39 +604,66 @@ export default defineComponent({
     };
 
     // Check for existing service
+    let serviceCheckInterval: number | null = null;
+
     const checkForExistingService = async () => {
+      if (serviceFound.value) return; // Already found, stop checking
+
       checkingService.value = true;
       try {
         const isResponding = await MCPService.ping();
-        serviceFound.value = isResponding;
-        serviceUrl.value = isResponding ? 'http://localhost:8911' : '';
-        logger.info(isResponding ? 'Existing SUSE AI Universal Proxy service found' : 'No existing SUSE AI Universal Proxy service found');
+        if (isResponding) {
+          serviceFound.value = true;
+          serviceUrl.value = 'http://localhost:8911';
+          stopServiceChecking();
+          logger.info('Existing SUSE AI Universal Proxy service found');
+        } else {
+          logger.info('No existing SUSE AI Universal Proxy service found, will continue checking...');
+        }
       } catch (err) {
         serviceFound.value = false;
         serviceUrl.value = '';
-        logger.info('No existing SUSE AI Universal Proxy service found');
+        logger.info('Error checking for service, will continue checking...');
       } finally {
         checkingService.value = false;
       }
     };
 
+    const startServiceChecking = () => {
+      if (serviceCheckInterval) return; // Already checking
+      serviceCheckInterval = window.setInterval(checkForExistingService, 2000); // Check every 2 seconds
+      // Initial check
+      checkForExistingService();
+    };
+
+    const stopServiceChecking = () => {
+      if (serviceCheckInterval) {
+        clearInterval(serviceCheckInterval);
+        serviceCheckInterval = null;
+      }
+      checkingService.value = false;
+    };
+
     // Service selection methods
     const selectExistingService = () => {
       useExistingService.value = true;
+      stopServiceChecking();
     };
 
     const selectInstallNew = () => {
       useExistingService.value = false;
+      stopServiceChecking();
     };
 
     const startInstallProcess = async () => {
       showInstallButton.value = false;
-      await checkForExistingService();
       showConfigurationWizard.value = true;
+      startServiceChecking();
     };
 
     // Handle next button
     const handleNext = () => {
+      stopServiceChecking();
       if (useExistingService.value) {
         // Use existing service - mark as installed and proceed to services
         installed.value = true;
@@ -900,6 +913,7 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
         clearInterval(pollInterval);
         pollInterval = null;
       }
+      stopServiceChecking();
     });
 
     return {
@@ -942,12 +956,18 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
       getStatusBadgeClass,
        getStatusLabel,
        viewServerScanResults,
-       selectExistingService,
-       selectInstallNew,
+        selectExistingService,
        handleNext,
-       canProceed,
-       checkForExistingService,
-       // Configuration mode
+        canProceed,
+        checkForExistingService,
+        startServiceChecking,
+        stopServiceChecking,
+        // Service checking state
+        checkingService,
+        serviceFound,
+        serviceUrl,
+        useExistingService,
+        // Configuration mode
        showConfigurationWizard,
        showInstallButton,
        startInstallProcess
@@ -1680,7 +1700,7 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
   font-weight: 500;
 }
 
-/* Install Instance Container */
+/* Start Container */
 .install-instance-container {
   display: flex;
   justify-content: center;

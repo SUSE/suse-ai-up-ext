@@ -1,6 +1,51 @@
 <template>
   <div class="enable-engine-step">
-    <div class="empty-state">
+    <!-- Checking for existing instance -->
+    <div v-if="checkingInstance" class="checking-state">
+      <div class="checking-content">
+        <div class="app-header">
+          <div class="app-icon">
+            <i class="icon icon-spinner icon-spin"></i>
+          </div>
+          <div class="app-info">
+            <h2>SUSE AI Universal Proxy</h2>
+            <span class="app-badge">HELM</span>
+          </div>
+        </div>
+
+        <div class="checking-message">
+          <h3>Checking for existing instance...</h3>
+          <p>Looking for a running SUSE AI Universal Proxy instance on localhost:8911</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instance found -->
+    <div v-else-if="instanceFound" class="instance-found">
+      <div class="found-content">
+        <div class="app-header">
+          <div class="app-icon">
+            <i class="icon icon-check"></i>
+          </div>
+          <div class="app-info">
+            <h2>SUSE AI Universal Proxy</h2>
+            <span class="app-badge">HELM</span>
+          </div>
+        </div>
+
+        <div class="found-message">
+          <h3>Instance Found</h3>
+          <p>A SUSE AI Universal Proxy instance is running and responding on localhost:8911.</p>
+        </div>
+
+        <div class="next-action">
+          <p>You can now proceed to select additional services.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- No instance found -->
+    <div v-else class="empty-state">
       <div class="empty-state-content">
         <div class="app-header">
           <div class="app-icon">
@@ -42,32 +87,85 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
+import { MCPService } from '../../../services/mcp-service';
 
 interface Props {
   form: {
     engineEnabled: boolean;
     installationStarted: boolean;
+    instanceFound: boolean;
   };
 }
 
 interface Emits {
-  (e: 'update:form', form: { engineEnabled: boolean; installationStarted: boolean }): void;
+  (e: 'update:form', form: { engineEnabled: boolean; installationStarted: boolean; instanceFound: boolean }): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const installationStarted = ref(props.form.installationStarted || false);
+const instanceFound = ref(props.form.instanceFound || false);
+const checkingInstance = ref(false);
+let pollInterval: number | null = null;
 
 const startInstallation = () => {
   installationStarted.value = true;
+  // Stop polling when user starts installation
+  stopPolling();
   emit('update:form', {
     ...props.form,
     engineEnabled: true,
-    installationStarted: true
+    installationStarted: true,
+    instanceFound: instanceFound.value
   });
 };
+
+const pollForInstance = async () => {
+  if (instanceFound.value || installationStarted.value) return;
+
+  checkingInstance.value = true;
+  try {
+    const isResponding = await MCPService.ping();
+    if (isResponding) {
+      instanceFound.value = true;
+      checkingInstance.value = false;
+      stopPolling();
+      emit('update:form', {
+        ...props.form,
+        engineEnabled: true,
+        installationStarted: installationStarted.value,
+        instanceFound: true
+      });
+    }
+  } catch (error) {
+    // Continue polling on error
+  }
+};
+
+const startPolling = () => {
+  if (pollInterval) return; // Already polling
+  pollInterval = window.setInterval(pollForInstance, 2000); // Poll every 2 seconds
+  // Initial check
+  pollForInstance();
+};
+
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+  checkingInstance.value = false;
+};
+
+onMounted(() => {
+  startPolling();
+});
+
+onUnmounted(() => {
+  stopPolling();
+});
 </script>
 
 <style scoped>
@@ -195,6 +293,74 @@ const startInstallation = () => {
 }
 
 .confirmation-content p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Checking state styles */
+.checking-state {
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+}
+
+.checking-content {
+  padding: 40px 20px;
+}
+
+.checking-message {
+  margin-bottom: 32px;
+}
+
+.checking-message h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.checking-message p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Instance found styles */
+.instance-found {
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+}
+
+.found-content {
+  padding: 40px 20px;
+}
+
+.found-message {
+  margin-bottom: 24px;
+}
+
+.found-message h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.found-message p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.next-action {
+  margin-bottom: 0;
+}
+
+.next-action p {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
