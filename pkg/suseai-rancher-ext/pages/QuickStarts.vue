@@ -1,9 +1,9 @@
  <template>
-   <div class="experimental-banner">
-     <span class="banner-icon">⚠️</span>
-     <strong>Experimental Feature</strong>
-     <p>This Quick Starts feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/sst/opencode/issues" target="_blank">Report Issue</a> or <a href="https://github.com/sst/opencode/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
-   </div>
+    <div class="experimental-banner">
+      <span class="banner-icon">⚠️</span>
+      <strong>Experimental Feature</strong>
+      <p>This SUSE AI Universal Proxy feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
+    </div>
    <main class="main-layout">
     <div class="outlet">
       <!-- Header -->

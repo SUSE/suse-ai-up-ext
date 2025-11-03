@@ -24,6 +24,21 @@ export interface ScanConfig {
   timeout: string | number;
   scanRanges: string[];
   ports: (string | number)[];
+  security_test?: boolean;
+  security_rules?: string; // Changed from security_rules_file to match backend API
+}
+
+export interface ScanResult {
+  scan_id: string;
+  status: 'running' | 'completed' | 'failed';
+  discovered_servers?: DiscoveredServer[];
+  security_summary?: {
+    total_servers: number;
+    servers_with_findings: number;
+    critical_findings: number;
+    warning_findings: number;
+  };
+  error?: string;
 }
 
 export interface AdapterResource {
@@ -45,6 +60,8 @@ export interface AdapterResource {
   lastUpdatedAt?: string;
 }
 
+
+
 export interface DiscoveredServer {
   id: string;
   address: string;
@@ -56,6 +73,11 @@ export interface DiscoveredServer {
   discoveredAt?: string;
   vulnerability_score?: 'high' | 'medium' | 'low';
   scan_results?: any;
+  name?: string;
+  metadata?: {
+    auth_type?: string;
+  };
+  security_findings?: any[]; // Will be defined by backend API
 }
 
 export class MCPService {
@@ -69,12 +91,32 @@ export class MCPService {
     }
   }
 
-  static async startScan(config: ScanConfig) {
+  static async startScan(config: ScanConfig): Promise<ScanResult> {
     try {
       const response = await apiClient.post('/scan', config);
       return response.data;
     } catch (error) {
       console.error('Failed to start scan:', error);
+      throw error;
+    }
+  }
+
+  static async getScanStatus(scanId: string): Promise<ScanResult> {
+    try {
+      const response = await apiClient.get(`/scan/${scanId}/status`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get scan status:', error);
+      throw error;
+    }
+  }
+
+  static async getScanResults(scanId: string): Promise<ScanResult> {
+    try {
+      const response = await apiClient.get(`/scan/${scanId}/results`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get scan results:', error);
       throw error;
     }
   }
@@ -136,4 +178,6 @@ export class MCPService {
       return null;
     }
   }
+
+
 }

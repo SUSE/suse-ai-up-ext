@@ -1,6 +1,11 @@
 <template>
-  <main class="main-layout">
-    <div class="outlet">
+   <main class="main-layout">
+     <div class="experimental-banner">
+       <span class="banner-icon">⚠️</span>
+       <strong>Experimental Feature</strong>
+       <p>This SUSE AI Universal Proxy feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
+     </div>
+     <div class="outlet">
       <!-- Header with breadcrumb and actions -->
       <header class="fixed-header">
         <!-- Breadcrumb navigation with app meta -->
@@ -1151,79 +1156,41 @@ export default defineComponent({
   }
 }
 
-// Responsive design
-@media (max-width: 1024px) {
-  .actions-container {
-    gap: 8px;
-
-    .left-actions {
-      gap: 8px;
-
-      .search-box .input-sm {
-        width: 180px;
-      }
-
-      .filter-group .form-control {
-        min-width: 120px;
-        width: 120px;
-      }
-    }
-
-    .right-actions {
-      gap: 6px;
-    }
-  }
+/* Experimental Banner */
+.experimental-banner {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin: 16px 24px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #856404;
 }
 
-@media (max-width: 768px) {
-  .breadcrumb-nav {
-    flex-wrap: wrap;
-    gap: 8px;
+.banner-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
 
-    .app-meta-inline {
-      margin-left: 0;
-      margin-top: 4px;
-      flex-basis: 100%;
-    }
-  }
+.experimental-banner strong {
+  font-weight: 600;
+  color: #856404;
+}
 
-  .actions-container {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+.experimental-banner p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
 
-    .left-actions,
-    .right-actions {
-      width: 100%;
-      justify-content: stretch;
-    }
+.experimental-banner a {
+  color: #d63384;
+  text-decoration: underline;
+}
 
-    .left-actions {
-      flex-direction: column;
-      gap: 8px;
-
-      .search-box .input-sm {
-        width: 100%;
-      }
-
-      .filter-group .form-control {
-        width: 100%;
-        min-width: 0;
-      }
-    }
-
-    .right-actions {
-      flex-direction: row;
-      justify-content: center;
-    }
-  }
-
-  .instances-table {
-    overflow-x: auto;
-
-    .table {
-      min-width: 800px;
-    }
-  }
+.experimental-banner a:hover {
+  color: #b02a5b;
 }
 </style>

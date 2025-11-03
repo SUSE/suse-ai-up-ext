@@ -1,0 +1,173 @@
+<template>
+  <div class="endpoints-section">
+    <h2>Registered MCP Adapters</h2>
+    <table class="endpoints-table">
+       <thead>
+         <tr>
+           <th>Name</th>
+           <th>Status</th>
+           <th>Protocol</th>
+           <th>Endpoint</th>
+           <th>Errors</th>
+           <th>Last Active</th>
+           <th>Actions</th>
+         </tr>
+       </thead>
+       <tbody>
+         <tr v-if="loading">
+           <td colspan="7" class="loading-row">Loading adapters...</td>
+         </tr>
+         <tr v-else-if="error">
+           <td colspan="7" class="error-row">{{ error }}</td>
+         </tr>
+         <tr v-else-if="adapters.length === 0">
+           <td colspan="7" class="empty-row">No adapters registered</td>
+         </tr>
+         <tr v-else v-for="adapter in adapters" :key="adapter.id">
+           <td>{{ adapter.name }}</td>
+           <td>
+             <span :class="adapter.status === 'active' || adapter.status === 'healthy' ? 'status-active' : 'status-inactive'">
+               {{ adapter.status || 'unknown' }}
+             </span>
+           </td>
+           <td>{{ adapter.protocol || 'MCP' }}</td>
+           <td>{{ adapter.endpoint || '-' }}</td>
+           <td>{{ adapter.errorCount || 0 }}</td>
+           <td>{{ adapter.lastActive ? new Date(adapter.lastActive).toLocaleString() : 'Never' }}</td>
+           <td>
+             <div class="action-buttons">
+               <button class="btn btn-sm role-secondary" @click="handleViewDetails(adapter)" title="View Details">
+                 <i class="icon icon-info"></i>
+               </button>
+               <button class="btn btn-sm role-secondary" @click="handleViewLogs(adapter)" title="View Logs">
+                 <i class="icon icon-file"></i>
+               </button>
+               <button class="btn btn-sm role-secondary" @click="handleEditAdapter(adapter)" title="Edit">
+                 <i class="icon icon-edit"></i>
+               </button>
+               <button class="btn btn-sm role-secondary" @click="handleDeleteAdapter(adapter)" title="Delete">
+                 <i class="icon icon-trash"></i>
+               </button>
+             </div>
+           </td>
+         </tr>
+       </tbody>
+     </table>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { AdapterResource } from '../../services/mcp-service';
+
+export default defineComponent({
+  name: 'AdaptersTable',
+  props: {
+    adapters: {
+      type: Array as () => AdapterResource[],
+      default: () => []
+    },
+    loading: {
+      type: Boolean,
+      default: false
+    },
+    error: {
+      type: String,
+      default: null
+    }
+  },
+  emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter'],
+  setup(props, { emit }) {
+    const handleViewDetails = (adapter: AdapterResource) => {
+      emit('view-details', adapter);
+    };
+
+    const handleViewLogs = (adapter: AdapterResource) => {
+      emit('view-logs', adapter);
+    };
+
+    const handleEditAdapter = (adapter: AdapterResource) => {
+      emit('edit-adapter', adapter);
+    };
+
+    const handleDeleteAdapter = (adapter: AdapterResource) => {
+      emit('delete-adapter', adapter);
+    };
+
+    return {
+      handleViewDetails,
+      handleViewLogs,
+      handleEditAdapter,
+      handleDeleteAdapter
+    };
+  }
+});
+</script>
+
+<style scoped>
+.endpoints-section {
+  margin-top: 40px;
+}
+
+.endpoints-section h2 {
+  margin-bottom: 20px;
+  color: var(--body-text, #111827);
+}
+
+.endpoints-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.endpoints-table th,
+.endpoints-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.endpoints-table th {
+  background: var(--accent-bg, #f9fafb);
+  font-weight: 600;
+  color: var(--body-text, #111827);
+}
+
+.endpoints-table tbody tr:hover {
+  background: var(--accent-bg, #f9fafb);
+}
+
+.status-active {
+  color: var(--success, #16a34a);
+  font-weight: 500;
+}
+
+.status-inactive {
+  color: var(--muted, #6b7280);
+  font-weight: 500;
+}
+
+.endpoints-table .loading-row,
+.endpoints-table .error-row,
+.endpoints-table .empty-row {
+  text-align: center;
+  color: var(--muted, #6b7280);
+  font-style: italic;
+  padding: 20px;
+}
+
+.endpoints-table .error-row {
+  color: var(--error, #dc2626);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  margin: 24px 0;
+  flex-wrap: wrap;
+}
+</style>

@@ -63,31 +63,88 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Ports to Scan:</label>
-          <div class="scan-ports">
-            <div v-for="(port, index) in scanConfig.ports || []" :key="index" class="port-item">
-              <input
-                type="number"
-                v-model.number="scanConfig.ports![index]"
-                class="form-control"
-                min="1"
-                max="65535"
-              />
-              <button
-                type="button"
-                class="btn btn-sm btn-secondary"
-                @click="removePort(index)"
-                :disabled="(scanConfig.ports || []).length <= 1"
-              >
-                &times;
-              </button>
-            </div>
-            <button type="button" class="btn btn-sm btn-secondary" @click="addPort">
-              Add Port
-            </button>
-          </div>
-        </div>
+         <div class="form-group">
+           <label>Ports to Scan:</label>
+           <div class="scan-ports">
+             <div v-for="(port, index) in scanConfig.ports || []" :key="index" class="port-item">
+               <input
+                 type="number"
+                 v-model.number="scanConfig.ports![index]"
+                 class="form-control"
+                 min="1"
+                 max="65535"
+               />
+               <button
+                 type="button"
+                 class="btn btn-sm btn-secondary"
+                 @click="removePort(index)"
+                 :disabled="(scanConfig.ports || []).length <= 1"
+               >
+                 &times;
+               </button>
+             </div>
+             <button type="button" class="btn btn-sm btn-secondary" @click="addPort">
+               Add Port
+             </button>
+           </div>
+         </div>
+
+         <!-- Security Testing Section -->
+         <div class="form-group">
+           <div class="security-section-header">
+             <label class="checkbox-label">
+               <input
+                 type="checkbox"
+                 v-model="scanConfig.security_test"
+                 class="form-checkbox"
+               />
+               <span class="checkbox-text">Enable Security Testing</span>
+             </label>
+             <button
+               type="button"
+               class="btn btn-sm btn-link"
+               @click="toggleSecuritySection"
+             >
+               {{ showSecuritySection ? 'Hide' : 'Show' }} Options
+             </button>
+           </div>
+
+           <div v-if="showSecuritySection && scanConfig.security_test" class="security-options">
+             <div class="form-group">
+               <label>Security Rules File:</label>
+               <input
+                 type="file"
+                 ref="rulesFileInput"
+                 @change="handleRulesFileChange"
+                 accept=".yaml,.yml"
+                 class="form-control"
+               />
+               <div class="form-help">
+                 Upload a YAML file with custom security rules. Leave empty to use built-in rules only.
+               </div>
+               <div v-if="rulesFileName" class="file-info">
+                 Selected: {{ rulesFileName }}
+                 <button type="button" class="btn btn-sm btn-link" @click="clearRulesFile">Clear</button>
+               </div>
+               <div v-if="rulesValidationError" class="error-message">
+                 {{ rulesValidationError }}
+               </div>
+               <div v-if="rulesPreview && !rulesValidationError" class="rules-preview">
+                 <strong>Rules Preview:</strong>
+                 <div class="rules-summary">
+                   <span>Built-in rules: {{ rulesPreview.builtin_count }}</span>
+                   <span>Custom rules: {{ rulesPreview.custom_count }}</span>
+                 </div>
+               </div>
+             </div>
+
+             <div class="security-warnings">
+               <div class="warning-message">
+                 ⚠️ Security testing may increase scan time and resource usage.
+               </div>
+             </div>
+           </div>
+         </div>
 
         <div v-if="error" class="error-message">
           {{ error }}
@@ -104,13 +161,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { MCPService, type ScanConfig } from '../../services/mcp-service';
 import { logger } from '../../utils/logger';
+import yaml from 'js-yaml';
 
 // Emits
 const emit = defineEmits<{
-  scanStarted: [];
+  scanStarted: [result: any];
   close: [];
 }>();
 
@@ -119,6 +177,13 @@ const isVisible = ref(false);
 const scanning = ref(false);
 const error = ref<string>('');
 
+// Security testing state
+const showSecuritySection = ref(false);
+const rulesFileName = ref<string>('');
+const rulesValidationError = ref<string>('');
+const rulesPreview = ref<{builtin_count: number, custom_count: number} | null>(null);
+const rulesFileInput = ref<HTMLInputElement>();
+
 
 
 // Scan configuration
@@ -126,7 +191,8 @@ const scanConfig = ref<ScanConfig>({
   maxConcurrent: 10,
   ports: [8000, 3000, 5000],
   scanRanges: ['192.168.1.0/24'],
-  timeout: '30s'
+  timeout: '30s',
+  security_test: false
 } as ScanConfig);
 
 // Computed properties
@@ -155,8 +221,12 @@ const reset = () => {
     maxConcurrent: 10,
     ports: [8911],
     scanRanges: ['192.168.1.0/24'],
-    timeout: '30s'
+    timeout: '30s',
+    security_test: false
   };
+  rulesFileName.value = '';
+  rulesValidationError.value = '';
+  rulesPreview.value = null;
 };
 
 const addRange = () => {
@@ -185,25 +255,88 @@ const removePort = (index: number) => {
   }
 };
 
-const scheduleScan = async () => {
-  scanning.value = true;
+const toggleSecuritySection = () => {
+  showSecuritySection.value = !showSecuritySection.value;
+};
+
+const handleRulesFileChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) {
+    clearRulesFile();
+    return;
+  }
+
+  rulesFileName.value = file.name;
+  rulesValidationError.value = '';
+
   try {
-    error.value = '';
+    const content = await file.text();
+    const parsed = yaml.load(content) as any;
 
-    await MCPService.startScan(scanConfig.value);
+    // Basic validation
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new Error('Invalid YAML structure');
+    }
 
-    logger.info('Discovery scan started', { data: { config: scanConfig.value } });
-    alert('Discovery scan started! Check discovered servers in a few moments.');
-    emit('scanStarted');
+    // Count rules
+    const builtinCount = parsed.global_settings ? 1 : 0;
+    const customCount = parsed.server_rules ?
+      Object.values(parsed.server_rules).reduce((count: number, serverRules: any) => {
+        return count + (serverRules.custom_rules ? serverRules.custom_rules.length : 0);
+      }, 0) : 0;
 
-    closeModal();
+    rulesPreview.value = {
+      builtin_count: builtinCount,
+      custom_count: customCount
+    };
+
+    // Store file content for submission (in a real implementation, you'd upload or store it)
+    scanConfig.value.security_rules_file = content;
+
   } catch (err) {
-    logger.error('Failed to start scan', err);
-    error.value = 'Failed to start scan. Please try again.';
-  } finally {
-    scanning.value = false;
+    rulesValidationError.value = `Invalid YAML file: ${err instanceof Error ? err.message : 'Unknown error'}`;
+    rulesPreview.value = null;
+    scanConfig.value.security_rules_file = undefined;
   }
 };
+
+const clearRulesFile = () => {
+  rulesFileName.value = '';
+  rulesValidationError.value = '';
+  rulesPreview.value = null;
+  scanConfig.value.security_rules_file = undefined;
+  if (rulesFileInput.value) {
+    rulesFileInput.value.value = '';
+  }
+};
+
+    const scheduleScan = async () => {
+      scanning.value = true;
+      try {
+        error.value = '';
+
+        // Prepare scan config for backend API
+        const backendConfig = {
+          ...scanConfig.value,
+          security_rules: scanConfig.value.security_rules_file // Rename for backend API
+        };
+        delete backendConfig.security_rules_file; // Remove old field
+
+        const scanResult = await MCPService.startScan(backendConfig);
+
+        logger.info('Discovery scan started', { scanId: scanResult.scan_id, config: backendConfig });
+        emit('scanStarted', scanResult);
+
+        closeModal();
+      } catch (err) {
+        logger.error('Failed to start scan', err);
+        error.value = 'Failed to start scan. Please try again.';
+      } finally {
+        scanning.value = false;
+      }
+    };
 
 // Expose methods to parent component
 defineExpose({
@@ -376,5 +509,90 @@ defineExpose({
 .btn-sm {
   padding: 4px 8px;
   font-size: 12px;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary, #2563eb);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  color: var(--primary-hover, #1d4ed8);
+}
+
+/* Security Testing Styles */
+.security-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.form-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary, #2563eb);
+  cursor: pointer;
+}
+
+.checkbox-text {
+  user-select: none;
+}
+
+.security-options {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--accent-bg, #f9fafb);
+  border-radius: 4px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.file-info {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--body-text, #111827);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rules-preview {
+  margin-top: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.rules-summary {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--muted, #6b7280);
+}
+
+.security-warnings {
+  margin-top: 16px;
+}
+
+.warning-message {
+  padding: 8px 12px;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 14px;
 }
 </style>
