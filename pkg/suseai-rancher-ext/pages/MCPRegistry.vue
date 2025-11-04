@@ -99,13 +99,13 @@
                  >
                    <div class="tile-header">
                      <div class="tile-logo-container">
-                       <img
-                         v-if="getServerLogo(server.name, server.iconClass)"
-                         :src="getServerLogo(server.name, server.iconClass)"
-                         :alt="`${server.name} logo`"
-                         class="tile-logo"
-                         @error="handleImageError"
-                       />
+                        <img
+                          v-if="getServerLogo(server.name, server.iconClass, server.iconurl)"
+                          :src="getServerLogo(server.name, server.iconClass, server.iconurl)"
+                          :alt="`${server.name} logo`"
+                          class="tile-logo"
+                          @error="handleImageError"
+                        />
                        <div v-else class="tile-icon">
                          <i :class="server.iconClass" aria-hidden="true" />
                        </div>
@@ -240,6 +240,16 @@
                    <i v-if="syncingRegistry !== null" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
                    {{ syncingRegistry !== null ? 'Syncing...' : 'Sync All Enabled' }}
                  </button>
+
+                 <button
+                   class="btn btn-secondary"
+                   @click="showAddRegistryModal = true"
+                   :title="'Add Custom Registry'"
+                   :aria-label="'Add Custom Registry'"
+                 >
+                   <i class="icon icon-plus" aria-hidden="true"></i>
+                   Add Registry
+                 </button>
                  <button
                    class="btn btn-secondary"
                    @click="showAdvancedModal = true"
@@ -278,16 +288,26 @@
                       </span>
                     </div>
                   </div>
-                  <div class="registry-actions">
-                    <button
-                      class="btn btn-sm btn-secondary"
-                      @click="syncRegistry(registry.id)"
-                      :disabled="!registry.enabled || syncingRegistry === registry.id"
-                    >
-                      <i v-if="syncingRegistry === registry.id" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
-                      {{ syncingRegistry === registry.id ? 'Syncing...' : 'Sync' }}
-                    </button>
-                  </div>
+                   <div class="registry-actions">
+                     <button
+                       class="btn btn-sm btn-secondary"
+                       @click="syncRegistry(registry.id)"
+                       :disabled="!registry.enabled || syncingRegistry === registry.id"
+                     >
+                       <i v-if="syncingRegistry === registry.id" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
+                       {{ syncingRegistry === registry.id ? 'Syncing...' : 'Sync' }}
+                     </button>
+                     <button
+                       v-if="isCustomRegistry(registry.id)"
+                       class="btn btn-sm btn-danger"
+                       @click="removeCustomRegistry(registry.id)"
+                       :title="'Remove this custom registry'"
+                       :aria-label="'Remove custom registry'"
+                     >
+                       <i class="icon icon-trash" aria-hidden="true"></i>
+                       Remove
+                     </button>
+                   </div>
                 </div>
               </div>
             </div>
@@ -338,6 +358,75 @@
            </div>
          </div>
        </div>
+
+       <!-- Add Custom Registry Modal -->
+       <div v-if="showAddRegistryModal" class="modal-overlay" @click="showAddRegistryModal = false">
+         <div class="modal-content" @click.stop>
+           <div class="modal-header">
+             <h3>Add Custom Registry</h3>
+             <button @click="showAddRegistryModal = false" class="btn btn-sm">×</button>
+           </div>
+           <div class="modal-body">
+             <form @submit.prevent="addCustomRegistry" class="registry-form">
+               <div class="form-group">
+                 <label for="registry-name">Registry Name *</label>
+                 <input
+                   id="registry-name"
+                   v-model="newRegistry.name"
+                   type="text"
+                   placeholder="e.g., My Custom Registry"
+                   required
+                   class="form-control"
+                 >
+               </div>
+
+               <div class="form-group">
+                 <label for="registry-source">Source Name *</label>
+                 <input
+                   id="registry-source"
+                   v-model="newRegistry.source"
+                   type="text"
+                   placeholder="e.g., my-custom"
+                   required
+                   class="form-control"
+                 >
+                 <small class="form-help">This will be used as the API source parameter: /public/registry?source={source}</small>
+               </div>
+
+               <div class="form-group">
+                 <label for="registry-url">Registry URL</label>
+                 <input
+                   id="registry-url"
+                   v-model="newRegistry.url"
+                   type="url"
+                   placeholder="https://example.com"
+                   class="form-control"
+                 >
+                 <small class="form-help">Optional display URL for the registry</small>
+               </div>
+
+               <div class="form-group">
+                 <label class="checkbox-label">
+                   <input
+                     type="checkbox"
+                     v-model="newRegistry.enabled"
+                   >
+                   <span class="checkbox-text">Enable registry</span>
+                 </label>
+               </div>
+
+               <div class="form-actions">
+                 <button type="button" class="btn btn-secondary" @click="showAddRegistryModal = false">
+                   Cancel
+                 </button>
+                 <button type="submit" class="btn btn-primary">
+                   Add Registry
+                 </button>
+               </div>
+             </form>
+           </div>
+         </div>
+       </div>
      </div>
    </template>
 
@@ -352,6 +441,7 @@ interface Registry {
   id: string;
   name: string;
   url: string;
+  source: string;
   enabled: boolean;
   lastSync: string | null;
   serverCount: number;
@@ -375,16 +465,19 @@ export default defineComponent({
     const showViewModal = ref(false);
     const showRegistryModal = ref(false);
     const showAdvancedModal = ref(false);
+    const showAddRegistryModal = ref(false);
     const isLoading = ref(true);
     const registryServers = ref<any[]>([]);
     const selectedServer = ref<RegistryServer | null>(null);
+    const hasPerformedInitialSync = ref(false);
 
-    // Registry management
-    const publicRegistries = ref<Registry[]>([
+    // Registry management - predefined registries
+    const predefinedRegistries = ref<Registry[]>([
       {
         id: 'official-mcp',
         name: 'MCP Official Registry',
         url: 'https://registry.modelcontextprotocol.io',
+        source: 'official',
         enabled: true,
         lastSync: null,
         serverCount: 0
@@ -393,6 +486,7 @@ export default defineComponent({
         id: 'docker-mcp',
         name: 'Docker MCP Registry',
         url: 'https://hub.docker.com/r/mcp',
+        source: 'docker',
         enabled: false,
         lastSync: null,
         serverCount: 0
@@ -401,11 +495,37 @@ export default defineComponent({
         id: 'community-mcp',
         name: 'Community MCP Registry',
         url: 'https://community-mcp.example.com',
+        source: 'community',
         enabled: true,
         lastSync: null,
         serverCount: 0
       }
     ]);
+
+    // Custom registries added by user
+    const customRegistries = ref<Registry[]>([]);
+
+    // Combined registries for UI
+    const publicRegistries = computed(() => [
+      ...predefinedRegistries.value,
+      ...customRegistries.value
+    ]);
+
+    // Function to refresh from browse API
+    const refreshFromBrowse = async () => {
+      try {
+        console.log('Refreshing registry servers from browse API...');
+        isLoading.value = true;
+        const servers = await MCPService.browseRegistryServers();
+        registryServers.value = processServerData(servers);
+        persistRegistryData();
+        console.log(`Refreshed ${servers.length} servers from registry browse API`);
+      } catch (error) {
+        console.error('Failed to refresh registry servers from browse API:', error);
+      } finally {
+        isLoading.value = false;
+      }
+    };
     const syncingRegistry = ref<string | null>(null);
 
     const newMcpServer = ref({
@@ -419,15 +539,24 @@ export default defineComponent({
       packageName: ''
     });
 
+    const newRegistry = ref({
+      name: '',
+      source: '',
+      url: '',
+      enabled: true
+    });
+
     const filteredServers = computed(() => {
       if (!registryServers.value || registryServers.value.length === 0) {
         return [];
       }
       const query = searchQuery.value.toLowerCase();
       return registryServers.value.filter((server: any) =>
-        server.name.toLowerCase().includes(query) ||
-        server.description.toLowerCase().includes(query) ||
-        server.author.toLowerCase().includes(query)
+        // Only hide servers where name is null
+        server.name != null &&
+        (server.name.toLowerCase().includes(query) ||
+         server.description.toLowerCase().includes(query) ||
+         server.author.toLowerCase().includes(query))
       );
     });
 
@@ -446,6 +575,7 @@ export default defineComponent({
             author: server.repository?.source || 'Unknown',
             stars: Math.floor(Math.random() * 10000) + 1000, // Could be removed or fetched from API
             iconClass: server.name?.toLowerCase().includes('suse') ? 'suse-logo' : 'icon icon-server',
+            iconurl: server.iconurl, // Add iconurl from server data
             status: isAlwaysInstalled ? 'installed' : 'not-installed',
             version: server.version,
             protocol: server.protocol,
@@ -455,6 +585,9 @@ export default defineComponent({
             packages: server.packages,
             tools: server.tools,
             repository: server.repository,
+            availabilityStatus: 'unknown', // New: online, offline, unknown
+            securityScanStatus: 'not-scanned', // New: not-scanned, running, completed, failed
+            lastSecurityScanId: null, // New: scan ID for tracking
             rawData: server // Keep original data for view modal
           };
         });
@@ -535,19 +668,8 @@ export default defineComponent({
       try {
         console.log(`Syncing from ${registry.name}...`);
 
-        // Call real API with source filtering
-        const response = await fetch(`http://localhost:8911/public/registry?source=${registryId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const servers = await response.json();
+        // Call real API with source filtering using MCPService
+        const servers = await MCPService.getPublicRegistryServersBySource(registry.source);
 
         // Process and add new servers to registry
         const processedServers = processServerData(servers);
@@ -557,8 +679,14 @@ export default defineComponent({
         registry.lastSync = new Date().toISOString();
         registry.serverCount = servers.length;
 
+        // Mark that initial sync has been performed
+        hasPerformedInitialSync.value = true;
+
         // Persist the updated data
         persistRegistryData();
+
+        // Automatically refresh from browse API after sync
+        await refreshFromBrowse();
 
         console.log(`Successfully synced ${servers.length} servers from ${registry.name}`);
       } catch (error) {
@@ -580,11 +708,13 @@ export default defineComponent({
     const persistRegistryData = () => {
       const data = {
         servers: registryServers.value,
-        registries: publicRegistries.value.map(r => ({
+        predefinedRegistries: predefinedRegistries.value.map(r => ({
           id: r.id,
           lastSync: r.lastSync,
           serverCount: r.serverCount
-        }))
+        })),
+        customRegistries: customRegistries.value,
+        hasPerformedInitialSync: hasPerformedInitialSync.value
       };
       persistSave('mcp-registry-data', data);
     };
@@ -592,10 +722,15 @@ export default defineComponent({
     // Advanced modal functions
     const clearAllEntries = () => {
       registryServers.value = [];
-      publicRegistries.value.forEach(registry => {
+      predefinedRegistries.value.forEach(registry => {
         registry.lastSync = null;
         registry.serverCount = 0;
       });
+      customRegistries.value.forEach(registry => {
+        registry.lastSync = null;
+        registry.serverCount = 0;
+      });
+      hasPerformedInitialSync.value = false;
       persistClear('mcp-registry-data');
       showAdvancedModal.value = false;
       console.log('All registry entries cleared');
@@ -603,16 +738,123 @@ export default defineComponent({
 
     const checkAvailability = async () => {
       console.log('Checking server availability...');
-      // TODO: Implement availability checking
-      // This would ping each server to see if it's still online
+
+      // Check availability of all registry servers
+      for (const server of registryServers.value) {
+        try {
+          // Try to ping the server URL with timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+          const response = await fetch(server.url, {
+            method: 'HEAD',
+            mode: 'no-cors', // Allow cross-origin requests
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+          server.availabilityStatus = 'online';
+        } catch (error) {
+          console.warn(`Server ${server.name} is not reachable:`, error);
+          server.availabilityStatus = 'offline';
+        }
+      }
+
+      // Persist the updated availability status
+      persistRegistryData();
+
+      console.log('Availability check completed');
       showAdvancedModal.value = false;
     };
 
     const checkSecurity = async () => {
       console.log('Running security checks...');
-      // TODO: Implement security scanning
-      // This would run security scans on registry servers
+
+      // Run security scans on registry servers
+      for (const server of registryServers.value) {
+        try {
+          // Extract host from URL for scanning
+          const url = new URL(server.url);
+          const host = url.hostname;
+
+          // Start a security scan for this server
+          const scanConfig = {
+            maxConcurrent: 1,
+            timeout: 30,
+            scanRanges: [host],
+            ports: [80, 443], // Common web ports
+            security_test: true
+          };
+
+          const scanResult = await MCPService.startScan(scanConfig);
+          console.log(`Security scan started for ${server.name}:`, scanResult.scan_id);
+
+          // Store scan ID for later status checking
+          server.lastSecurityScanId = scanResult.scan_id;
+          server.securityScanStatus = 'running';
+
+        } catch (error) {
+          console.error(`Failed to start security scan for ${server.name}:`, error);
+          server.securityScanStatus = 'failed';
+        }
+      }
+
+      // Persist the updated security scan status
+      persistRegistryData();
+
+      console.log('Security scan initiation completed');
       showAdvancedModal.value = false;
+    };
+
+    // Custom registry management
+    const addCustomRegistry = () => {
+      if (!newRegistry.value.name.trim() || !newRegistry.value.source.trim()) {
+        return; // Basic validation
+      }
+
+      // Check if source already exists
+      const existingRegistry = publicRegistries.value.find(r => r.source === newRegistry.value.source);
+      if (existingRegistry) {
+        console.error('Registry with this source already exists');
+        return;
+      }
+
+      const customRegistry: Registry = {
+        id: `custom-${Date.now()}`, // Unique ID for custom registries
+        name: newRegistry.value.name.trim(),
+        url: newRegistry.value.url.trim() || `https://${newRegistry.value.source}.example.com`,
+        source: newRegistry.value.source.trim(),
+        enabled: newRegistry.value.enabled,
+        lastSync: null,
+        serverCount: 0
+      };
+
+      customRegistries.value.push(customRegistry);
+
+      // Reset form
+      newRegistry.value = {
+        name: '',
+        source: '',
+        url: '',
+        enabled: true
+      };
+
+      // Persist changes
+      persistRegistryData();
+
+      showAddRegistryModal.value = false;
+    };
+
+    const removeCustomRegistry = (registryId: string) => {
+      const index = customRegistries.value.findIndex(r => r.id === registryId);
+      if (index !== -1) {
+        customRegistries.value.splice(index, 1);
+        persistRegistryData();
+      }
+    };
+
+    const isCustomRegistry = (registryId: string) => {
+      return customRegistries.value.some(r => r.id === registryId);
     };
 
     const onTileClick = (server: any) => {
@@ -715,7 +957,12 @@ export default defineComponent({
       };
     };
 
-    const getServerLogo = (serverName: string, iconClass: string) => {
+    const getServerLogo = (serverName: string, iconClass: string, iconurl?: string) => {
+      // First check if iconurl is provided (e.g., from Docker registry)
+      if (iconurl) {
+        return iconurl;
+      }
+      // Fallback to existing logic
       if (iconClass === 'suse-logo' || serverName.toLowerCase().includes('suse')) {
         return '/SUSE_Logo-vert.jpg'; // Absolute path from public folder root
       }
@@ -738,22 +985,57 @@ export default defineComponent({
       img.style.display = 'none';
     };
 
-    onMounted(() => {
-      // Load persisted registry servers if available
-      const persisted = persistLoad<{ servers: any[]; registries: { id: string; lastSync: string | null; serverCount: number }[] }>('mcp-registry-data', { servers: [], registries: [] }, 24 * 60 * 60 * 1000); // 24 hours TTL
-      if (persisted.servers) {
-        registryServers.value = persisted.servers;
+    onMounted(async () => {
+      // Load persisted registry servers and custom registries if available
+      const persisted = persistLoad<{
+        servers: any[];
+        predefinedRegistries: { id: string; lastSync: string | null; serverCount: number }[];
+        customRegistries: Registry[];
+        hasPerformedInitialSync: boolean;
+      }>('mcp-registry-data', {
+        servers: [],
+        predefinedRegistries: [],
+        customRegistries: [],
+        hasPerformedInitialSync: false
+      }, 24 * 60 * 60 * 1000); // 24 hours TTL
+
+      // Load custom registries
+      if (persisted.customRegistries) {
+        customRegistries.value = persisted.customRegistries;
       }
-      if (persisted.registries) {
-        // Update registry states with persisted data
-        persisted.registries.forEach((persistedRegistry: { id: string; lastSync: string | null; serverCount: number }) => {
-          const registry = publicRegistries.value.find(r => r.id === persistedRegistry.id);
+
+      // Update predefined registry states with persisted data
+      if (persisted.predefinedRegistries) {
+        persisted.predefinedRegistries.forEach((persistedRegistry: { id: string; lastSync: string | null; serverCount: number }) => {
+          const registry = predefinedRegistries.value.find(r => r.id === persistedRegistry.id);
           if (registry) {
             registry.lastSync = persistedRegistry.lastSync;
             registry.serverCount = persistedRegistry.serverCount;
           }
         });
       }
+
+      // Check if initial sync has been performed
+      hasPerformedInitialSync.value = persisted.hasPerformedInitialSync || false;
+
+      if (hasPerformedInitialSync.value && persisted.servers && persisted.servers.length > 0) {
+        // Load from persisted data if initial sync was done
+        registryServers.value = persisted.servers;
+        console.log(`Loaded ${persisted.servers.length} servers from persisted data`);
+      } else if (hasPerformedInitialSync.value) {
+        // If initial sync was performed but no persisted data, try to load from /registry/browse
+        try {
+          console.log('Loading registry servers from browse API...');
+          isLoading.value = true;
+          const servers = await MCPService.browseRegistryServers();
+          registryServers.value = processServerData(servers);
+          console.log(`Loaded ${servers.length} servers from registry browse API`);
+        } catch (error) {
+          console.error('Failed to load registry servers from browse API:', error);
+          registryServers.value = [];
+        }
+      }
+
       isLoading.value = false;
     });
 
@@ -770,6 +1052,7 @@ export default defineComponent({
        showViewModal,
        showRegistryModal,
        showAdvancedModal,
+       showAddRegistryModal,
       selectedServer,
       registryServers,
       filteredServers,
@@ -784,6 +1067,12 @@ export default defineComponent({
        clearAllEntries,
        checkAvailability,
        checkSecurity,
+       addCustomRegistry,
+       removeCustomRegistry,
+       isCustomRegistry,
+       newRegistry,
+       hasPerformedInitialSync,
+       refreshFromBrowse,
       isLoading,
       newMcpServer,
       handleAddMcpServer,
@@ -1338,6 +1627,7 @@ export default defineComponent({
 .registry-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
@@ -1486,5 +1776,67 @@ export default defineComponent({
 .option-buttons .btn-danger:hover {
   background-color: #c82333;
   border-color: #bd2130;
+}
+
+/* Custom Registry Modal Styles */
+.registry-form {
+  max-width: 500px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.form-help {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted-text);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin: 0;
+}
+
+.checkbox-text {
+  font-weight: normal;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }
 </style>

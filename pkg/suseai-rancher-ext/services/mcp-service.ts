@@ -90,6 +90,7 @@ export interface RegistryServer {
   url: string;
   validation_status: string;
   discovered_at: string;
+  iconurl?: string;
   repository?: {
     source: string;
     url: string;
@@ -236,6 +237,16 @@ export class MCPService {
       return response.data || [];
     } catch (error) {
       console.error('Failed to fetch public registry servers:', error);
+      return [];
+    }
+  }
+
+  static async getPublicRegistryServersBySource(source: string): Promise<RegistryServer[]> {
+    try {
+      const response = await apiClient.get(`/public/registry?source=${source}`);
+      return response.data || [];
+    } catch (error) {
+      console.error(`Failed to fetch registry servers for source ${source}:`, error);
       return [];
     }
   }
