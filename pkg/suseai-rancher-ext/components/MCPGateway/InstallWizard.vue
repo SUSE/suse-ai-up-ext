@@ -74,7 +74,7 @@
                <div class="empty-message">
                  <h3 v-if="checkingService">Checking for existing service...</h3>
                  <h3 v-else-if="!serviceFound && !installed">No instances found</h3>
-                 <h3 v-else-if="!serviceFound && installed">1 instance of SUSE AI Universal Proxy found</h3>
+                 <h3 v-else-if="!serviceFound && installed">An instance of SUSE AI Universal Proxy has been found</h3>
                  <p v-if="checkingService">Please wait while we check for existing services.</p>
                  <p v-else-if="!serviceFound && !installed">This application has not been installed yet.</p>
                  <p v-else-if="!serviceFound && installed">Your SUSE AI Universal Proxy is ready to use.</p>
@@ -212,10 +212,12 @@
     <button
       v-if="currentStep < wizardSteps.length - 1"
       class="btn role-primary"
-      :disabled="!wizardSteps[currentStep].ready"
+      :class="{ 'btn-installing': fakeInstalling }"
+      :disabled="!wizardSteps[currentStep].ready || fakeInstalling"
       @click="nextStep"
     >
-      Next
+      <i v-if="fakeInstalling" class="icon icon-spinner icon-spin mr-5"></i>
+      {{ fakeInstalling ? 'Installing...' : (currentStep === 0 && !serviceFound && !checkingService ? 'Install' : 'Next') }}
     </button>
 
     <button
@@ -283,13 +285,14 @@ export default defineComponent({
       hasSelectedServices,
       startServiceConfiguration,
 
-      // Service checking state
-      checkingService,
-      serviceFound,
-      serviceUrl,
-      useExistingService,
+       // Service checking state
+       checkingService,
+       serviceFound,
+       serviceUrl,
+       useExistingService,
+       fakeInstalling,
 
-      // Configuration mode
+       // Configuration mode
       showConfigurationWizard,
       showInstallButton,
       startInstallProcess,
@@ -316,18 +319,19 @@ export default defineComponent({
       hasSelectedServices,
       startServiceConfiguration,
 
-      // Service checking state
-      checkingService,
-      serviceFound,
-      serviceUrl,
-      useExistingService,
+       // Service checking state
+       checkingService,
+       serviceFound,
+       serviceUrl,
+       useExistingService,
+       fakeInstalling,
 
-      // Configuration mode
-      showConfigurationWizard,
-      showInstallButton,
-      startInstallProcess,
-      selectExistingService
-    };
+       // Configuration mode
+       showConfigurationWizard,
+       showInstallButton,
+       startInstallProcess,
+       selectExistingService
+     };
   }
 });
 </script>
@@ -952,6 +956,17 @@ export default defineComponent({
 .wizard-buttons-fixed .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.wizard-buttons-fixed .btn-installing {
+  background: var(--warning, #f59e0b);
+  border-color: var(--warning, #f59e0b);
+  color: white;
+}
+
+.wizard-buttons-fixed .btn-installing:hover:not(:disabled) {
+  background: var(--warning-hover, #d97706);
+  border-color: var(--warning-hover, #d97706);
 }
 
 .flex-spacer {

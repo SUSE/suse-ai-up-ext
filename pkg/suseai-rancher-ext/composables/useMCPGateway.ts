@@ -36,6 +36,9 @@ export function useMCPGateway() {
   const showConfigurationWizard = ref(false);
   const showInstallButton = ref(true);
 
+  // Fake installation state
+  const fakeInstalling = ref(false);
+
   // MCP Gateway state
   const discoveredServers = ref<DiscoveredServer[]>([]);
   const adapters = ref<AdapterResource[]>([]);
@@ -107,6 +110,18 @@ export function useMCPGateway() {
     }, 5000);
   };
 
+  // Fake installation for demo purposes
+  const fakeInstall = () => {
+    fakeInstalling.value = true;
+    setTimeout(() => {
+      fakeInstalling.value = false;
+      serviceFound.value = true;
+      serviceUrl.value = 'http://localhost:8911';
+      useExistingService.value = true; // Auto-select the found service
+      logger.info('Fake installation completed - service discovered at localhost:8911');
+    }, 10000); // 10 seconds
+  };
+
   // Service selection
   const toggleService = (serviceId: string) => {
     const index = selectedServices.value.indexOf(serviceId);
@@ -125,17 +140,22 @@ export function useMCPGateway() {
   // Wizard navigation
   const nextStep = () => {
     if (currentStep.value === 0) {
-      // First step - handle service selection
-      if (useExistingService.value) {
-        // Use existing service
+      // First step - handle service selection or installation
+      if (serviceFound.value && useExistingService.value) {
+        // Use existing service - proceed to services selection
         installed.value = true;
         store.dispatch('suseai/setProxyInstalled', true);
-        currentStep.value = 1; // Go to services selection
-        logger.info('Using existing SUSE AI Universal Proxy service');
-      } else {
-        // Install new service - advance immediately and show progress
         currentStep.value = 1;
-        handleInstall();
+        logger.info('Using existing SUSE AI Universal Proxy service');
+      } else if (!serviceFound.value && !fakeInstalling.value) {
+        // No service found - start fake installation
+        fakeInstall();
+      } else if (serviceFound.value) {
+        // Service now found after installation - proceed to services
+        installed.value = true;
+        store.dispatch('suseai/setProxyInstalled', true);
+        currentStep.value = 1;
+        logger.info('Proceeding with discovered service');
       }
     } else if (currentStep.value < wizardSteps.value.length - 1 && wizardSteps.value[currentStep.value + 1].ready) {
       currentStep.value++;
@@ -149,23 +169,17 @@ export function useMCPGateway() {
   };
 
   const onWizardCancel = () => {
-    if (showConfigurationWizard.value) {
-      // Just hide the configuration wizard
-      showConfigurationWizard.value = false;
-      currentStep.value = 0;
-      selectedServices.value = [];
-    } else {
-      // Reset wizard state
-      currentStep.value = 0;
-      installing.value = false;
-      installed.value = false;
-      selectedServices.value = [];
-      // Navigate back or to home
-      router?.push({
-        name: `c-cluster-suseai-home-root`,
-        params: { cluster: route?.params?.cluster }
-      });
-    }
+    // Reset all wizard state
+    currentStep.value = 0;
+    installing.value = false;
+    installed.value = false;
+    selectedServices.value = [];
+    showConfigurationWizard.value = false;
+    // Always navigate back to service configuration home
+    router?.push({
+      name: `c-cluster-suseai-home-root`,
+      params: { cluster: route?.params?.cluster }
+    });
   };
 
   const onWizardFinish = () => {
@@ -272,7 +286,7 @@ export function useMCPGateway() {
 
   // Computed property for next button state
   const canProceed = computed(() => {
-    if (checkingService.value) return false;
+    if (checkingService.value || fakeInstalling.value) return false;
     if (!serviceFound.value) return !installed.value; // Can proceed if no service found and not installed
     return useExistingService.value !== null; // Must select an option when service is found
   });
@@ -685,6 +699,7 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
     serviceFound,
     serviceUrl,
     useExistingService,
+    fakeInstalling,
 
     // Configuration mode
     showConfigurationWizard,

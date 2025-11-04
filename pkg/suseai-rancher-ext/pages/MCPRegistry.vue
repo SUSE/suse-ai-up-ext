@@ -54,6 +54,17 @@
                   <i class="icon icon-upload" aria-hidden="true" />
                   Import
                 </button>
+
+                <button
+                  class="btn role-secondary"
+                  @click="showRegistryModal = true"
+                  :title="'Manage Public Registries'"
+                  :aria-label="'Manage Public Registries'"
+                  type="button"
+                >
+                  <i class="icon icon-sync" aria-hidden="true" />
+                  Registries
+                </button>
               </div>
             </header>
 
@@ -65,9 +76,9 @@
                    <i class="icon icon-spinner icon-spin" aria-hidden="true" />
                    <span>Loading MCP servers...</span>
                  </div>
-                 <div v-else-if="filteredServers.length" class="results-text">
-                   Showing {{ filteredServers.length }} of {{ filteredServers.length }} MCP servers
-                 </div>
+                  <div v-else-if="filteredServers.length" class="results-text">
+                    Showing {{ filteredServers.length }} of {{ registryServers.length }} MCP servers
+                  </div>
                  <div v-else-if="!isLoading" class="results-text">
                    No MCP servers found
                  </div>
@@ -108,152 +119,190 @@
                        <p class="tile-description">{{ server.description }}</p>
                      </div>
                    </div>
-                   <div class="tile-footer">
-                     <div class="tile-actions">
-                       <button
-                         v-if="server.status === 'not-installed'"
-                         class="btn btn-sm btn-primary"
-                         @click.stop="handleInstallServer(server.id)"
-                         :aria-label="`Install ${server.name}`"
-                       >
-                         Install
-                       </button>
-                       <button
-                         v-else-if="server.status === 'installed'"
-                         class="btn btn-sm btn-secondary"
-                         @click.stop="handleRemoveServer(server.id)"
-                         :aria-label="`Remove ${server.name}`"
-                       >
-                         Remove
-                       </button>
-                       <button
-                         v-else-if="server.status === 'installing'"
-                         class="btn btn-sm btn-secondary"
-                         disabled
-                         aria-label="Installing"
-                       >
-                         <i class="icon icon-spinner icon-spin" aria-hidden="true" />
-                         Installing...
-                       </button>
-                     </div>
-                   </div>
+                    <div class="tile-footer">
+                      <div class="tile-actions">
+                        <button
+                          class="btn btn-sm btn-primary"
+                          @click.stop="handleViewServer(server)"
+                          :aria-label="`View details for ${server.name}`"
+                        >
+                          View
+                        </button>
+                        <button
+                          v-if="server.status === 'not-installed'"
+                          class="btn btn-sm btn-primary"
+                          @click.stop="handleInstallServer(server.id)"
+                          :aria-label="`Install ${server.name}`"
+                        >
+                          Install
+                        </button>
+                        <button
+                          v-else-if="server.status === 'installed'"
+                          class="btn btn-sm btn-secondary"
+                          @click.stop="handleRemoveServer(server.id)"
+                          :aria-label="`Remove ${server.name}`"
+                        >
+                          Remove
+                        </button>
+                        <button
+                          v-else-if="server.status === 'installing'"
+                          class="btn btn-sm btn-secondary"
+                          disabled
+                          aria-label="Installing"
+                        >
+                          <i class="icon icon-spinner icon-spin" aria-hidden="true" />
+                          Installing...
+                        </button>
+                      </div>
+                    </div>
                  </div>
                </div>
              </div>
           </div>
         </div>
       </main>
+
+      <!-- View Server Modal -->
+      <div v-if="showViewModal" class="modal-overlay" @click="showViewModal = false">
+        <div class="modal-content" @click.stop>
+          <div class="modal-header">
+            <h3>{{ selectedServer?.name }} Details</h3>
+            <button @click="showViewModal = false" class="btn btn-sm">×</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="selectedServer" class="server-details">
+              <div class="detail-section">
+                <h4>Basic Information</h4>
+                <p><strong>Name:</strong> {{ selectedServer.name }}</p>
+                <p><strong>Description:</strong> {{ selectedServer.description }}</p>
+                <p><strong>Version:</strong> {{ selectedServer.version }}</p>
+                <p><strong>Protocol:</strong> {{ selectedServer.protocol }}</p>
+                <p><strong>URL:</strong> {{ selectedServer.url }}</p>
+                <p><strong>Validation Status:</strong> {{ selectedServer.validation_status }}</p>
+                <p><strong>Discovered At:</strong> {{ selectedServer.discovered_at }}</p>
+              </div>
+
+              <div v-if="selectedServer.repository" class="detail-section">
+                <h4>Repository</h4>
+                <p><strong>Source:</strong> {{ selectedServer.repository.source }}</p>
+                <p><strong>URL:</strong> <a :href="selectedServer.repository.url" target="_blank">{{ selectedServer.repository.url }}</a></p>
+              </div>
+
+              <div v-if="selectedServer.packages?.length" class="detail-section">
+                <h4>Packages</h4>
+                <div v-for="pkg in selectedServer.packages" :key="pkg.identifier" class="package-item">
+                  <p><strong>Identifier:</strong> {{ pkg.identifier }}</p>
+                  <p><strong>Type:</strong> {{ pkg.registryType }}</p>
+                  <p><strong>Transport:</strong> {{ pkg.transport.type }}</p>
+                  <div v-if="pkg.environmentVariables?.length" class="env-vars">
+                    <p><strong>Environment Variables:</strong></p>
+                    <ul>
+                      <li v-for="env in pkg.environmentVariables" :key="env.name">
+                        {{ env.name }}: {{ env.description }} ({{ env.isSecret ? 'Secret' : 'Public' }})
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="selectedServer.tools?.length" class="detail-section">
+                <h4>Tools</h4>
+                <div v-for="tool in selectedServer.tools" :key="tool.name" class="tool-item">
+                  <p><strong>Name:</strong> {{ tool.name }}</p>
+                  <p><strong>Description:</strong> {{ tool.description }}</p>
+                </div>
+              </div>
+
+              <div v-if="selectedServer._meta" class="detail-section">
+                <h4>Metadata</h4>
+                <pre>{{ JSON.stringify(selectedServer._meta, null, 2) }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Registry Management Modal -->
+      <div v-if="showRegistryModal" class="modal-overlay" @click="showRegistryModal = false">
+        <div class="modal-content" @click.stop>
+          <div class="modal-header">
+            <h3>Manage Public Registries</h3>
+            <button @click="showRegistryModal = false" class="btn btn-sm">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="registry-management">
+              <div class="registry-actions">
+                <button
+                  class="btn btn-primary"
+                  @click="syncAllRegistries"
+                  :disabled="syncingRegistry !== null"
+                >
+                  <i v-if="syncingRegistry !== null" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
+                  {{ syncingRegistry !== null ? 'Syncing...' : 'Sync All Enabled' }}
+                </button>
+              </div>
+
+              <div class="registries-list">
+                <div
+                  v-for="registry in publicRegistries"
+                  :key="registry.id"
+                  class="registry-item"
+                >
+                  <div class="registry-info">
+                    <div class="registry-header">
+                      <h4>{{ registry.name }}</h4>
+                      <label class="checkbox-label">
+                        <input
+                          type="checkbox"
+                          :checked="registry.enabled"
+                          @change="toggleRegistry(registry.id)"
+                        />
+                        <span class="checkbox-text">Enabled</span>
+                      </label>
+                    </div>
+                    <p class="registry-url">{{ registry.url }}</p>
+                    <div class="registry-stats">
+                      <span v-if="registry.lastSync" class="registry-sync">
+                        Last sync: {{ new Date(registry.lastSync).toLocaleString() }}
+                      </span>
+                      <span class="registry-count">
+                        {{ registry.serverCount }} servers
+                      </span>
+                    </div>
+                  </div>
+                  <div class="registry-actions">
+                    <button
+                      class="btn btn-sm btn-secondary"
+                      @click="syncRegistry(registry.id)"
+                      :disabled="!registry.enabled || syncingRegistry === registry.id"
+                    >
+                      <i v-if="syncingRegistry === registry.id" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
+                      {{ syncingRegistry === registry.id ? 'Syncing...' : 'Sync' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, getCurrentInstance } from 'vue';
 import { useStore } from 'vuex';
+import { MCPService } from '../services/mcp-service';
+import type { RegistryServer } from '../services/mcp-service';
 
-const mockServerData = [
-  {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-    "name": "io.suse.trento/mcp-server",
-    "title": "SUSE Trento MCP Server",
-    "description": "The Trento MCP Server project introduces a Model Context Protocol (MCP) server implementation, enabling Trento to be used and configured as a tool for AI. Instead of interacting with the Trento server solely through the web UI, you can now interact with it directly from an AI, a chat interface, or an agent.",
-    "version": "1.0.0",
-    "packages": [
-      {
-        "registryType": "npm",
-        "identifier": "@suse/trento-mcp-server",
-        "version": "1.0.0",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  },
-  {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-    "name": "io.suse.uyuni/mcp-server",
-    "title": "SUSE Multi-Linux Manager MCP Server",
-    "description": "Any Linux, Anywhere, Any Scale. Simplify management of your complex IT infrastructure. SUSE Multi-Linux Manager provides automated patching, content lifecycle management, and realtime monitoring to keep your mixed Linux environment secure and compliant at any scale – from 10 to over 100,000 clients – from a single console.",
-    "version": "1.0.0",
-    "packages": [
-      {
-        "registryType": "npm",
-        "identifier": "@suse/uyuni-mcp-server",
-        "version": "1.0.0",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  },
-      {
-      "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-      "name": "io.suse.rancher/mcp-server",
-      "title": "Rancher MCP server",
-      "description": "Secure deploy, run‌ and manage modern workloads anywhere in your Hybrid IT platform. Delivering centralized authentication, access control, observability, and built-in security.",
-      "version": "1.0.0",
-      "packages": [
-        {
-          "registryType": "npm",
-          "identifier": "@suse/rancher-mcp-server",
-          "version": "1.0.0",
-          "transport": {
-            "type": "sse"
-          }
-        }
-      ]
-    },
-  {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-    "name": "weather-mcp",
-    "title": "Weather",
-    "description": "Provides current weather information and forecasts",
-    "version": "1.0.0",
-    "packages": [
-      {
-        "registryType": "npm",
-        "identifier": "weather-mcp",
-        "version": "1.0.0",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  },
-  {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-    "name": "everything-mcp",
-    "title": "Everything",
-    "description": "A comprehensive tool that can answer questions about anything",
-    "version": "1.0.0",
-    "packages": [
-      {
-        "registryType": "npm",
-        "identifier": "everything-mcp",
-        "version": "1.0.0",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  },
-  {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-    "name": "time-mcp",
-    "title": "Time",
-    "description": "Provides current time and date information",
-    "version": "1.0.0",
-    "packages": [
-      {
-        "registryType": "npm",
-        "identifier": "time-mcp",
-        "version": "1.0.0",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  }
-];
+interface Registry {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  lastSync: string | null;
+  serverCount: number;
+}
 
 export default defineComponent({
   name: 'MCPRegistry',
@@ -270,8 +319,40 @@ export default defineComponent({
     const searchQuery = ref('');
     const showAddModal = ref(false);
     const showImportModal = ref(false);
+    const showViewModal = ref(false);
+    const showRegistryModal = ref(false);
     const isLoading = ref(true);
     const registryServers = ref<any[]>([]);
+    const selectedServer = ref<RegistryServer | null>(null);
+
+    // Registry management
+    const publicRegistries = ref<Registry[]>([
+      {
+        id: 'mcp-official',
+        name: 'MCP Official Registry',
+        url: 'https://registry.modelcontextprotocol.io',
+        enabled: true,
+        lastSync: null,
+        serverCount: 0
+      },
+      {
+        id: 'docker-mcp',
+        name: 'Docker MCP Registry',
+        url: 'https://hub.docker.com/r/mcp',
+        enabled: false,
+        lastSync: null,
+        serverCount: 0
+      },
+      {
+        id: 'community-mcp',
+        name: 'Community MCP Registry',
+        url: 'https://community-mcp.example.com',
+        enabled: true,
+        lastSync: null,
+        serverCount: 0
+      }
+    ]);
+    const syncingRegistry = ref<string | null>(null);
 
     const newMcpServer = ref({
       name: '',
@@ -296,44 +377,53 @@ export default defineComponent({
       );
     });
 
-    const processServerData = (serverData: any) => {
+    const processServerData = (serverData: RegistryServer[]) => {
       if (Array.isArray(serverData)) {
-        return serverData.map((server: any, index: number) => {
-          const name = server.title || server.name || `Server ${index + 1}`;
-          const isAlwaysInstalled = name === 'SUSE Multi Linux Manager MCP Server' || name === 'Rancher MCP server';
+        return serverData.map((server: RegistryServer, index: number) => {
+          const isAlwaysInstalled = server.name?.toLowerCase().includes('suse') ||
+                                   server.name?.toLowerCase().includes('trento') ||
+                                   server.name?.toLowerCase().includes('uyuni') ||
+                                   server.name?.toLowerCase().includes('rancher');
+
           return {
-            id: index + 1,
-            name,
-            description: server.description || 'No description available',
-            author: server.name?.toLowerCase().includes('suse') ? 'SUSE' : 'Unknown',
-            stars: Math.floor(Math.random() * 10000) + 1000,
+            id: server.id,
+            name: server.name,
+            description: server.description,
+            author: server.repository?.source || 'Unknown',
+            stars: Math.floor(Math.random() * 10000) + 1000, // Could be removed or fetched from API
             iconClass: server.name?.toLowerCase().includes('suse') ? 'suse-logo' : 'icon icon-server',
             status: isAlwaysInstalled ? 'installed' : 'not-installed',
-            version: server.version || '1.0.0'
+            version: server.version,
+            protocol: server.protocol,
+            url: server.url,
+            validationStatus: server.validation_status,
+            discoveredAt: server.discovered_at,
+            packages: server.packages,
+            tools: server.tools,
+            repository: server.repository,
+            rawData: server // Keep original data for view modal
           };
         });
       }
-      const name = serverData.title || serverData.name || 'Custom Server';
-      const isAlwaysInstalled = name === 'SUSE Multi Linux Manager MCP Server' || name === 'Rancher MCP server';
-      return [{
-        id: 1,
-        name,
-        description: serverData.description || 'No description available',
-        author: serverData.name?.toLowerCase().includes('suse') ? 'SUSE' : 'Unknown',
-        stars: Math.floor(Math.random() * 10000) + 1000,
-        iconClass: serverData.name?.toLowerCase().includes('suse') ? 'suse-logo' : 'icon icon-server',
-        status: isAlwaysInstalled ? 'installed' : 'not-installed',
-        version: serverData.version || '1.0.0'
-      }];
+      return [];
     };
 
 
 
-    const loadRegistryServers = () => {
-      console.log('Loading registry servers from mock data...');
-      const servers = processServerData(mockServerData);
-      registryServers.value = servers;
-      console.log(`Loaded ${servers.length} servers from mock data`);
+    const loadRegistryServers = async () => {
+      console.log('Loading registry servers from browse API...');
+      isLoading.value = true;
+      try {
+        const servers = await MCPService.browseRegistryServers();
+        registryServers.value = processServerData(servers);
+        console.log(`Loaded ${servers.length} servers from registry browse API`);
+      } catch (error) {
+        console.error('Failed to load registry servers:', error);
+        // Fallback to empty array
+        registryServers.value = [];
+      } finally {
+        isLoading.value = false;
+      }
     };
 
     const handleInstallServer = (serverId: number) => {
@@ -354,6 +444,226 @@ export default defineComponent({
         } else {
           registryServers.value = registryServers.value.filter(s => s.id !== serverId);
         }
+      }
+    };
+
+    const handleViewServer = async (server: any) => {
+      try {
+        // If we have raw data, use it; otherwise fetch detailed server info
+        if (server.rawData) {
+          selectedServer.value = server.rawData;
+        } else {
+          const detailedServer = await MCPService.getRegistryServer(server.id);
+          selectedServer.value = detailedServer || null;
+        }
+        showViewModal.value = true;
+      } catch (error) {
+        console.error('Failed to fetch server details:', error);
+        // Still show modal with available data
+        selectedServer.value = server.rawData || null;
+        showViewModal.value = true;
+      }
+    };
+
+    // Registry management functions
+    const toggleRegistry = (registryId: string) => {
+      const registry = publicRegistries.value.find(r => r.id === registryId);
+      if (registry) {
+        registry.enabled = !registry.enabled;
+      }
+    };
+
+    const syncRegistry = async (registryId: string) => {
+      const registry = publicRegistries.value.find(r => r.id === registryId);
+      if (!registry || !registry.enabled) return;
+
+      syncingRegistry.value = registryId;
+      try {
+        // Simulate API call to sync from registry
+        console.log(`Syncing from ${registry.name}...`);
+
+        // Fake sync delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Fake server data based on registry
+        let fakeServers: any[] = [];
+        if (registryId === 'mcp-official') {
+          fakeServers = [
+            {
+              id: 'official-weather-mcp',
+              name: 'Weather MCP (Official)',
+              description: 'Official weather information MCP server with current conditions and forecasts',
+              version: '1.2.0',
+              protocol: 'http',
+              url: 'https://weather-mcp.example.com',
+              validation_status: 'valid',
+              discovered_at: new Date().toISOString(),
+              packages: [{
+                identifier: '@modelcontextprotocol/weather-mcp',
+                registryType: 'npm',
+                transport: { type: 'stdio' }
+              }],
+              tools: [
+                { name: 'get_current_weather', description: 'Get current weather for a location' },
+                { name: 'get_weather_forecast', description: 'Get weather forecast for upcoming days' }
+              ],
+              repository: { source: 'official', url: 'https://github.com/modelcontextprotocol/weather-mcp' }
+            },
+            {
+              id: 'official-filesystem-mcp',
+              name: 'Filesystem MCP (Official)',
+              description: 'Secure file system operations MCP server',
+              version: '2.0.1',
+              protocol: 'http',
+              url: 'https://filesystem-mcp.example.com',
+              validation_status: 'valid',
+              discovered_at: new Date().toISOString(),
+              packages: [{
+                identifier: '@modelcontextprotocol/filesystem-mcp',
+                registryType: 'npm',
+                transport: { type: 'stdio' }
+              }],
+              tools: [
+                { name: 'read_file', description: 'Read contents of a file' },
+                { name: 'write_file', description: 'Write content to a file' },
+                { name: 'list_directory', description: 'List contents of a directory' }
+              ],
+              repository: { source: 'official', url: 'https://github.com/modelcontextprotocol/filesystem-mcp' }
+            },
+            {
+              id: 'official-github-mcp',
+              name: 'GitHub MCP (Official)',
+              description: 'GitHub integration MCP server for repository management',
+              version: '1.5.0',
+              protocol: 'http',
+              url: 'https://github-mcp.example.com',
+              validation_status: 'valid',
+              discovered_at: new Date().toISOString(),
+              packages: [{
+                identifier: '@modelcontextprotocol/github-mcp',
+                registryType: 'npm',
+                transport: { type: 'stdio' }
+              }],
+              tools: [
+                { name: 'search_repositories', description: 'Search GitHub repositories' },
+                { name: 'get_pull_request', description: 'Get details of a pull request' },
+                { name: 'create_issue', description: 'Create a new GitHub issue' }
+              ],
+              repository: { source: 'official', url: 'https://github.com/modelcontextprotocol/github-mcp' }
+            }
+          ];
+        } else if (registryId === 'docker-mcp') {
+          fakeServers = [
+            {
+              id: 'docker-git-mcp',
+              name: 'Git MCP (Docker)',
+              description: 'Git operations MCP server via Docker container',
+              version: '1.1.0',
+              protocol: 'http',
+              url: 'https://git-mcp.example.com',
+              validation_status: 'valid',
+              discovered_at: new Date().toISOString(),
+              packages: [{
+                identifier: 'mcp/git:latest',
+                registryType: 'docker',
+                transport: { type: 'stdio' }
+              }],
+              tools: [
+                { name: 'git_status', description: 'Get git repository status' },
+                { name: 'git_commit', description: 'Create a git commit' },
+                { name: 'git_log', description: 'View git commit history' }
+              ],
+              repository: { source: 'docker', url: 'https://hub.docker.com/r/mcp/git' }
+            },
+            {
+              id: 'docker-database-mcp',
+              name: 'Database MCP (Docker)',
+              description: 'Database operations MCP server for SQL databases',
+              version: '2.1.0',
+              protocol: 'http',
+              url: 'https://database-mcp.example.com',
+              validation_status: 'valid',
+              discovered_at: new Date().toISOString(),
+              packages: [{
+                identifier: 'mcp/database:v2.1.0',
+                registryType: 'docker',
+                transport: { type: 'stdio' }
+              }],
+              tools: [
+                { name: 'execute_query', description: 'Execute SQL query' },
+                { name: 'list_tables', description: 'List database tables' },
+                { name: 'get_schema', description: 'Get table schema information' }
+              ],
+              repository: { source: 'docker', url: 'https://hub.docker.com/r/mcp/database' }
+            }
+          ];
+        } else if (registryId === 'community-mcp') {
+          fakeServers = [
+            {
+              id: 'community-slack-mcp',
+              name: 'Slack MCP (Community)',
+              description: 'Community-built Slack integration MCP server',
+              version: '0.8.0',
+              protocol: 'http',
+              url: 'https://slack-mcp.example.com',
+              validation_status: 'valid',
+              discovered_at: new Date().toISOString(),
+              packages: [{
+                identifier: 'community/slack-mcp',
+                registryType: 'npm',
+                transport: { type: 'stdio' }
+              }],
+              tools: [
+                { name: 'send_message', description: 'Send message to Slack channel' },
+                { name: 'list_channels', description: 'List available Slack channels' },
+                { name: 'get_user_info', description: 'Get Slack user information' }
+              ],
+              repository: { source: 'community', url: 'https://github.com/community-mcp/slack-mcp' }
+            },
+            {
+              id: 'community-calendar-mcp',
+              name: 'Calendar MCP (Community)',
+              description: 'Calendar and scheduling MCP server for Google Calendar integration',
+              version: '1.0.0-beta',
+              protocol: 'http',
+              url: 'https://calendar-mcp.example.com',
+              validation_status: 'valid',
+              discovered_at: new Date().toISOString(),
+              packages: [{
+                identifier: 'community/calendar-mcp',
+                registryType: 'npm',
+                transport: { type: 'stdio' }
+              }],
+              tools: [
+                { name: 'create_event', description: 'Create calendar event' },
+                { name: 'list_events', description: 'List upcoming calendar events' },
+                { name: 'update_event', description: 'Update existing calendar event' }
+              ],
+              repository: { source: 'community', url: 'https://github.com/community-mcp/calendar-mcp' }
+            }
+          ];
+        }
+
+        // Add new servers to registry
+        const processedServers = processServerData(fakeServers);
+        registryServers.value.push(...processedServers);
+
+        // Update registry info
+        registry.lastSync = new Date().toISOString();
+        registry.serverCount = fakeServers.length;
+
+        console.log(`Successfully synced ${fakeServers.length} servers from ${registry.name}`);
+      } catch (error) {
+        console.error(`Failed to sync from ${registry.name}:`, error);
+      } finally {
+        syncingRegistry.value = null;
+      }
+    };
+
+    const syncAllRegistries = async () => {
+      const enabledRegistries = publicRegistries.value.filter(r => r.enabled);
+      for (const registry of enabledRegistries) {
+        await syncRegistry(registry.id);
       }
     };
 
@@ -398,34 +708,48 @@ export default defineComponent({
       console.log('Server added successfully');
     };
 
-    const generateServerJson = (data: any) => {
-      const baseSchema = {
-        "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-        "name": data.name,
-        "title": data.title,
-        "description": data.description,
-        "version": data.version
-      };
+    const generateServerJson = (data: any): RegistryServer => {
+      const now = new Date().toISOString();
 
       if (data.isRemote) {
         return {
-          ...baseSchema,
-          "remotes": [{
-            "type": data.type,
-            "url": data.url
-          }]
+          id: `custom-${Date.now()}`,
+          name: data.name,
+          description: data.description,
+          version: data.version,
+          protocol: 'http',
+          url: data.url,
+          validation_status: 'unknown',
+          discovered_at: now,
+          packages: [],
+          tools: [],
+          repository: {
+            source: 'custom',
+            url: data.url
+          }
         };
       } else {
         return {
-          ...baseSchema,
-          "packages": [{
-            "registryType": "npm",
-            "identifier": data.packageName,
-            "version": data.version,
-            "transport": {
-              "type": "stdio"
+          id: `custom-${Date.now()}`,
+          name: data.name,
+          description: data.description,
+          version: data.version,
+          protocol: 'stdio',
+          url: '',
+          validation_status: 'unknown',
+          discovered_at: now,
+          packages: [{
+            identifier: data.packageName,
+            registryType: 'npm',
+            transport: {
+              type: 'stdio'
             }
-          }]
+          }],
+          tools: [],
+          repository: {
+            source: 'npm',
+            url: `https://www.npmjs.com/package/${data.packageName}`
+          }
         };
       }
     };
@@ -481,9 +805,19 @@ export default defineComponent({
       searchQuery,
       showAddModal,
       showImportModal,
+      showViewModal,
+      showRegistryModal,
+      selectedServer,
+      registryServers,
       filteredServers,
+      publicRegistries,
+      syncingRegistry,
       handleInstallServer,
       handleRemoveServer,
+      handleViewServer,
+      toggleRegistry,
+      syncRegistry,
+      syncAllRegistries,
       isLoading,
       newMcpServer,
       handleAddMcpServer,
@@ -769,6 +1103,7 @@ export default defineComponent({
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 8px;
 }
 
 .installing-state {
@@ -881,7 +1216,7 @@ export default defineComponent({
   background: var(--body-bg, white);
   border-radius: var(--border-radius, 8px);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  max-width: 600px;
+  max-width: 800px;
   width: 90vw;
   max-height: 80vh;
   overflow-y: auto;
@@ -896,6 +1231,12 @@ export default defineComponent({
   align-items: center;
 }
 
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .modal-body {
   padding: 24px;
 }
@@ -906,6 +1247,79 @@ export default defineComponent({
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+/* Server details modal content */
+.server-details {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.detail-section {
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  background: var(--card-bg, var(--body-bg));
+}
+
+.detail-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.detail-section p {
+  margin: 8px 0;
+  color: var(--body-text);
+}
+
+.detail-section strong {
+  color: var(--body-text);
+  font-weight: 600;
+}
+
+.detail-section a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.detail-section a:hover {
+  text-decoration: underline;
+}
+
+.package-item,
+.tool-item {
+  border: 1px solid var(--border-light, rgba(0,0,0,0.1));
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: var(--accent-bg, #f9fafb);
+}
+
+.env-vars {
+  margin-top: 8px;
+}
+
+.env-vars ul {
+  margin: 4px 0 0 0;
+  padding-left: 20px;
+}
+
+.env-vars li {
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+
+.detail-section pre {
+  background: var(--code-bg, #f6f8fa);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 12px;
+  color: var(--body-text);
 }
 
 
@@ -948,6 +1362,91 @@ export default defineComponent({
   margin: 0;
 }
 
+/* Registry Management Styles */
+.registry-management {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.registry-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.registries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.registry-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  background: var(--body-bg);
+}
+
+.registry-info {
+  flex: 1;
+}
+
+.registry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.registry-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.registry-url {
+  margin: 4px 0;
+  font-size: 14px;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.registry-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.registry-sync {
+  color: var(--success);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox-text {
+  user-select: none;
+}
+
 /* Responsive enhancements */
 @media (max-width: 768px) {
   .modal-content {
@@ -962,6 +1461,16 @@ export default defineComponent({
     padding: 16px;
   }
 
+  .registry-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 
+  .registry-actions {
+    align-self: stretch;
+    display: flex;
+    justify-content: center;
+  }
 }
 </style>

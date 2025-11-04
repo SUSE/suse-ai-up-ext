@@ -5,7 +5,7 @@ import {
   BLANK_CLUSTER,
   SUSEAI_PRODUCT,
   VIRTUAL_TYPES,
-  BASIC_TYPES,
+  // BASIC_TYPES,
   PAGE_TYPES
 } from './config/suseai';
 import type { RancherStore } from './types/rancher-types';
@@ -19,19 +19,31 @@ export function init($plugin: IPlugin, store: RancherStore) {
   store.registerModule?.(PRODUCT, suseaiStore);
 
   // Configure product following standard patterns
-  product({
+  // product({
+  //   category: SUSEAI_PRODUCT.category,
+  //   name: PRODUCT,
+  //   icon: SUSEAI_PRODUCT.icon,
+  //   inStore: SUSEAI_PRODUCT.inStore,
+  //   weight: SUSEAI_PRODUCT.weight,
+  //   to: {
+  //     name: `c-cluster-${PRODUCT}-${PAGE_TYPES.APPS}`,
+  //     params: { product: PRODUCT, cluster: BLANK_CLUSTER },
+  //     meta: { product: PRODUCT }
+  //   }
+  // });
+
+    product({
     category: SUSEAI_PRODUCT.category,
     name: PRODUCT,
     icon: SUSEAI_PRODUCT.icon,
     inStore: SUSEAI_PRODUCT.inStore,
     weight: SUSEAI_PRODUCT.weight,
     to: {
-      name: `c-cluster-${PRODUCT}-${PAGE_TYPES.APPS}`,
+      name: `c-cluster-${PRODUCT}-${PAGE_TYPES.UP}`,
       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
       meta: { product: PRODUCT }
     }
   });
-
   // Register virtual types following standard patterns
   VIRTUAL_TYPES.forEach(vType => {
     virtualType({
@@ -42,7 +54,7 @@ export function init($plugin: IPlugin, store: RancherStore) {
   });
 
   // Register basic types
-  basicType(BASIC_TYPES);
+  // basicType(BASIC_TYPES);
   // registering some of the defined pages as side-menu entries in a group
   basicType([PAGE_TYPES.MCPGATEWAY,PAGE_TYPES.MCPREGISTRY,PAGE_TYPES.VIRTUALMCP,PAGE_TYPES.SMARTAGENTS], PAGE_TYPES.UP);
   // // => => => ordering of the grouped entry

@@ -80,6 +80,47 @@ export interface DiscoveredServer {
   security_findings?: any[]; // Will be defined by backend API
 }
 
+export interface RegistryServer {
+  _meta?: Record<string, any>;
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  protocol: string;
+  url: string;
+  validation_status: string;
+  discovered_at: string;
+  repository?: {
+    source: string;
+    url: string;
+  };
+  packages: RegistryPackage[];
+  tools: RegistryTool[];
+}
+
+export interface RegistryPackage {
+  identifier: string;
+  registryType: string;
+  transport: {
+    type: string;
+  };
+  environmentVariables?: RegistryEnvironmentVariable[];
+}
+
+export interface RegistryEnvironmentVariable {
+  name: string;
+  description: string;
+  default: string;
+  format: string;
+  isSecret: boolean;
+}
+
+export interface RegistryTool {
+  name: string;
+  description: string;
+  input_schema: Record<string, any>;
+}
+
 export class MCPService {
   static async createAdapter(data: AdapterData) {
     try {
@@ -179,5 +220,44 @@ export class MCPService {
     }
   }
 
+  static async getRegistryServers(): Promise<RegistryServer[]> {
+    try {
+      const response = await apiClient.get('/registry');
+      return response.data || [];
+    } catch (error) {
+      console.error('Failed to fetch registry servers:', error);
+      return [];
+    }
+  }
+
+  static async getPublicRegistryServers(): Promise<RegistryServer[]> {
+    try {
+      const response = await apiClient.get('/public/registry');
+      return response.data || [];
+    } catch (error) {
+      console.error('Failed to fetch public registry servers:', error);
+      return [];
+    }
+  }
+
+  static async getRegistryServer(id: string): Promise<RegistryServer | null> {
+    try {
+      const response = await apiClient.get(`/registry/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch registry server details:', error);
+      return null;
+    }
+  }
+
+  static async browseRegistryServers(): Promise<RegistryServer[]> {
+    try {
+      const response = await apiClient.get('/registry/browse');
+      return response.data || [];
+    } catch (error) {
+      console.error('Failed to browse registry servers:', error);
+      return [];
+    }
+  }
 
 }

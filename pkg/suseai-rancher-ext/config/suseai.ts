@@ -49,46 +49,46 @@ export interface NavItem {
   icon?: string;
 }
 
-export const NAVIGATION_ITEMS: NavItem[] = [
-  {
-    name: 'apps',
-    label: 'Apps',
-    route: {
-      name: `c-cluster-${PRODUCT}-apps`,
-      params: { product: PRODUCT, cluster: BLANK_CLUSTER },
-      meta: { product: PRODUCT }
-    },
-    icon: 'apps'
-  },
-  {
-    name: 'install',
-    label: 'Install',
-    route: {
-      name: `c-cluster-${PRODUCT}-install`,
-      params: { product: PRODUCT, cluster: BLANK_CLUSTER },
-      meta: { product: PRODUCT }
-    },
-    icon: 'plus'
-  },
-  {
-    name: 'manage',
-    label: 'Manage',
-    route: {
-      name: `c-cluster-${PRODUCT}-manage`,
-      params: { product: PRODUCT, cluster: BLANK_CLUSTER },
-      meta: { product: PRODUCT }
-    },
-    icon: 'compass'
-  }
-];
+// export const NAVIGATION_ITEMS: NavItem[] = [
+//   {
+//     name: 'apps',
+//     label: 'Apps',
+//     route: {
+//       name: `c-cluster-${PRODUCT}-apps`,
+//       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
+//       meta: { product: PRODUCT }
+//     },
+//     icon: 'apps'
+//   },
+//   {
+//     name: 'install',
+//     label: 'Install',
+//     route: {
+//       name: `c-cluster-${PRODUCT}-install`,
+//       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
+//       meta: { product: PRODUCT }
+//     },
+//     icon: 'plus'
+//   },
+//   {
+//     name: 'manage',
+//     label: 'Manage',
+//     route: {
+//       name: `c-cluster-${PRODUCT}-manage`,
+//       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
+//       meta: { product: PRODUCT }
+//     },
+//     icon: 'compass'
+//   }
+// ];
 
 // === Page Definitions ===
 export const PAGE_TYPES = {
-  APPS: 'apps',
-  INSTALL: 'install',
-  MANAGE: 'manage',
-  REPOSITORIES: 'repositories',
-  SETTINGS: 'settings',
+  // APPS: 'apps',
+  // INSTALL: 'install',
+  // MANAGE: 'manage',
+  // REPOSITORIES: 'repositories',
+  // SETTINGS: 'settings',
   UP: "SUSE AI Universal Proxy",
   MCPGATEWAY: "MCP gateway",
   MCPREGISTRY: "MCP registry",
@@ -109,24 +109,24 @@ export interface VirtualTypeConfig {
 }
 
 export const VIRTUAL_TYPES: VirtualTypeConfig[] = [
-  {
-    name: PAGE_TYPES.APPS,
-    label: 'AI Collection',
-    route: {
-      name: `c-cluster-${PRODUCT}-${PAGE_TYPES.APPS}`,
-      params: { product: PRODUCT, cluster: BLANK_CLUSTER },
-      meta: { product: PRODUCT }
-    }
-  },
-  {
-    name: PAGE_TYPES.QUICKSTARTS,
-    label: 'Quick Starts',
-    route: {
-      name: `c-cluster-${PRODUCT}-quick-starts`,
-      params: { product: PRODUCT, cluster: BLANK_CLUSTER },
-      meta: { product: PRODUCT }
-    }
-  },
+  // {
+  //   name: PAGE_TYPES.APPS,
+  //   label: 'AI Collection',
+  //   route: {
+  //     name: `c-cluster-${PRODUCT}-${PAGE_TYPES.APPS}`,
+  //     params: { product: PRODUCT, cluster: BLANK_CLUSTER },
+  //     meta: { product: PRODUCT }
+  //   }
+  // },
+  // {
+  //   name: PAGE_TYPES.QUICKSTARTS,
+  //   label: 'Quick Starts',
+  //   route: {
+  //     name: `c-cluster-${PRODUCT}-quick-starts`,
+  //     params: { product: PRODUCT, cluster: BLANK_CLUSTER },
+  //     meta: { product: PRODUCT }
+  //   }
+  // },
   {
     name: PAGE_TYPES.UP,
     label: 'SUSE AI Universal Proxy',
@@ -175,10 +175,10 @@ export const VIRTUAL_TYPES: VirtualTypeConfig[] = [
 ];
 
 // === Basic Types Configuration ===
-export const BASIC_TYPES = [
-  PAGE_TYPES.APPS,
-  PAGE_TYPES.QUICKSTARTS
-];
+// export const BASIC_TYPES = [
+//   PAGE_TYPES.APPS,
+//   PAGE_TYPES.QUICKSTARTS
+// ];
 
 
 
