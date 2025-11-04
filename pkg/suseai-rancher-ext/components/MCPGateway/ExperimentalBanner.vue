@@ -2,7 +2,7 @@
   <div class="experimental-banner">
     <span class="banner-icon">⚠️</span>
     <strong>Experimental Feature</strong>
-    <p>This SUSE AI Universal Proxy feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
+    <p>This SUSE AI Universal Proxy feature is experimental and may not be completly stable. DO NOT USE IT in production. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
   </div>
 </template>
 

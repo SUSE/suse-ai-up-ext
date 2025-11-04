@@ -99,13 +99,13 @@
                  >
                    <div class="tile-header">
                      <div class="tile-logo-container">
-                        <img
-                          v-if="getServerLogo(server.name, server.iconClass, server.iconurl)"
-                          :src="getServerLogo(server.name, server.iconClass, server.iconurl)"
-                          :alt="`${server.name} logo`"
-                          class="tile-logo"
-                          @error="handleImageError"
-                        />
+                         <img
+                           v-if="getServerLogo(server.name, server.iconClass, server.iconurl, server)"
+                           :src="getServerLogo(server.name, server.iconClass, server.iconurl, server)"
+                           :alt="`${server.name} logo`"
+                           class="tile-logo"
+                           @error="handleImageError"
+                         />
                        <div v-else class="tile-icon">
                          <i :class="server.iconClass" aria-hidden="true" />
                        </div>
@@ -487,7 +487,7 @@ export default defineComponent({
         name: 'Docker MCP Registry',
         url: 'https://hub.docker.com/r/mcp',
         source: 'docker',
-        enabled: false,
+        enabled: true,
         lastSync: null,
         serverCount: 0
       },
@@ -574,7 +574,7 @@ export default defineComponent({
             description: server.description,
             author: server.repository?.source || 'Unknown',
             stars: Math.floor(Math.random() * 10000) + 1000, // Could be removed or fetched from API
-            iconClass: server.name?.toLowerCase().includes('suse') ? 'suse-logo' : 'icon icon-server',
+            iconClass: server.name?.toLowerCase().includes('suse') ? 'suse-logo' : (server.repository?.source === 'docker' ? 'docker-logo' : 'icon icon-server'),
             iconurl: server.iconurl, // Add iconurl from server data
             status: isAlwaysInstalled ? 'installed' : 'not-installed',
             version: server.version,
@@ -957,7 +957,7 @@ export default defineComponent({
       };
     };
 
-    const getServerLogo = (serverName: string, iconClass: string, iconurl?: string) => {
+    const getServerLogo = (serverName: string, iconClass: string, iconurl?: string, server?: any) => {
       // First check if iconurl is provided (e.g., from Docker registry)
       if (iconurl) {
         return iconurl;
@@ -965,6 +965,10 @@ export default defineComponent({
       // Fallback to existing logic
       if (iconClass === 'suse-logo' || serverName.toLowerCase().includes('suse')) {
         return '/SUSE_Logo-vert.jpg'; // Absolute path from public folder root
+      }
+      // For Docker servers, use local Docker icon
+      if (server?.repository?.source === 'docker') {
+        return '/docker-icon.svg';
       }
       // For other servers, return empty to show placeholder
       return '';
@@ -1404,6 +1408,10 @@ export default defineComponent({
 
 .suse-logo {
   background: #90ebcd;
+}
+
+.docker-logo {
+  background: linear-gradient(135deg, #2496ED, #1e87db);
 }
 
 /* Responsive design */
