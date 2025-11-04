@@ -230,17 +230,25 @@
             <button @click="showRegistryModal = false" class="btn btn-sm">×</button>
           </div>
           <div class="modal-body">
-            <div class="registry-management">
-              <div class="registry-actions">
-                <button
-                  class="btn btn-primary"
-                  @click="syncAllRegistries"
-                  :disabled="syncingRegistry !== null"
-                >
-                  <i v-if="syncingRegistry !== null" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
-                  {{ syncingRegistry !== null ? 'Syncing...' : 'Sync All Enabled' }}
-                </button>
-              </div>
+             <div class="registry-management">
+               <div class="registry-actions">
+                 <button
+                   class="btn btn-primary"
+                   @click="syncAllRegistries"
+                   :disabled="syncingRegistry !== null"
+                 >
+                   <i v-if="syncingRegistry !== null" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
+                   {{ syncingRegistry !== null ? 'Syncing...' : 'Sync All Enabled' }}
+                 </button>
+                 <button
+                   class="btn btn-secondary"
+                   @click="showAdvancedModal = true"
+                   :title="'Advanced Registry Options'"
+                   :aria-label="'Advanced Registry Options'"
+                 >
+                   Advanced
+                 </button>
+               </div>
 
               <div class="registries-list">
                 <div
@@ -283,16 +291,61 @@
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </template>
+           </div>
+         </div>
+       </div>
+
+       <!-- Advanced Registry Options Modal -->
+       <div v-if="showAdvancedModal" class="modal-overlay" @click="showAdvancedModal = false">
+         <div class="modal-content" @click.stop>
+           <div class="modal-header">
+             <h3>Advanced Registry Options</h3>
+             <button @click="showAdvancedModal = false" class="btn btn-sm">×</button>
+           </div>
+           <div class="modal-body">
+             <div class="advanced-options">
+               <p class="warning-text">
+                 <i class="icon icon-warning" aria-hidden="true"></i>
+                 These operations may affect your registry data. Use with caution.
+               </p>
+               <div class="option-buttons">
+                 <button
+                   class="btn btn-danger"
+                   @click="clearAllEntries"
+                   :title="'Clear all registry entries and reset data'"
+                 >
+                   <i class="icon icon-trash" aria-hidden="true"></i>
+                   Clean All Entries
+                 </button>
+                 <button
+                   class="btn btn-secondary"
+                   @click="checkAvailability"
+                   :title="'Check which servers are currently available'"
+                 >
+                   <i class="icon icon-check" aria-hidden="true"></i>
+                   Check Availability
+                 </button>
+                 <button
+                   class="btn btn-secondary"
+                   @click="checkSecurity"
+                   :title="'Run security checks on registry servers'"
+                 >
+                   <i class="icon icon-shield" aria-hidden="true"></i>
+                   Check Security
+                 </button>
+               </div>
+             </div>
+           </div>
+         </div>
+       </div>
+     </div>
+   </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, getCurrentInstance } from 'vue';
 import { useStore } from 'vuex';
 import { MCPService } from '../services/mcp-service';
+import { persistLoad, persistSave, persistClear } from '../services/ui-persist';
 import type { RegistryServer } from '../services/mcp-service';
 
 interface Registry {
@@ -321,6 +374,7 @@ export default defineComponent({
     const showImportModal = ref(false);
     const showViewModal = ref(false);
     const showRegistryModal = ref(false);
+    const showAdvancedModal = ref(false);
     const isLoading = ref(true);
     const registryServers = ref<any[]>([]);
     const selectedServer = ref<RegistryServer | null>(null);
@@ -328,7 +382,7 @@ export default defineComponent({
     // Registry management
     const publicRegistries = ref<Registry[]>([
       {
-        id: 'mcp-official',
+        id: 'official-mcp',
         name: 'MCP Official Registry',
         url: 'https://registry.modelcontextprotocol.io',
         enabled: true,
@@ -479,182 +533,37 @@ export default defineComponent({
 
       syncingRegistry.value = registryId;
       try {
-        // Simulate API call to sync from registry
         console.log(`Syncing from ${registry.name}...`);
 
-        // Fake sync delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Call real API with source filtering
+        const response = await fetch(`http://localhost:8911/public/registry?source=${registryId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-        // Fake server data based on registry
-        let fakeServers: any[] = [];
-        if (registryId === 'mcp-official') {
-          fakeServers = [
-            {
-              id: 'official-weather-mcp',
-              name: 'Weather MCP (Official)',
-              description: 'Official weather information MCP server with current conditions and forecasts',
-              version: '1.2.0',
-              protocol: 'http',
-              url: 'https://weather-mcp.example.com',
-              validation_status: 'valid',
-              discovered_at: new Date().toISOString(),
-              packages: [{
-                identifier: '@modelcontextprotocol/weather-mcp',
-                registryType: 'npm',
-                transport: { type: 'stdio' }
-              }],
-              tools: [
-                { name: 'get_current_weather', description: 'Get current weather for a location' },
-                { name: 'get_weather_forecast', description: 'Get weather forecast for upcoming days' }
-              ],
-              repository: { source: 'official', url: 'https://github.com/modelcontextprotocol/weather-mcp' }
-            },
-            {
-              id: 'official-filesystem-mcp',
-              name: 'Filesystem MCP (Official)',
-              description: 'Secure file system operations MCP server',
-              version: '2.0.1',
-              protocol: 'http',
-              url: 'https://filesystem-mcp.example.com',
-              validation_status: 'valid',
-              discovered_at: new Date().toISOString(),
-              packages: [{
-                identifier: '@modelcontextprotocol/filesystem-mcp',
-                registryType: 'npm',
-                transport: { type: 'stdio' }
-              }],
-              tools: [
-                { name: 'read_file', description: 'Read contents of a file' },
-                { name: 'write_file', description: 'Write content to a file' },
-                { name: 'list_directory', description: 'List contents of a directory' }
-              ],
-              repository: { source: 'official', url: 'https://github.com/modelcontextprotocol/filesystem-mcp' }
-            },
-            {
-              id: 'official-github-mcp',
-              name: 'GitHub MCP (Official)',
-              description: 'GitHub integration MCP server for repository management',
-              version: '1.5.0',
-              protocol: 'http',
-              url: 'https://github-mcp.example.com',
-              validation_status: 'valid',
-              discovered_at: new Date().toISOString(),
-              packages: [{
-                identifier: '@modelcontextprotocol/github-mcp',
-                registryType: 'npm',
-                transport: { type: 'stdio' }
-              }],
-              tools: [
-                { name: 'search_repositories', description: 'Search GitHub repositories' },
-                { name: 'get_pull_request', description: 'Get details of a pull request' },
-                { name: 'create_issue', description: 'Create a new GitHub issue' }
-              ],
-              repository: { source: 'official', url: 'https://github.com/modelcontextprotocol/github-mcp' }
-            }
-          ];
-        } else if (registryId === 'docker-mcp') {
-          fakeServers = [
-            {
-              id: 'docker-git-mcp',
-              name: 'Git MCP (Docker)',
-              description: 'Git operations MCP server via Docker container',
-              version: '1.1.0',
-              protocol: 'http',
-              url: 'https://git-mcp.example.com',
-              validation_status: 'valid',
-              discovered_at: new Date().toISOString(),
-              packages: [{
-                identifier: 'mcp/git:latest',
-                registryType: 'docker',
-                transport: { type: 'stdio' }
-              }],
-              tools: [
-                { name: 'git_status', description: 'Get git repository status' },
-                { name: 'git_commit', description: 'Create a git commit' },
-                { name: 'git_log', description: 'View git commit history' }
-              ],
-              repository: { source: 'docker', url: 'https://hub.docker.com/r/mcp/git' }
-            },
-            {
-              id: 'docker-database-mcp',
-              name: 'Database MCP (Docker)',
-              description: 'Database operations MCP server for SQL databases',
-              version: '2.1.0',
-              protocol: 'http',
-              url: 'https://database-mcp.example.com',
-              validation_status: 'valid',
-              discovered_at: new Date().toISOString(),
-              packages: [{
-                identifier: 'mcp/database:v2.1.0',
-                registryType: 'docker',
-                transport: { type: 'stdio' }
-              }],
-              tools: [
-                { name: 'execute_query', description: 'Execute SQL query' },
-                { name: 'list_tables', description: 'List database tables' },
-                { name: 'get_schema', description: 'Get table schema information' }
-              ],
-              repository: { source: 'docker', url: 'https://hub.docker.com/r/mcp/database' }
-            }
-          ];
-        } else if (registryId === 'community-mcp') {
-          fakeServers = [
-            {
-              id: 'community-slack-mcp',
-              name: 'Slack MCP (Community)',
-              description: 'Community-built Slack integration MCP server',
-              version: '0.8.0',
-              protocol: 'http',
-              url: 'https://slack-mcp.example.com',
-              validation_status: 'valid',
-              discovered_at: new Date().toISOString(),
-              packages: [{
-                identifier: 'community/slack-mcp',
-                registryType: 'npm',
-                transport: { type: 'stdio' }
-              }],
-              tools: [
-                { name: 'send_message', description: 'Send message to Slack channel' },
-                { name: 'list_channels', description: 'List available Slack channels' },
-                { name: 'get_user_info', description: 'Get Slack user information' }
-              ],
-              repository: { source: 'community', url: 'https://github.com/community-mcp/slack-mcp' }
-            },
-            {
-              id: 'community-calendar-mcp',
-              name: 'Calendar MCP (Community)',
-              description: 'Calendar and scheduling MCP server for Google Calendar integration',
-              version: '1.0.0-beta',
-              protocol: 'http',
-              url: 'https://calendar-mcp.example.com',
-              validation_status: 'valid',
-              discovered_at: new Date().toISOString(),
-              packages: [{
-                identifier: 'community/calendar-mcp',
-                registryType: 'npm',
-                transport: { type: 'stdio' }
-              }],
-              tools: [
-                { name: 'create_event', description: 'Create calendar event' },
-                { name: 'list_events', description: 'List upcoming calendar events' },
-                { name: 'update_event', description: 'Update existing calendar event' }
-              ],
-              repository: { source: 'community', url: 'https://github.com/community-mcp/calendar-mcp' }
-            }
-          ];
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // Add new servers to registry
-        const processedServers = processServerData(fakeServers);
+        const servers = await response.json();
+
+        // Process and add new servers to registry
+        const processedServers = processServerData(servers);
         registryServers.value.push(...processedServers);
 
         // Update registry info
         registry.lastSync = new Date().toISOString();
-        registry.serverCount = fakeServers.length;
+        registry.serverCount = servers.length;
 
-        console.log(`Successfully synced ${fakeServers.length} servers from ${registry.name}`);
+        // Persist the updated data
+        persistRegistryData();
+
+        console.log(`Successfully synced ${servers.length} servers from ${registry.name}`);
       } catch (error) {
         console.error(`Failed to sync from ${registry.name}:`, error);
+        // Could show a user notification here
       } finally {
         syncingRegistry.value = null;
       }
@@ -665,6 +574,45 @@ export default defineComponent({
       for (const registry of enabledRegistries) {
         await syncRegistry(registry.id);
       }
+    };
+
+    // Persistence helper
+    const persistRegistryData = () => {
+      const data = {
+        servers: registryServers.value,
+        registries: publicRegistries.value.map(r => ({
+          id: r.id,
+          lastSync: r.lastSync,
+          serverCount: r.serverCount
+        }))
+      };
+      persistSave('mcp-registry-data', data);
+    };
+
+    // Advanced modal functions
+    const clearAllEntries = () => {
+      registryServers.value = [];
+      publicRegistries.value.forEach(registry => {
+        registry.lastSync = null;
+        registry.serverCount = 0;
+      });
+      persistClear('mcp-registry-data');
+      showAdvancedModal.value = false;
+      console.log('All registry entries cleared');
+    };
+
+    const checkAvailability = async () => {
+      console.log('Checking server availability...');
+      // TODO: Implement availability checking
+      // This would ping each server to see if it's still online
+      showAdvancedModal.value = false;
+    };
+
+    const checkSecurity = async () => {
+      console.log('Running security checks...');
+      // TODO: Implement security scanning
+      // This would run security scans on registry servers
+      showAdvancedModal.value = false;
     };
 
     const onTileClick = (server: any) => {
@@ -791,7 +739,21 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      loadRegistryServers();
+      // Load persisted registry servers if available
+      const persisted = persistLoad<{ servers: any[]; registries: { id: string; lastSync: string | null; serverCount: number }[] }>('mcp-registry-data', { servers: [], registries: [] }, 24 * 60 * 60 * 1000); // 24 hours TTL
+      if (persisted.servers) {
+        registryServers.value = persisted.servers;
+      }
+      if (persisted.registries) {
+        // Update registry states with persisted data
+        persisted.registries.forEach((persistedRegistry: { id: string; lastSync: string | null; serverCount: number }) => {
+          const registry = publicRegistries.value.find(r => r.id === persistedRegistry.id);
+          if (registry) {
+            registry.lastSync = persistedRegistry.lastSync;
+            registry.serverCount = persistedRegistry.serverCount;
+          }
+        });
+      }
       isLoading.value = false;
     });
 
@@ -803,10 +765,11 @@ export default defineComponent({
     return {
       isEnabled,
       searchQuery,
-      showAddModal,
-      showImportModal,
-      showViewModal,
-      showRegistryModal,
+       showAddModal,
+       showImportModal,
+       showViewModal,
+       showRegistryModal,
+       showAdvancedModal,
       selectedServer,
       registryServers,
       filteredServers,
@@ -815,9 +778,12 @@ export default defineComponent({
       handleInstallServer,
       handleRemoveServer,
       handleViewServer,
-      toggleRegistry,
-      syncRegistry,
-      syncAllRegistries,
+       toggleRegistry,
+       syncRegistry,
+       syncAllRegistries,
+       clearAllEntries,
+       checkAvailability,
+       checkSecurity,
       isLoading,
       newMcpServer,
       handleAddMcpServer,
@@ -1472,5 +1438,53 @@ export default defineComponent({
     display: flex;
     justify-content: center;
   }
+}
+
+/* Advanced Modal Styles */
+.advanced-options {
+  padding: 16px 0;
+}
+
+.warning-text {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #856404;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warning-text .icon {
+  color: #856404;
+  font-size: 16px;
+}
+
+.option-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.option-buttons .btn {
+  justify-content: flex-start;
+  padding: 12px 16px;
+}
+
+.option-buttons .btn .icon {
+  margin-right: 8px;
+}
+
+.option-buttons .btn-danger {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.option-buttons .btn-danger:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
 }
 </style>
