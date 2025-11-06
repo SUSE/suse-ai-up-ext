@@ -8,6 +8,7 @@ const apiClient = axios.create({
 });
 
 export interface AdapterData {
+  id: string;
   name: string;
   imageName: string;
   imageVersion: string;
@@ -17,6 +18,7 @@ export interface AdapterData {
   replicaCount: number;
   useWorkloadIdentity: boolean;
   environmentVariables?: Record<string, string>;
+  originalServer?: DiscoveredServer;
 }
 
 export interface ScanConfig {
@@ -58,6 +60,7 @@ export interface AdapterResource {
   replicaCount?: number;
   useWorkloadIdentity?: boolean;
   lastUpdatedAt?: string;
+  originalServer?: DiscoveredServer;
 }
 
 
@@ -129,6 +132,16 @@ export class MCPService {
       return response.data;
     } catch (error) {
       console.error('Failed to create adapter:', error);
+      throw error;
+    }
+  }
+
+  static async registerDiscoveredServer(serverId: string) {
+    try {
+      const response = await apiClient.post('/register', { DiscoveredServerId: serverId });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to register discovered server:', error);
       throw error;
     }
   }

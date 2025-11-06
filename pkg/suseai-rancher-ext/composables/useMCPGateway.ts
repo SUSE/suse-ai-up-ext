@@ -2,7 +2,7 @@ import { computed, ref, getCurrentInstance, onMounted, onUnmounted, nextTick, wa
 import { useStore } from 'vuex';
 import { logger } from '../utils/logger';
 import { MCPService } from '../services/mcp-service';
-import type { AdapterResource, DiscoveredServer } from '../services/mcp-service';
+import type { AdapterResource, DiscoveredServer, AdapterData } from '../services/mcp-service';
 
 interface Service {
   id: string;
@@ -346,26 +346,27 @@ export function useMCPGateway() {
     }
   };
 
+  const generateAdapterName = (server: DiscoveredServer): string => {
+    // For /register endpoint, use server name as alias/display name
+    // This is the human-readable name like "MCP Server (Authenticated)"
+    return server.name || server.address;
+  };
+
   const registerServer = async (server: DiscoveredServer) => {
     try {
-      // Create adapter data from discovered server
-      const adapterData = {
-        name: `adapter-${server.id}`,
-        imageName: 'mcp-server', // Default image
-        imageVersion: 'latest',
-        connectionType: server.connection,
-        protocol: server.protocol,
-        description: `Adapter for discovered server ${server.address}`,
-        replicaCount: 1,
-        useWorkloadIdentity: false
-      };
-
-      await MCPService.createAdapter(adapterData);
+      // Register discovered server by ID - the /register endpoint handles the rest
+      const result = await MCPService.registerDiscoveredServer(server.id);
 
       // Refresh adapters list
       await fetchAdapters();
 
-      logger.info('Server registered successfully', { data: { serverId: server.id, adapterName: adapterData.name } });
+      logger.info('Server registered successfully', {
+        data: {
+          serverId: server.id,
+          adapterId: result.adapter?.id,
+          adapterName: result.adapter?.name
+        }
+      });
 
     } catch (err) {
       logger.error('Failed to register server', err);
