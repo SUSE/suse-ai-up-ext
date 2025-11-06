@@ -20,31 +20,92 @@
       @rule-management-open="handleRuleManagement"
     />
 
-    <AdaptersTable
-      :adapters="adapters"
-      :loading="loading"
-      :error="error || undefined"
-      @view-logs="handleViewAdapterLogs"
-      @edit-adapter="handleEditAdapter"
-      @delete-adapter="handleDeleteAdapter"
-    />
+    <div class="tabs-container">
+      <div class="tab-nav">
+        <button 
+          v-for="tab in tabs" 
+          :key="tab.id"
+          :class="['tab-button', { active: activeTab === tab.id }]"
+          @click="activeTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
 
-    <DiscoveredServersTable
-      :discovered-servers="discoveredServers"
-      :loading="loading"
-      @view-server-details="handleViewServerDetails"
-      @register-server="handleRegisterServer"
-    />
+      <div class="tab-content">
+        <!-- Overview Tab -->
+        <div v-if="activeTab === 'overview'" class="tab-pane">
+          <AdaptersTable
+            :adapters="adapters"
+            :loading="loading"
+            :error="error || undefined"
+            @view-logs="handleViewAdapterLogs"
+            @edit-adapter="handleEditAdapter"
+            @delete-adapter="handleDeleteAdapter"
+          />
+
+          <DiscoveredServersTable
+            :discovered-servers="discoveredServers"
+            :loading="loading"
+            @view-server-details="handleViewServerDetails"
+            @register-server="handleRegisterServer"
+          />
+        </div>
+
+        <!-- Adapter Details Tab -->
+        <div v-if="activeTab === 'adapters'" class="tab-pane">
+          <div v-if="adapters.length === 0" class="no-data">
+            <p>No adapters available</p>
+          </div>
+          <div v-else>
+            <div class="adapter-selector">
+              <label>Select Adapter:</label>
+              <select v-model="selectedAdapterName">
+                <option v-for="adapter in adapters" :key="adapter.name" :value="adapter.name">
+                  {{ adapter.name }}
+                </option>
+              </select>
+            </div>
+            <AdapterDetails
+              v-if="selectedAdapter"
+              :adapter="selectedAdapter"
+              @edit-adapter="handleEditAdapter"
+            />
+          </div>
+        </div>
+
+        <!-- Session Manager Tab -->
+        <div v-if="activeTab === 'sessions'" class="tab-pane">
+          <SessionManager
+            :adapters="adapters"
+            @create-session="handleCreateSession"
+            @terminate-session="handleTerminateSession"
+            @view-session-details="handleViewSessionDetails"
+          />
+        </div>
+
+        <!-- Real-time Metrics Tab -->
+        <div v-if="activeTab === 'metrics'" class="tab-pane">
+          <RealTimeMetrics
+            :adapters="adapters"
+            @refresh-metrics="handleRefreshMetrics"
+          />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, ref, computed } from 'vue';
 import { useMCPGateway } from '../../composables/useMCPGateway';
 import MetricsGrid from './MetricsGrid.vue';
 import ScanActions from './ScanActions.vue';
 import AdaptersTable from './AdaptersTable.vue';
 import DiscoveredServersTable from './DiscoveredServersTable.vue';
+import AdapterDetails from './AdapterDetails.vue';
+import SessionManager from './SessionManager.vue';
+import RealTimeMetrics from './RealTimeMetrics.vue';
 
 export default defineComponent({
   name: 'Dashboard',
@@ -52,10 +113,27 @@ export default defineComponent({
     MetricsGrid,
     ScanActions,
     AdaptersTable,
-    DiscoveredServersTable
+    DiscoveredServersTable,
+    AdapterDetails,
+    SessionManager,
+    RealTimeMetrics
   },
   emits: ['scan-modal-open', 'security-modal-open', 'rule-modal-open'],
   setup(props, { emit }) {
+    const activeTab = ref('overview');
+    const selectedAdapterName = ref('');
+    
+    const tabs = [
+      { id: 'overview', label: 'Overview' },
+      { id: 'adapters', label: 'Adapter Details' },
+      { id: 'sessions', label: 'Session Manager' },
+      { id: 'metrics', label: 'Real-time Metrics' }
+    ];
+
+    const selectedAdapter = computed(() => {
+      return adapters.value.find(adapter => adapter.name === selectedAdapterName.value) || null;
+    });
+
     const {
       // Dashboard data
       discoveredServers,
@@ -71,6 +149,12 @@ export default defineComponent({
       availableCount,
       errorRate,
 
+      // Enhanced data from useMCPGateway
+      sessions,
+      loadingSessions,
+      systemMetrics,
+      loadingMetrics,
+
       // Methods
       onScanStarted,
       openRuleManagement,
@@ -78,7 +162,12 @@ export default defineComponent({
       editAdapter,
       deleteAdapter,
       viewServerDetails,
-      registerServer
+      registerServer,
+
+      // Enhanced methods
+      createSession,
+      deleteSession,
+      fetchSystemMetrics
     } = useMCPGateway();
 
     const handleScanStart = () => {
@@ -88,8 +177,6 @@ export default defineComponent({
     const handleRuleManagement = () => {
       emit('rule-modal-open');
     };
-
-
 
     const handleViewAdapterLogs = (adapter: any) => {
       viewAdapterLogs(adapter);
@@ -112,7 +199,30 @@ export default defineComponent({
       registerServer(server);
     };
 
+    const handleCreateSession = (adapterId: string) => {
+      createSession(adapterId);
+    };
+
+    const handleTerminateSession = (adapterId: string, sessionId: string) => {
+      deleteSession(adapterId, sessionId);
+    };
+
+    const handleViewSessionDetails = (sessionId: string) => {
+      // Implementation for viewing session details
+      console.log('View session details:', sessionId);
+    };
+
+    const handleRefreshMetrics = () => {
+      fetchSystemMetrics();
+    };
+
     return {
+      // Tab management
+      activeTab,
+      tabs,
+      selectedAdapterName,
+      selectedAdapter,
+
       // Data
       discoveredServers,
       adapters,
@@ -127,6 +237,12 @@ export default defineComponent({
       availableCount,
       errorRate,
 
+      // Enhanced data
+      sessions,
+      loadingSessions,
+      systemMetrics,
+      loadingMetrics,
+
       // Handlers
       handleScanStart,
       handleRuleManagement,
@@ -134,7 +250,11 @@ export default defineComponent({
       handleEditAdapter,
       handleDeleteAdapter,
       handleViewServerDetails,
-      handleRegisterServer
+      handleRegisterServer,
+      handleCreateSession,
+      handleTerminateSession,
+      handleViewSessionDetails,
+      handleRefreshMetrics
     };
   }
 });
@@ -143,5 +263,56 @@ export default defineComponent({
 <style scoped>
 .mcp-gateway-content {
   padding: 24px;
+}
+
+.tabs-container {
+  margin-top: 24px;
+}
+
+.tab-nav {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--input-label);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+  color: var(--primary);
+  background-color: var(--muted);
+}
+
+.tab-button.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+
+.tab-content {
+  min-height: 400px;
+}
+
+.tab-pane {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

@@ -95,61 +95,32 @@
            </div>
          </div>
 
-         <!-- Security Testing Section -->
+         <!-- Advanced Options -->
          <div class="form-group">
-           <div class="security-section-header">
-             <label class="checkbox-label">
-               <input
-                 type="checkbox"
-                 v-model="scanConfig.security_test"
-                 class="form-checkbox"
-               />
-               <span class="checkbox-text">Enable Security Testing</span>
-             </label>
-             <button
-               type="button"
-               class="btn btn-sm btn-link"
-               @click="toggleSecuritySection"
-             >
-               {{ showSecuritySection ? 'Hide' : 'Show' }} Options
-             </button>
+           <label class="checkbox-label">
+             <input
+               type="checkbox"
+               v-model="scanConfig.excludeProxy"
+               class="form-checkbox"
+             />
+             <span class="checkbox-text">Exclude Proxy Address</span>
+           </label>
+           <div class="form-help">
+             Skip scanning the proxy's own address to avoid self-discovery.
            </div>
+         </div>
 
-           <div v-if="showSecuritySection && scanConfig.security_test" class="security-options">
-             <div class="form-group">
-               <label>Security Rules File:</label>
-               <input
-                 type="file"
-                 ref="rulesFileInput"
-                 @change="handleRulesFileChange"
-                 accept=".yaml,.yml"
-                 class="form-control"
-               />
-               <div class="form-help">
-                 Upload a YAML file with custom security rules. Leave empty to use built-in rules only.
-               </div>
-               <div v-if="rulesFileName" class="file-info">
-                 Selected: {{ rulesFileName }}
-                 <button type="button" class="btn btn-sm btn-link" @click="clearRulesFile">Clear</button>
-               </div>
-               <div v-if="rulesValidationError" class="error-message">
-                 {{ rulesValidationError }}
-               </div>
-               <div v-if="rulesPreview && !rulesValidationError" class="rules-preview">
-                 <strong>Rules Preview:</strong>
-                 <div class="rules-summary">
-                   <span>Built-in rules: {{ rulesPreview.builtin_count }}</span>
-                   <span>Custom rules: {{ rulesPreview.custom_count }}</span>
-                 </div>
-               </div>
-             </div>
-
-             <div class="security-warnings">
-               <div class="warning-message">
-                 ⚠️ Security testing may increase scan time and resource usage.
-               </div>
-             </div>
+         <div class="form-group">
+           <label>Exclude Addresses (Optional):</label>
+           <div class="form-help">
+             Additional addresses to skip during scanning (one per line)
            </div>
+           <textarea
+             v-model="excludeAddressesText"
+             class="form-control"
+             rows="3"
+             placeholder="192.168.1.100&#10;10.0.0.50"
+           ></textarea>
          </div>
 
         <div v-if="error" class="error-message">
@@ -183,29 +154,25 @@ const isVisible = ref(false);
 const scanning = ref(false);
 const error = ref<string>('');
 
-// Security testing state
-const showSecuritySection = ref(false);
-const rulesFileName = ref<string>('');
-const rulesValidationError = ref<string>('');
-const rulesPreview = ref<{builtin_count: number, custom_count: number} | null>(null);
-const rulesFileInput = ref<HTMLInputElement>();
+// Exclude addresses handling
+const excludeAddressesText = ref<string>('');
 
 
 
 // Scan configuration
 const scanConfig = ref<ScanConfig>({
   maxConcurrent: 10,
-  ports: [8000, 3000, 5000],
+  ports: ['8000', '3000', '5000'],
   scanRanges: ['192.168.1.0/24'],
   timeout: '30s',
-  security_test: false
+  excludeProxy: true
 } as ScanConfig);
 
 // Computed properties
 const isValid = computed(() => {
   // Validate scan configuration
-  return scanConfig.value.scanRanges.length > 0 &&
-         scanConfig.value.ports.length > 0 &&
+  return (scanConfig.value.scanRanges?.length || 0) > 0 &&
+         (scanConfig.value.ports?.length || 0) > 0 &&
          Number(scanConfig.value.maxConcurrent) > 0 &&
          !hasInvalidPorts.value;
 });
@@ -260,11 +227,9 @@ const reset = () => {
     ports: ['8000', '3000-3010'],
     scanRanges: ['192.168.1.0/24'],
     timeout: '30s',
-    security_test: false
+    excludeProxy: true
   };
-  rulesFileName.value = '';
-  rulesValidationError.value = '';
-  rulesPreview.value = null;
+  excludeAddressesText.value = '';
 };
 
 const addRange = () => {
@@ -293,62 +258,7 @@ const removePort = (index: number) => {
   }
 };
 
-const toggleSecuritySection = () => {
-  showSecuritySection.value = !showSecuritySection.value;
-};
 
-const handleRulesFileChange = async (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-
-  if (!file) {
-    clearRulesFile();
-    return;
-  }
-
-  rulesFileName.value = file.name;
-  rulesValidationError.value = '';
-
-  try {
-    const content = await file.text();
-    const parsed = yaml.load(content) as any;
-
-    // Basic validation
-    if (typeof parsed !== 'object' || parsed === null) {
-      throw new Error('Invalid YAML structure');
-    }
-
-    // Count rules
-    const builtinCount = parsed.global_settings ? 1 : 0;
-    const customCount = parsed.server_rules ?
-      Object.values(parsed.server_rules).reduce((count: number, serverRules: any) => {
-        return count + (serverRules.custom_rules ? serverRules.custom_rules.length : 0);
-      }, 0) : 0;
-
-    rulesPreview.value = {
-      builtin_count: builtinCount,
-      custom_count: customCount
-    };
-
-    // Store file content for submission (in a real implementation, you'd upload or store it)
-    scanConfig.value.security_rules = content;
-
-  } catch (err) {
-    rulesValidationError.value = `Invalid YAML file: ${err instanceof Error ? err.message : 'Unknown error'}`;
-    rulesPreview.value = null;
-    scanConfig.value.security_rules = undefined;
-  }
-};
-
-const clearRulesFile = () => {
-  rulesFileName.value = '';
-  rulesValidationError.value = '';
-  rulesPreview.value = null;
-  scanConfig.value.security_rules = undefined;
-  if (rulesFileInput.value) {
-    rulesFileInput.value.value = '';
-  }
-};
 
     const scheduleScan = async () => {
       scanning.value = true;
@@ -357,7 +267,10 @@ const clearRulesFile = () => {
 
         // Prepare scan config for backend API
         const backendConfig = {
-          ...scanConfig.value
+          ...scanConfig.value,
+          excludeAddresses: excludeAddressesText.value 
+            ? excludeAddressesText.value.split('\n').map(addr => addr.trim()).filter(addr => addr)
+            : undefined
         };
 
         const scanResult = await MCPService.startScan(backendConfig);

@@ -2,7 +2,25 @@ import { computed, ref, getCurrentInstance, onMounted, onUnmounted, nextTick, wa
 import { useStore } from 'vuex';
 import { logger } from '../utils/logger';
 import { MCPService } from '../services/mcp-service';
-import type { AdapterResource, DiscoveredServer, AdapterData } from '../services/mcp-service';
+import { tokenService } from '../services/token-service';
+import { API_BASE_URLS } from '../config/api-config';
+import type { 
+  AdapterResource, 
+  DiscoveredServer, 
+  AdapterData,
+  SessionInfo,
+  SessionListResponse
+} from '../services/mcp-service';
+import type {
+  Adapter as EnhancedAdapter,
+  Session as EnhancedSession,
+  AdapterHealth,
+  AdapterMetrics,
+  SystemMetrics,
+  AdapterToken,
+  TokenValidationResult,
+  SessionMetrics
+} from '../types/mcp-types';
 
 interface Service {
   id: string;
@@ -53,6 +71,27 @@ export function useMCPGateway() {
   // Modal refs and data
   const selectedServerFindings = ref<any[]>([]);
   const selectedServerName = ref('');
+
+  // Session Management
+  const sessions = ref<Record<string, SessionInfo[]>>({});
+  const selectedAdapterSessions = ref<SessionInfo[]>([]);
+  const loadingSessions = ref(false);
+  const sessionMetrics = ref<Record<string, SessionMetrics>>({});
+
+  // Token Management
+  const adapterTokens = ref<Record<string, any>>({});
+  const loadingTokens = ref(false);
+  const tokenValidation = ref<Record<string, TokenValidationResult>>({});
+
+  // Metrics and Monitoring
+  const adapterMetrics = ref<Record<string, AdapterMetrics>>({});
+  const systemMetrics = ref<SystemMetrics | null>(null);
+  const loadingMetrics = ref(false);
+  const metricsPollInterval = ref<number | null>(null);
+
+  // Real-time updates
+  const realTimeUpdates = ref(false);
+  const eventSource = ref<EventSource | null>(null);
 
   // Polling
   let pollInterval: number | null = null;
@@ -294,26 +333,13 @@ export function useMCPGateway() {
   // MCP Gateway methods
   const fetchDiscoveredServers = async () => {
     try {
-      // If we have a current scan, get its results
-      if (currentScanId.value) {
-        const scanResult = await MCPService.getScanResults(currentScanId.value);
-        const servers = scanResult.results || scanResult.discovered_servers;
-        if (servers) {
-          discoveredServers.value = servers.sort((a: any, b: any) => {
-            const nameA = a.name || a.address;
-            const nameB = b.name || b.address;
-            return nameA.localeCompare(nameB);
-          });
-        }
-      } else {
-        // Fallback to direct server fetch (for backward compatibility)
-        const servers = await MCPService.getDiscoveredServers();
-        discoveredServers.value = servers.sort((a, b) => {
-          const nameA = a.name || a.address;
-          const nameB = b.name || b.address;
-          return nameA.localeCompare(nameB);
-        });
-      }
+      // Always fetch from discovery servers API to get current results
+      const servers = await MCPService.getDiscoveryServers();
+      discoveredServers.value = (servers as any).sort((a: any, b: any) => {
+        const nameA = a.name || a.address;
+        const nameB = b.name || b.address;
+        return nameA.localeCompare(nameB);
+      });
     } catch (err) {
       logger.error('Failed to fetch discovered servers', err);
       // Continue - this is not critical
@@ -361,12 +387,18 @@ export function useMCPGateway() {
       // Refresh adapters list to get the updated adapter with server_name
       await fetchAdapters();
 
+      // Find the newly created adapter from the refreshed list
+      const newAdapter = adapters.value.find(adapter => 
+        adapter.originalServer?.id === server.id || 
+        adapter.name === server.name
+      );
+
       logger.info('Server registered successfully', {
         data: {
           serverId: server.id,
-          adapterId: result.adapter?.id,
-          adapterName: result.adapter?.name || result.adapter?.server_name,
-          serverName: result.adapter?.server_name
+          adapterId: newAdapter?.name,
+          adapterName: newAdapter?.name,
+          serverName: newAdapter?.originalServer?.name || server.name
         }
       });
 
@@ -384,8 +416,9 @@ export function useMCPGateway() {
 
   const viewAdapterLogs = async (adapter: AdapterResource) => {
     try {
-      const logsResponse = await MCPService.getAdapterLogs(adapter.name);
-      alert(`Logs for ${adapter.name}:\n\n${logsResponse}`);
+      // TODO: Implement logs endpoint when available
+      // const logsResponse = await MCPService.getAdapterLogs(adapter.name);
+      alert(`Logs functionality not yet implemented for ${adapter.name}`);
     } catch (err) {
       logger.error('Failed to fetch adapter logs', err);
       alert('Failed to fetch adapter logs');
@@ -529,7 +562,7 @@ export function useMCPGateway() {
 
   const onScanStarted = (scanResult: any) => {
     scanning.value = true;
-    currentScanId.value = scanResult.scan_id;
+    currentScanId.value = scanResult.id || scanResult.scan_id;
 
     // Start polling for scan completion
     pollScanStatus();
@@ -602,7 +635,7 @@ export function useMCPGateway() {
 
   // Watch for service selection changes to trigger data loading
   watch(hasSelectedServices, (newValue) => {
-    if (newValue && discoveredServers.value.length === 0) {
+    if (newValue) {
       logger.info('Services selected, loading MCP data');
       loadData();
     }
@@ -615,6 +648,227 @@ export function useMCPGateway() {
     }
     stopServiceChecking();
   });
+
+  // Session Management Functions
+  const fetchSessions = async (adapterName: string) => {
+    try {
+      loadingSessions.value = true;
+      const sessionList = await MCPService.listSessions(adapterName);
+      sessions.value[adapterName] = sessionList.sessions;
+      selectedAdapterSessions.value = sessionList.sessions;
+    } catch (err) {
+      logger.error('Failed to fetch sessions', err);
+      sessions.value[adapterName] = [];
+      selectedAdapterSessions.value = [];
+    } finally {
+      loadingSessions.value = false;
+    }
+  };
+
+  const createSession = async (adapterName: string, clientInfo?: { name: string; version: string }) => {
+    try {
+      const response = await MCPService.createSession(adapterName, { clientInfo });
+      await fetchSessions(adapterName); // Refresh sessions list
+      return response;
+    } catch (err) {
+      logger.error('Failed to create session', err);
+      throw err;
+    }
+  };
+
+  const deleteSession = async (adapterName: string, sessionId: string) => {
+    try {
+      await MCPService.deleteSession(adapterName, sessionId);
+      await fetchSessions(adapterName); // Refresh sessions list
+    } catch (err) {
+      logger.error('Failed to delete session', err);
+      throw err;
+    }
+  };
+
+  const deleteAllSessions = async (adapterName: string) => {
+    try {
+      await MCPService.deleteAllSessions(adapterName);
+      await fetchSessions(adapterName); // Refresh sessions list
+    } catch (err) {
+      logger.error('Failed to delete all sessions', err);
+      throw err;
+    }
+  };
+
+  // Token Management Functions
+  const fetchAdapterToken = async (adapterName: string) => {
+    try {
+      loadingTokens.value = true;
+      const token = await tokenService.getAdapterToken(adapterName);
+      adapterTokens.value[adapterName] = token;
+      return token;
+    } catch (err) {
+      logger.error('Failed to fetch adapter token', err);
+      throw err;
+    } finally {
+      loadingTokens.value = false;
+    }
+  };
+
+  const refreshAdapterToken = async (adapterName: string) => {
+    try {
+      loadingTokens.value = true;
+      const token = await tokenService.refreshAdapterToken(adapterName);
+      adapterTokens.value[adapterName] = token;
+      return token;
+    } catch (err) {
+      logger.error('Failed to refresh adapter token', err);
+      throw err;
+    } finally {
+      loadingTokens.value = false;
+    }
+  };
+
+  const validateAdapterToken = async (adapterName: string, token: string) => {
+    try {
+      const validation = await tokenService.validateAdapterToken(adapterName, token);
+      tokenValidation.value[adapterName] = validation;
+      return validation;
+    } catch (err) {
+      logger.error('Failed to validate adapter token', err);
+      throw err;
+    }
+  };
+
+  const generateClientToken = async (adapterName: string, request: { clientId: string; permissions?: string[]; expiresIn?: number }) => {
+    try {
+      const token = await tokenService.generateClientToken(adapterName, request);
+      return token;
+    } catch (err) {
+      logger.error('Failed to generate client token', err);
+      throw err;
+    }
+  };
+
+  // Metrics Management Functions
+  const fetchAdapterMetrics = async (adapterName: string) => {
+    try {
+      loadingMetrics.value = true;
+      const metrics = await MCPService.getAdapterMetrics(adapterName);
+      adapterMetrics.value[adapterName] = metrics;
+      return metrics;
+    } catch (err) {
+      logger.error('Failed to fetch adapter metrics', err);
+      throw err;
+    } finally {
+      loadingMetrics.value = false;
+    }
+  };
+
+  const fetchSystemMetrics = async () => {
+    try {
+      const metrics = await MCPService.getSystemMetrics();
+      systemMetrics.value = metrics;
+      return metrics;
+    } catch (err) {
+      logger.error('Failed to fetch system metrics', err);
+      throw err;
+    }
+  };
+
+  const startMetricsPolling = (intervalMs: number = 30000) => {
+    if (metricsPollInterval.value) {
+      clearInterval(metricsPollInterval.value as any);
+    }
+    
+    metricsPollInterval.value = setInterval(async () => {
+      try {
+        await fetchSystemMetrics();
+        // Fetch metrics for all active adapters
+        for (const adapter of adapters.value) {
+          if (adapter.status === 'running') {
+            await fetchAdapterMetrics(adapter.name);
+          }
+        }
+      } catch (err) {
+        logger.error('Error in metrics polling', err);
+      }
+    }, intervalMs) as any;
+  };
+
+  const stopMetricsPolling = () => {
+    if (metricsPollInterval.value) {
+      clearInterval(metricsPollInterval.value);
+      metricsPollInterval.value = null;
+    }
+  };
+
+  // Real-time Updates
+  const startRealTimeUpdates = () => {
+    if (eventSource.value) {
+      eventSource.value.close();
+    }
+
+    try {
+      eventSource.value = new EventSource(`${API_BASE_URLS.MCP_GATEWAY}/events`);
+      
+      eventSource.value.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleRealTimeEvent(data);
+        } catch (err) {
+          logger.error('Failed to parse real-time event', err);
+        }
+      };
+
+      eventSource.value.onerror = (err) => {
+        logger.error('EventSource error', err);
+        realTimeUpdates.value = false;
+      };
+
+      realTimeUpdates.value = true;
+    } catch (err) {
+      logger.error('Failed to start real-time updates', err);
+      realTimeUpdates.value = false;
+    }
+  };
+
+  const stopRealTimeUpdates = () => {
+    if (eventSource.value) {
+      eventSource.value.close();
+      eventSource.value = null;
+    }
+    realTimeUpdates.value = false;
+  };
+
+  const handleRealTimeEvent = (event: any) => {
+    switch (event.type) {
+      case 'adapter_status':
+        // Update adapter status
+        const adapterIndex = adapters.value.findIndex(a => a.name === event.data.adapterName);
+        if (adapterIndex >= 0) {
+          adapters.value[adapterIndex] = { ...adapters.value[adapterIndex], ...event.data };
+        }
+        break;
+      
+      case 'session_created':
+      case 'session_ended':
+        // Refresh sessions for the adapter
+        if (event.data.adapterName) {
+          fetchSessions(event.data.adapterName);
+        }
+        break;
+      
+      case 'metrics':
+        // Update metrics
+        if (event.data.adapterName) {
+          adapterMetrics.value[event.data.adapterName] = event.data;
+        } else {
+          systemMetrics.value = event.data;
+        }
+        break;
+      
+      case 'error':
+        logger.error('Real-time error event', event.data);
+        break;
+    }
+  };
 
   // Helper function for server deduplication
   const generateServerKey = (server: DiscoveredServer): string => {
@@ -700,6 +954,39 @@ export function useMCPGateway() {
     canProceed,
     checkForExistingService,
     startServiceChecking,
-    stopServiceChecking
+    stopServiceChecking,
+
+    // Session Management
+    sessions,
+    selectedAdapterSessions,
+    loadingSessions,
+    sessionMetrics,
+    fetchSessions,
+    createSession,
+    deleteSession,
+    deleteAllSessions,
+
+    // Token Management
+    adapterTokens,
+    loadingTokens,
+    tokenValidation,
+    fetchAdapterToken,
+    refreshAdapterToken,
+    validateAdapterToken,
+    generateClientToken,
+
+    // Metrics and Monitoring
+    adapterMetrics,
+    systemMetrics,
+    loadingMetrics,
+    fetchAdapterMetrics,
+    fetchSystemMetrics,
+    startMetricsPolling,
+    stopMetricsPolling,
+
+    // Real-time Updates
+    realTimeUpdates,
+    startRealTimeUpdates,
+    stopRealTimeUpdates
   };
 }

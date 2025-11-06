@@ -2,6 +2,30 @@
 
 import axios from 'axios';
 import { API_BASE_URLS, MCP_ENDPOINTS, getApiConfig } from '../config/api-config';
+import type {
+  Adapter,
+  AdapterConfig,
+  AdapterHealth,
+  Session,
+  SessionMetrics,
+  AdapterToken,
+  TokenValidationResult,
+  ClientTokenRequest,
+  DiscoveredServer as EnhancedDiscoveredServer,
+  DiscoveryScan,
+  DiscoveryScanConfig,
+  RegisterServerRequest,
+  RegistryServer as EnhancedRegistryServer,
+  RegistryBrowseOptions,
+  RegistryBrowseResult,
+  DeploymentConfig,
+  DeploymentRequest,
+  DeploymentResult,
+  AdapterMetrics,
+  SystemMetrics,
+  PluginService as EnhancedPluginService,
+  UploadRequest
+} from '../types/mcp-types';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URLS.MCP_GATEWAY,
@@ -34,28 +58,23 @@ export interface AdapterData {
 }
 
 export interface ScanConfig {
-  maxConcurrent: string | number;
-  timeout: string | number;
-  scanRanges: string[];
-  ports: (string | number)[];
-  security_test?: boolean;
-  security_rules?: string;
+  maxConcurrent?: number;
+  timeout?: string;
+  scanRanges?: string[];
+  ports?: string[];
+  excludeAddresses?: string[];
+  excludeProxy?: boolean;
 }
 
 export interface ScanResult {
-  scanId: string;
+  id: string;
   status: 'running' | 'completed' | 'failed';
-  serverCount?: number;
+  startTime?: string;
+  config?: ScanConfig;
   results?: DiscoveredServer[];
-  security_summary?: {
-    total_servers: number;
-    servers_with_findings: number;
-    critical_findings: number;
-    warning_findings: number;
-  };
   error?: string;
-  message?: string;
   // Legacy fields for backward compatibility
+  scanId?: string;
   scan_id?: string;
   discovered_servers?: DiscoveredServer[];
 }
@@ -265,7 +284,8 @@ export class MCPService {
   static async registerDiscoveredServer(serverId: string) {
     try {
       const response = await apiClient.post(MCP_ENDPOINTS.REGISTER_SERVER, { discoveredServerId: serverId });
-      return response.data;
+      // API returns 201 Created with no content, so return success status
+      return { success: response.status === 201, status: response.status };
     } catch (error) {
       console.error('Failed to register discovered server:', error);
       throw error;
@@ -274,7 +294,7 @@ export class MCPService {
 
   static async startScan(config: ScanConfig): Promise<ScanResult> {
     try {
-      const response = await apiClient.post(MCP_ENDPOINTS.SCAN_START, config);
+      const response = await apiClient.post(MCP_ENDPOINTS.DISCOVERY_SCAN, config);
       return response.data;
     } catch (error) {
       console.error('Failed to start scan:', error);
@@ -284,7 +304,7 @@ export class MCPService {
 
   static async getScanStatus(scanId: string): Promise<ScanResult> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.SCAN_STATUS(scanId));
+      const response = await apiClient.get(`${MCP_ENDPOINTS.DISCOVERY_SCAN}/${scanId}`);
       return response.data;
     } catch (error) {
       console.error('Failed to get scan status:', error);
@@ -294,7 +314,7 @@ export class MCPService {
 
   static async getScanResults(scanId: string): Promise<ScanResult> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.SCAN_STATUS(scanId));
+      const response = await apiClient.get(`${MCP_ENDPOINTS.DISCOVERY_SCAN}/${scanId}`);
       return response.data;
     } catch (error) {
       console.error('Failed to get scan results:', error);
@@ -312,23 +332,13 @@ export class MCPService {
     }
   }
 
-  static async getDiscoveredServers(): Promise<DiscoveredServer[]> {
+  static async getAdapter(name: string): Promise<AdapterResource | null> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.SERVERS);
-      return response.data || [];
+      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTER_DETAILS(name));
+      return response.data;
     } catch (error) {
-      console.error('Failed to fetch discovered servers:', error);
-      return [];
-    }
-  }
-
-  static async getAdapterLogs(name: string): Promise<string> {
-    try {
-      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTER_LOGS(name));
-      return response.data || '';
-    } catch (error) {
-      console.error('Failed to fetch adapter logs:', error);
-      return '';
+      console.error('Failed to fetch adapter:', error);
+      return null;
     }
   }
 
@@ -341,29 +351,20 @@ export class MCPService {
     }
   }
 
-  static async ping(): Promise<boolean> {
-    try {
-      await apiClient.get(MCP_ENDPOINTS.PING);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
   static async getMetrics() {
     try {
       const response = await apiClient.get(MCP_ENDPOINTS.METRICS);
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch metrics:', error);
-      return null;
+      console.error('Failed to get metrics:', error);
+      throw error;
     }
   }
 
   static async getRegistryServers(): Promise<RegistryServer[]> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY);
-      return response.data || [];
+      const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY_BROWSE);
+      return response.data.servers || [];
     } catch (error) {
       console.error('Failed to fetch registry servers:', error);
       return [];
@@ -372,7 +373,7 @@ export class MCPService {
 
   static async getPublicRegistryServers(): Promise<RegistryServer[]> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.PUBLIC_REGISTRY);
+      const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY_PUBLIC);
       return response.data || [];
     } catch (error) {
       console.error('Failed to fetch public registry servers:', error);
@@ -382,7 +383,7 @@ export class MCPService {
 
   static async getPublicRegistryServersBySource(source: string): Promise<RegistryServer[]> {
     try {
-      const response = await apiClient.get(`${MCP_ENDPOINTS.PUBLIC_REGISTRY}?source=${source}`);
+      const response = await apiClient.get(`${MCP_ENDPOINTS.REGISTRY_PUBLIC}?source=${source}`);
       return response.data || [];
     } catch (error) {
       console.error(`Failed to fetch registry servers for source ${source}:`, error);
@@ -395,7 +396,7 @@ export class MCPService {
       const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY_DETAILS(id));
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch registry server details:', error);
+      console.error(`Failed to get registry server ${id}:`, error);
       return null;
     }
   }
@@ -556,6 +557,193 @@ export class MCPService {
       return response.data;
     } catch (error) {
       console.error('Failed to establish MCP connection:', error);
+      throw error;
+    }
+  }
+
+  // Enhanced Discovery Methods
+  static async startDiscoveryScan(config: DiscoveryScanConfig): Promise<DiscoveryScan> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.DISCOVERY_SCAN, config);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to start discovery scan:', error);
+      throw error;
+    }
+  }
+
+  static async getDiscoveryServers(): Promise<EnhancedDiscoveredServer[]> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.DISCOVERY_SERVERS);
+      return response.data || [];
+    } catch (error) {
+      console.error('Failed to get discovery servers:', error);
+      return [];
+    }
+  }
+
+  static async getDiscoveryServerDetails(id: string): Promise<EnhancedDiscoveredServer | null> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.DISCOVERY_SERVER_DETAILS(id));
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to get discovery server ${id}:`, error);
+      return null;
+    }
+  }
+
+  static async registerDiscoveredServerEnhanced(request: RegisterServerRequest): Promise<AdapterResource> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.DISCOVERY_REGISTER, request);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to register discovered server:', error);
+      throw error;
+    }
+  }
+
+  // Enhanced Registry Methods
+  static async syncOfficialRegistry(): Promise<{ synced: number; updated: number }> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.REGISTRY_SYNC_OFFICIAL);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to sync official registry:', error);
+      throw error;
+    }
+  }
+
+  static async uploadToRegistry(request: UploadRequest): Promise<EnhancedRegistryServer> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.REGISTRY_UPLOAD, request);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to upload to registry:', error);
+      throw error;
+    }
+  }
+
+  static async bulkUploadToRegistry(requests: UploadRequest[]): Promise<EnhancedRegistryServer[]> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.REGISTRY_UPLOAD_BULK, { servers: requests });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to bulk upload to registry:', error);
+      throw error;
+    }
+  }
+
+  static async uploadLocalMcp(name: string, path: string, options: {
+    description?: string
+    category?: string
+    tags?: string[]
+    metadata?: Record<string, any>
+  } = {}): Promise<EnhancedRegistryServer> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.REGISTRY_UPLOAD_LOCAL_MCP, {
+        name,
+        path,
+        ...options
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to upload local MCP ${name}:`, error);
+      throw error;
+    }
+  }
+
+  static async getRegistryServerDetailsEnhanced(id: string): Promise<EnhancedRegistryServer | null> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY_DETAILS(id));
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to get registry server ${id}:`, error);
+      return null;
+    }
+  }
+
+  // Deployment Management
+  static async getDeploymentConfig(serverId: string): Promise<DeploymentConfig> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.DEPLOYMENT_CONFIG(serverId));
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to get deployment config for ${serverId}:`, error);
+      throw error;
+    }
+  }
+
+  static async deployServer(request: DeploymentRequest): Promise<DeploymentResult> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.DEPLOYMENT_DEPLOY, request);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to deploy server ${request.serverId}:`, error);
+      throw error;
+    }
+  }
+
+  // Metrics and Monitoring
+  static async getAdapterMetrics(adapterName: string): Promise<AdapterMetrics> {
+    try {
+      const response = await apiClient.get(`${MCP_ENDPOINTS.ADAPTER_DETAILS(adapterName)}/metrics`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to get metrics for adapter ${adapterName}:`, error);
+      throw error;
+    }
+  }
+
+  static async getSystemMetrics(): Promise<SystemMetrics> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.METRICS);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get system metrics:', error);
+      throw error;
+    }
+  }
+
+  // Plugin Services by Type
+  static async getPluginServicesByType(serviceType: string): Promise<PluginServiceListResponse> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.PLUGIN_SERVICES_BY_TYPE(serviceType));
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to get plugin services by type ${serviceType}:`, error);
+      throw error;
+    }
+  }
+
+  // System Health
+  static async ping(): Promise<boolean> {
+    try {
+      // Ping endpoint is at root level, not under /api/v1
+      const response = await axios.get(`${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}/ping`);
+      // Check if the service responds with "pong"
+      return response.data?.message === 'pong' || response.data?.status === 'pong' || response.data === 'pong';
+    } catch (error) {
+      console.error('Failed to ping MCP Gateway:', error);
+      return false;
+    }
+  }
+
+  static async getApiDocs(): Promise<any> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.DOCS);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get API docs:', error);
+      throw error;
+    }
+  }
+
+  static async getSwaggerSpec(): Promise<any> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.SWAGGER_JSON);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get Swagger spec:', error);
       throw error;
     }
   }

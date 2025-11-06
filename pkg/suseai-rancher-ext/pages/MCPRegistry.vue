@@ -162,271 +162,40 @@
         </div>
       </main>
 
-      <!-- View Server Modal -->
-      <div v-if="showViewModal" class="modal-overlay" @click="showViewModal = false">
-        <div class="modal-content" @click.stop>
-          <div class="modal-header">
-            <h3>{{ selectedServer?.name }} Details</h3>
-            <button @click="showViewModal = false" class="btn btn-sm">×</button>
-          </div>
-          <div class="modal-body">
-            <div v-if="selectedServer" class="server-details">
-              <div class="detail-section">
-                <h4>Basic Information</h4>
-                <p><strong>Name:</strong> {{ selectedServer.name }}</p>
-                <p><strong>Description:</strong> {{ selectedServer.description }}</p>
-                <p><strong>Version:</strong> {{ selectedServer.version }}</p>
-                <p><strong>Protocol:</strong> {{ selectedServer.protocol }}</p>
-                <p><strong>URL:</strong> {{ selectedServer.url }}</p>
-                <p><strong>Validation Status:</strong> {{ selectedServer.validation_status }}</p>
-                <p><strong>Discovered At:</strong> {{ selectedServer.discovered_at }}</p>
-              </div>
+      <!-- Modal Components -->
+      <ServerDetailsModal
+        v-if="showViewModal"
+        :server="selectedServer"
+        @close="showViewModal = false"
+      />
 
-              <div v-if="selectedServer.repository" class="detail-section">
-                <h4>Repository</h4>
-                <p><strong>Source:</strong> {{ selectedServer.repository.source }}</p>
-                <p><strong>URL:</strong> <a :href="selectedServer.repository.url" target="_blank">{{ selectedServer.repository.url }}</a></p>
-              </div>
+      <RegistryManagementModal
+        v-if="showRegistryModal"
+        :registries="publicRegistries"
+        :syncing-registry="syncingRegistry"
+        @close="showRegistryModal = false"
+        @toggle-registry="toggleRegistry"
+        @sync-registry="syncRegistry"
+        @sync-all="syncAllRegistries"
+        @add-registry="showAddRegistryModal = true"
+        @advanced="showAdvancedModal = true"
+        @remove-registry="removeCustomRegistry"
+      />
 
-              <div v-if="selectedServer.packages?.length" class="detail-section">
-                <h4>Packages</h4>
-                <div v-for="pkg in selectedServer.packages" :key="pkg.identifier" class="package-item">
-                  <p><strong>Identifier:</strong> {{ pkg.identifier }}</p>
-                  <p><strong>Type:</strong> {{ pkg.registryType }}</p>
-                  <p><strong>Transport:</strong> {{ pkg.transport.type }}</p>
-                  <div v-if="pkg.environmentVariables?.length" class="env-vars">
-                    <p><strong>Environment Variables:</strong></p>
-                    <ul>
-                      <li v-for="env in pkg.environmentVariables" :key="env.name">
-                        {{ env.name }}: {{ env.description }} ({{ env.isSecret ? 'Secret' : 'Public' }})
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+      <AdvancedRegistryModal
+        v-if="showAdvancedModal"
+        @close="showAdvancedModal = false"
+        @clear-all="clearAllEntries"
+        @check-availability="checkAvailability"
+        @check-security="checkSecurity"
+      />
 
-              <div v-if="selectedServer.tools?.length" class="detail-section">
-                <h4>Tools</h4>
-                <div v-for="tool in selectedServer.tools" :key="tool.name" class="tool-item">
-                  <p><strong>Name:</strong> {{ tool.name }}</p>
-                  <p><strong>Description:</strong> {{ tool.description }}</p>
-                </div>
-              </div>
-
-              <div v-if="selectedServer._meta" class="detail-section">
-                <h4>Metadata</h4>
-                <pre>{{ JSON.stringify(selectedServer._meta, null, 2) }}</pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Registry Management Modal -->
-      <div v-if="showRegistryModal" class="modal-overlay" @click="showRegistryModal = false">
-        <div class="modal-content" @click.stop>
-          <div class="modal-header">
-            <h3>Manage Public Registries</h3>
-            <button @click="showRegistryModal = false" class="btn btn-sm">×</button>
-          </div>
-          <div class="modal-body">
-             <div class="registry-management">
-               <div class="registry-actions">
-                 <button
-                   class="btn btn-primary"
-                   @click="syncAllRegistries"
-                   :disabled="syncingRegistry !== null"
-                 >
-                   <i v-if="syncingRegistry !== null" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
-                   {{ syncingRegistry !== null ? 'Syncing...' : 'Sync All Enabled' }}
-                 </button>
-
-                 <button
-                   class="btn btn-secondary"
-                   @click="showAddRegistryModal = true"
-                   :title="'Add Custom Registry'"
-                   :aria-label="'Add Custom Registry'"
-                 >
-                   <i class="icon icon-plus" aria-hidden="true"></i>
-                   Add Registry
-                 </button>
-                 <button
-                   class="btn btn-secondary"
-                   @click="showAdvancedModal = true"
-                   :title="'Advanced Registry Options'"
-                   :aria-label="'Advanced Registry Options'"
-                 >
-                   Advanced
-                 </button>
-               </div>
-
-              <div class="registries-list">
-                <div
-                  v-for="registry in publicRegistries"
-                  :key="registry.id"
-                  class="registry-item"
-                >
-                  <div class="registry-info">
-                    <div class="registry-header">
-                      <h4>{{ registry.name }}</h4>
-                      <label class="checkbox-label">
-                        <input
-                          type="checkbox"
-                          :checked="registry.enabled"
-                          @change="toggleRegistry(registry.id)"
-                        />
-                        <span class="checkbox-text">Enabled</span>
-                      </label>
-                    </div>
-                    <p class="registry-url">{{ registry.url }}</p>
-                    <div class="registry-stats">
-                      <span v-if="registry.lastSync" class="registry-sync">
-                        Last sync: {{ new Date(registry.lastSync).toLocaleString() }}
-                      </span>
-                      <span class="registry-count">
-                        {{ registry.serverCount }} servers
-                      </span>
-                    </div>
-                  </div>
-                   <div class="registry-actions">
-                     <button
-                       class="btn btn-sm btn-secondary"
-                       @click="syncRegistry(registry.id)"
-                       :disabled="!registry.enabled || syncingRegistry === registry.id"
-                     >
-                       <i v-if="syncingRegistry === registry.id" class="icon icon-spinner icon-spin" aria-hidden="true"></i>
-                       {{ syncingRegistry === registry.id ? 'Syncing...' : 'Sync' }}
-                     </button>
-                     <button
-                       v-if="isCustomRegistry(registry.id)"
-                       class="btn btn-sm btn-danger"
-                       @click="removeCustomRegistry(registry.id)"
-                       :title="'Remove this custom registry'"
-                       :aria-label="'Remove custom registry'"
-                     >
-                       <i class="icon icon-trash" aria-hidden="true"></i>
-                       Remove
-                     </button>
-                   </div>
-                </div>
-              </div>
-            </div>
-           </div>
-         </div>
-       </div>
-
-       <!-- Advanced Registry Options Modal -->
-       <div v-if="showAdvancedModal" class="modal-overlay" @click="showAdvancedModal = false">
-         <div class="modal-content" @click.stop>
-           <div class="modal-header">
-             <h3>Advanced Registry Options</h3>
-             <button @click="showAdvancedModal = false" class="btn btn-sm">×</button>
-           </div>
-           <div class="modal-body">
-             <div class="advanced-options">
-               <p class="warning-text">
-                 <i class="icon icon-warning" aria-hidden="true"></i>
-                 These operations may affect your registry data. Use with caution.
-               </p>
-               <div class="option-buttons">
-                 <button
-                   class="btn btn-danger"
-                   @click="clearAllEntries"
-                   :title="'Clear all registry entries and reset data'"
-                 >
-                   <i class="icon icon-trash" aria-hidden="true"></i>
-                   Clean All Entries
-                 </button>
-                 <button
-                   class="btn btn-secondary"
-                   @click="checkAvailability"
-                   :title="'Check which servers are currently available'"
-                 >
-                   <i class="icon icon-check" aria-hidden="true"></i>
-                   Check Availability
-                 </button>
-                 <button
-                   class="btn btn-secondary"
-                   @click="checkSecurity"
-                   :title="'Run security checks on registry servers'"
-                 >
-                   <i class="icon icon-shield" aria-hidden="true"></i>
-                   Check Security
-                 </button>
-               </div>
-             </div>
-           </div>
-         </div>
-       </div>
-
-       <!-- Add Custom Registry Modal -->
-       <div v-if="showAddRegistryModal" class="modal-overlay" @click="showAddRegistryModal = false">
-         <div class="modal-content" @click.stop>
-           <div class="modal-header">
-             <h3>Add Custom Registry</h3>
-             <button @click="showAddRegistryModal = false" class="btn btn-sm">×</button>
-           </div>
-           <div class="modal-body">
-             <form @submit.prevent="addCustomRegistry" class="registry-form">
-               <div class="form-group">
-                 <label for="registry-name">Registry Name *</label>
-                 <input
-                   id="registry-name"
-                   v-model="newRegistry.name"
-                   type="text"
-                   placeholder="e.g., My Custom Registry"
-                   required
-                   class="form-control"
-                 >
-               </div>
-
-               <div class="form-group">
-                 <label for="registry-source">Source Name *</label>
-                 <input
-                   id="registry-source"
-                   v-model="newRegistry.source"
-                   type="text"
-                   placeholder="e.g., my-custom"
-                   required
-                   class="form-control"
-                 >
-                 <small class="form-help">This will be used as the API source parameter: /public/registry?source={source}</small>
-               </div>
-
-               <div class="form-group">
-                 <label for="registry-url">Registry URL</label>
-                 <input
-                   id="registry-url"
-                   v-model="newRegistry.url"
-                   type="url"
-                   placeholder="https://example.com"
-                   class="form-control"
-                 >
-                 <small class="form-help">Optional display URL for the registry</small>
-               </div>
-
-               <div class="form-group">
-                 <label class="checkbox-label">
-                   <input
-                     type="checkbox"
-                     v-model="newRegistry.enabled"
-                   >
-                   <span class="checkbox-text">Enable registry</span>
-                 </label>
-               </div>
-
-               <div class="form-actions">
-                 <button type="button" class="btn btn-secondary" @click="showAddRegistryModal = false">
-                   Cancel
-                 </button>
-                 <button type="submit" class="btn btn-primary">
-                   Add Registry
-                 </button>
-               </div>
-             </form>
-           </div>
-         </div>
-       </div>
+      <AddRegistryModal
+        v-if="showAddRegistryModal"
+        :registry="newRegistry"
+        @close="showAddRegistryModal = false"
+        @submit="addCustomRegistry"
+      />
      </div>
    </template>
 
@@ -436,6 +205,12 @@ import { useStore } from 'vuex';
 import { MCPService } from '../services/mcp-service';
 import { persistLoad, persistSave, persistClear } from '../services/ui-persist';
 import type { RegistryServer } from '../services/mcp-service';
+import { 
+  ServerDetailsModal,
+  RegistryManagementModal,
+  AdvancedRegistryModal,
+  AddRegistryModal
+} from '../components/MCPGateway';
 
 interface Registry {
   id: string;
@@ -449,6 +224,12 @@ interface Registry {
 
 export default defineComponent({
   name: 'MCPRegistry',
+  components: {
+    ServerDetailsModal,
+    RegistryManagementModal,
+    AdvancedRegistryModal,
+    AddRegistryModal
+  },
 
   metaInfo() {
     return {
@@ -780,10 +561,10 @@ export default defineComponent({
           // Start a security scan for this server
           const scanConfig = {
             maxConcurrent: 1,
-            timeout: 30,
+            timeout: '30s',
             scanRanges: [host],
-            ports: [80, 443], // Common web ports
-            security_test: true
+            ports: ['80', '443'], // Common web ports
+            excludeProxy: true
           };
 
           const scanResult = await MCPService.startScan(scanConfig);
@@ -1460,391 +1241,5 @@ export default defineComponent({
   border: 0;
 }
 
-/* Modal styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(2px);
-}
 
-.modal-content {
-  background: var(--body-bg, white);
-  border-radius: var(--border-radius, 8px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  max-width: 800px;
-  width: 90vw;
-  max-height: 80vh;
-  overflow-y: auto;
-  border: 1px solid var(--border, #e0e0e0);
-}
-
-.modal-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border, #e0e0e0);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.modal-body {
-  padding: 24px;
-}
-
-.modal-footer {
-  padding: 16px 24px;
-  border-top: 1px solid var(--border, #e0e0e0);
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-/* Server details modal content */
-.server-details {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.detail-section {
-  border: 1px solid var(--border);
-  border-radius: var(--border-radius);
-  padding: 16px;
-  background: var(--card-bg, var(--body-bg));
-}
-
-.detail-section h4 {
-  margin: 0 0 12px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--body-text);
-}
-
-.detail-section p {
-  margin: 8px 0;
-  color: var(--body-text);
-}
-
-.detail-section strong {
-  color: var(--body-text);
-  font-weight: 600;
-}
-
-.detail-section a {
-  color: var(--primary);
-  text-decoration: none;
-}
-
-.detail-section a:hover {
-  text-decoration: underline;
-}
-
-.package-item,
-.tool-item {
-  border: 1px solid var(--border-light, rgba(0,0,0,0.1));
-  border-radius: 4px;
-  padding: 12px;
-  margin-bottom: 8px;
-  background: var(--accent-bg, #f9fafb);
-}
-
-.env-vars {
-  margin-top: 8px;
-}
-
-.env-vars ul {
-  margin: 4px 0 0 0;
-  padding-left: 20px;
-}
-
-.env-vars li {
-  margin-bottom: 4px;
-  color: var(--muted);
-}
-
-.detail-section pre {
-  background: var(--code-bg, #f6f8fa);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 12px;
-  overflow-x: auto;
-  font-size: 12px;
-  color: var(--body-text);
-}
-
-
-
-/* Form styling */
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 500;
-  color: var(--body-text, #333);
-}
-
-.form-control {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border, #ddd);
-  border-radius: var(--border-radius, 4px);
-  font-size: 14px;
-  background: var(--body-bg, white);
-  color: var(--body-text, #333);
-}
-
-.form-control:focus {
-  border-color: var(--primary, #007bff);
-  box-shadow: 0 0 0 2px rgba(var(--primary-rgb, 0, 123, 255), 0.2);
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.checkbox-label input[type="checkbox"] {
-  margin: 0;
-}
-
-/* Registry Management Styles */
-.registry-management {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.registry-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.registries-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.registry-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--border-radius);
-  background: var(--body-bg);
-}
-
-.registry-info {
-  flex: 1;
-}
-
-.registry-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.registry-header h4 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--body-text);
-}
-
-.registry-url {
-  margin: 4px 0;
-  font-size: 14px;
-  color: var(--muted);
-  font-family: monospace;
-}
-
-.registry-stats {
-  display: flex;
-  gap: 16px;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 8px;
-}
-
-.registry-sync {
-  color: var(--success);
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.checkbox-label input[type="checkbox"] {
-  margin: 0;
-  width: 16px;
-  height: 16px;
-}
-
-.checkbox-text {
-  user-select: none;
-}
-
-/* Responsive enhancements */
-@media (max-width: 768px) {
-  .modal-content {
-    width: 95vw;
-    margin: 16px;
-    max-height: 90vh;
-  }
-
-  .modal-header,
-  .modal-body,
-  .modal-footer {
-    padding: 16px;
-  }
-
-  .registry-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .registry-actions {
-    align-self: stretch;
-    display: flex;
-    justify-content: center;
-  }
-}
-
-/* Advanced Modal Styles */
-.advanced-options {
-  padding: 16px 0;
-}
-
-.warning-text {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  border-radius: 4px;
-  padding: 12px 16px;
-  margin-bottom: 20px;
-  color: #856404;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.warning-text .icon {
-  color: #856404;
-  font-size: 16px;
-}
-
-.option-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.option-buttons .btn {
-  justify-content: flex-start;
-  padding: 12px 16px;
-}
-
-.option-buttons .btn .icon {
-  margin-right: 8px;
-}
-
-.option-buttons .btn-danger {
-  background-color: #dc3545;
-  border-color: #dc3545;
-  color: white;
-}
-
-.option-buttons .btn-danger:hover {
-  background-color: #c82333;
-  border-color: #bd2130;
-}
-
-/* Custom Registry Modal Styles */
-.registry-form {
-  max-width: 500px;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: 600;
-  color: var(--body-text);
-}
-
-.form-control {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--input-bg);
-  color: var(--input-text);
-}
-
-.form-control:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.form-help {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--muted-text);
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.checkbox-label input[type="checkbox"] {
-  margin: 0;
-}
-
-.checkbox-text {
-  font-weight: normal;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
 </style>

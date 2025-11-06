@@ -5,7 +5,7 @@
 
 // Base URLs for different services
 export const API_BASE_URLS = {
-  MCP_GATEWAY: 'http://localhost:8911',
+  MCP_GATEWAY: 'http://localhost:8911/api/v1',
   SMART_AGENTS: 'http://localhost:8910',
   RANCHER: window.location.origin
 } as const;
@@ -27,6 +27,14 @@ export const MCP_ENDPOINTS = {
   SESSION_DELETE: (name: string, sessionId: string) => `/adapters/${name}/sessions/${sessionId}`,
   SESSION_DELETE_ALL: (name: string) => `/adapters/${name}/sessions`,
   
+  // Token Management
+  ADAPTER_TOKEN: (name: string) => `/adapters/${name}/token`,
+  ADAPTER_TOKEN_REFRESH: (name: string) => `/adapters/${name}/token/refresh`,
+  ADAPTER_TOKEN_VALIDATE: (name: string) => `/adapters/${name}/token/validate`,
+  ADAPTER_CLIENT_TOKEN: (name: string) => `/adapters/${name}/client-token`,
+  ADAPTER_TEST_AUTH: (name: string) => `/adapters/${name}/test-auth`,
+  ADAPTER_VALIDATE_AUTH: (name: string) => `/adapters/${name}/validate-auth`,
+  
   // MCP Communication
   ADAPTER_SSE: (name: string) => `/adapters/${name}/sse`,
   ADAPTER_MESSAGES: (name: string) => `/adapters/${name}/messages`,
@@ -34,22 +42,36 @@ export const MCP_ENDPOINTS = {
   ADAPTER_WEBSOCKET: (name: string) => `/adapters/${name}/ws`,
   
   // Network Discovery
+  DISCOVERY_SCAN: '/discovery/scan',
+  DISCOVERY_SERVERS: '/discovery/servers',
+  DISCOVERY_SERVER_DETAILS: (id: string) => `/discovery/servers/${id}`,
+  DISCOVERY_REGISTER: '/discovery/register',
+  
+  // Legacy endpoints (for backward compatibility)
   SCAN_START: '/scan',
   SCAN_STATUS: (scanId: string) => `/scan/${scanId}`,
   SERVERS: '/servers',
-  REGISTER_SERVER: '/register',
+  REGISTER_SERVER: '/discovery/register',
+  
+  // Registry Management
+  REGISTRY_BROWSE: '/registry/browse',
+  REGISTRY_PUBLIC: '/registry/public',
+  REGISTRY_SYNC_OFFICIAL: '/registry/sync/official',
+  REGISTRY_UPLOAD: '/registry/upload',
+  REGISTRY_UPLOAD_BULK: '/registry/upload/bulk',
+  REGISTRY_UPLOAD_LOCAL_MCP: '/registry/upload/local-mcp',
+  REGISTRY_DETAILS: (id: string) => `/registry/${id}`,
+  
+  // Deployment Management
+  DEPLOYMENT_CONFIG: (serverId: string) => `/deployment/config/${serverId}`,
+  DEPLOYMENT_DEPLOY: '/deployment/deploy',
   
   // Plugin Services
   PLUGIN_SERVICES: '/plugins/services',
   PLUGIN_REGISTER: '/plugins/register',
   PLUGIN_HEALTH: (serviceId: string) => `/plugins/services/${serviceId}/health`,
   PLUGIN_UNREGISTER: (serviceId: string) => `/plugins/services/${serviceId}`,
-  
-  // Registry
-  REGISTRY: '/registry',
-  REGISTRY_DETAILS: (id: string) => `/registry/${id}`,
-  REGISTRY_BROWSE: '/registry/browse',
-  PUBLIC_REGISTRY: '/public/registry',
+  PLUGIN_SERVICES_BY_TYPE: (serviceType: string) => `/plugins/services/type/${serviceType}`,
   
   // System
   PING: '/ping',
