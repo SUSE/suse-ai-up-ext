@@ -62,6 +62,7 @@
 <script lang="ts">
  import { defineComponent, ref } from 'vue';
  import type { AdapterResource } from '../../services/mcp-service';
+ import { MCPService } from '../../services/mcp-service';
  import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
 
  export default defineComponent({
@@ -87,10 +88,23 @@
    setup(props, { emit }) {
      const adapterDetailsModal = ref();
 
-     const handleViewDetails = (adapter: AdapterResource) => {
-       // Open the modal instead of emitting event
-       adapterDetailsModal.value?.openModal(adapter);
-     };
+      const handleViewDetails = async (adapter: AdapterResource) => {
+        try {
+          // Fetch full adapter details including authentication token
+          const adapterDetails = await MCPService.getAdapterDetails(adapter.name);
+          if (adapterDetails) {
+            adapterDetailsModal.value?.openModal(adapterDetails);
+          } else {
+            console.error('Failed to fetch adapter details');
+            // Fallback to basic adapter info if details fetch fails
+            adapterDetailsModal.value?.openModal(adapter);
+          }
+        } catch (error) {
+          console.error('Error fetching adapter details:', error);
+          // Fallback to basic adapter info if details fetch fails
+          adapterDetailsModal.value?.openModal(adapter);
+        }
+      };
 
      const handleViewLogs = (adapter: AdapterResource) => {
        emit('view-logs', adapter);

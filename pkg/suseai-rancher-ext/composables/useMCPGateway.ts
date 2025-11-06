@@ -297,8 +297,9 @@ export function useMCPGateway() {
       // If we have a current scan, get its results
       if (currentScanId.value) {
         const scanResult = await MCPService.getScanResults(currentScanId.value);
-        if (scanResult.discovered_servers) {
-          discoveredServers.value = scanResult.discovered_servers.sort((a, b) => {
+        const servers = scanResult.results || scanResult.discovered_servers;
+        if (servers) {
+          discoveredServers.value = servers.sort((a: any, b: any) => {
             const nameA = a.name || a.address;
             const nameB = b.name || b.address;
             return nameA.localeCompare(nameB);

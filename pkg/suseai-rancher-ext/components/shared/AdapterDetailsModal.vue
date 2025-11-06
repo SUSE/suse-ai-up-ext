@@ -179,6 +179,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { AdapterResource } from '../../services/mcp-service';
+import { API_BASE_URLS } from '../../config/api-config';
 
 const isVisible = ref(false);
 const adapter = ref<AdapterResource | null>(null);
@@ -186,21 +187,15 @@ const showToken = ref(false);
 const copying = ref(false);
 const copiedField = ref<string | null>(null);
 
-// Proxy configuration - could be made configurable
-const PROXY_CONFIG = {
-  url: 'http://localhost:8911',
-  port: 8911
-};
-
 // Generate MCP URL
 const mcpUrl = computed(() => {
   if (!adapter.value?.name) return '';
-  return `${PROXY_CONFIG.url}/adapters/${adapter.value.name}/mcp`;
+  return `${API_BASE_URLS.MCP_GATEWAY}/adapters/${adapter.value.name}/mcp`;
 });
 
 // Extract token from authentication object in API response
 const token = computed(() => {
-  return adapter.value?.authentication?.token || '';
+  return adapter.value?.authentication?.bearerToken?.token || '';
 });
 
 const openModal = (adapterData: AdapterResource) => {

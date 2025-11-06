@@ -103,6 +103,7 @@
 
 <script setup lang="ts">
   import { ref, computed, onMounted, onUnmounted } from 'vue';
+import SmartAgentsService, { type SmartAgent } from '../services/smart-agents-service';
   import { useStore } from 'vuex';
 import CreateSmartAgent from './components/create-smart-agent.vue';
 import ImportAgentModal from './components/import-agent-modal.vue';
@@ -125,7 +126,7 @@ const importAgentRef = ref<any>(null);
 const detailsAgentRef = ref<any>(null);
 
   // Reactive data for agents (fetched from API)
-  const agents = ref<any[]>([]);
+  const agents = ref<SmartAgent[]>([]);
 
   // Interval for regular updates
   const refreshInterval = ref<number | null>(null);
@@ -133,37 +134,18 @@ const detailsAgentRef = ref<any>(null);
   // Fetch agents from API
   const fetchAgents = async () => {
     try {
-      const response = await fetch('http://localhost:8910/agents');
-      if (!response.ok) throw new Error('Failed to fetch agents');
-      const apiAgents = await response.json();
-      // Map API data to table format, using fake data for missing fields
-      const checkAvailability = async (agentId: string) => {
-        try {
-          const response = await fetch(`http://localhost:8910/agents/${agentId}`);
-          return response.ok ? 'available' : 'unavailable';
-        } catch {
-          return 'unavailable';
-        }
-      };
-
-      agents.value = await Promise.all(apiAgents.map(async (agent: any) => {
-        const state = await checkAvailability(agent.id);
-        return {
-          id: agent.id,
-          name: agent.name || 'Unnamed Agent',
-          type: 'smart agent', // Fake, since all are smart agents
-          status: (agent.supervisor?.provider && agent.worker?.provider) ? 'Running' : 'Stopped',
-          state: state,
-          supervisor: agent.supervisor,
-          worker: agent.worker,
-          totalTokens: agent.totalTokens || 0,
-          totalRequests: agent.totalRequests || 0,
-          totalCost: agent.totalCost || 0
-        };
+      const apiAgents = await SmartAgentsService.getAgents();
+      agents.value = apiAgents.map((agent: SmartAgent) => ({
+        ...agent,
+        type: agent.type || 'smart agent',
+        status: agent.status,
+        state: agent.state || (agent.status === 'active' ? 'available' : 'unavailable'),
+        totalTokens: agent.totalTokens || agent.metadata?.totalTokens || 0,
+        totalRequests: agent.totalRequests || agent.metadata?.totalRequests || 0,
+        totalCost: agent.totalCost || agent.metadata?.totalCost || 0
       }));
     } catch (err) {
       console.error('Failed to fetch agents:', err);
-      // Fallback to empty list
       agents.value = [];
     }
   };
@@ -196,10 +178,7 @@ const editAgent = (agentId: string) => {
 
 const deleteAgent = async (agentId: string) => {
   try {
-    const response = await fetch(`http://localhost:8910/agents/${agentId}`, {
-      method: 'DELETE'
-    });
-    if (!response.ok) throw new Error('Failed to delete agent');
+    await SmartAgentsService.deleteAgent(agentId);
     fetchAgents(); // Refetch after delete
   } catch (err) {
     console.error('Delete failed:', err);
@@ -221,15 +200,15 @@ const onAgentImported = () => {
 // Method to update agent tokens after chat API call
 const updateAgentTokens = (agentId: string, tokens: number) => {
   const agent = agents.value.find(a => a.id === agentId);
-  if (agent) {
+  if (agent && agent.totalTokens !== undefined) {
     agent.totalTokens += tokens;
   }
 };
 
 // Computed data for Smart Agents
-const smartAgents = computed(() => agents.value?.filter(agent => agent.type === 'smart agent') || []);
-const agentsRunning = computed(() => smartAgents.value?.filter(agent => agent.state === 'available').length || 0);
-const agentsIdle = computed(() => smartAgents.value?.filter(agent => agent.state === 'unavailable').length || 0);
+const smartAgents = computed(() => agents.value?.filter(agent => (agent.type || 'smart agent') === 'smart agent') || []);
+const agentsRunning = computed(() => smartAgents.value?.filter(agent => (agent.state || agent.status) === 'available' || agent.status === 'active').length || 0);
+const agentsIdle = computed(() => smartAgents.value?.filter(agent => (agent.state || agent.status) === 'unavailable' || agent.status === 'inactive').length || 0);
 const totalTokens = computed(() => smartAgents.value?.reduce((sum, agent) => sum + (agent.totalTokens || 0), 0) || 0);
 const totalRequests = computed(() => smartAgents.value?.reduce((sum, agent) => sum + (agent.totalRequests || 0), 0) || 0);
 const totalCost = computed(() => smartAgents.value?.reduce((sum, agent) => sum + (agent.totalCost || 0), 0) || 0);

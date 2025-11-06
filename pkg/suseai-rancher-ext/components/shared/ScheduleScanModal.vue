@@ -362,7 +362,7 @@ const clearRulesFile = () => {
 
         const scanResult = await MCPService.startScan(backendConfig);
 
-        logger.info('Discovery scan started', { scanId: scanResult.scan_id, config: backendConfig });
+        logger.info('Discovery scan started', { scanId: scanResult.scanId || scanResult.scan_id, config: backendConfig });
         emit('scanStarted', scanResult);
 
         closeModal();

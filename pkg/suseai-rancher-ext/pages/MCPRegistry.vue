@@ -787,10 +787,10 @@ export default defineComponent({
           };
 
           const scanResult = await MCPService.startScan(scanConfig);
-          console.log(`Security scan started for ${server.name}:`, scanResult.scan_id);
+          console.log(`Security scan started for ${server.name}:`, scanResult.scanId || scanResult.scan_id);
 
           // Store scan ID for later status checking
-          server.lastSecurityScanId = scanResult.scan_id;
+          server.lastSecurityScanId = scanResult.scanId || scanResult.scan_id;
           server.securityScanStatus = 'running';
 
         } catch (error) {

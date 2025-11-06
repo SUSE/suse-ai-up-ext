@@ -386,6 +386,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import SmartAgentsService, { type SmartAgent, type CreateAgentRequest, type UpdateAgentRequest } from '../../services/smart-agents-service';
 
 interface RemoteProviderData {
   provider: string;
@@ -433,7 +434,7 @@ interface ApiModel {
 
 const showModal = ref(false);
 const isEditing = ref(false);
-const editingAgentId = ref<number | null>(null);
+const editingAgentId = ref<string | null>(null);
 const showAdvanced = ref(false);
 
 const maxRounds = computed(() => {
@@ -973,53 +974,76 @@ const onLocalProviderChange = () => {
      updated_at: Date.now()
    };
 
-   try {
-     if (isEditing.value) {
-       // Update existing agent
-       const response = await fetch(`http://localhost:8910/agents/${editingAgentId.value}`, {
-         method: 'PUT',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify(agentData)
-       });
-       if (!response.ok) throw new Error('Failed to update agent');
-       emit('agent-updated');
-     } else {
-       // Create new agent
-       const response = await fetch('http://localhost:8910/agents', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify(agentData)
-       });
-       if (!response.ok) throw new Error('Failed to create agent');
-       emit('agent-created');
-     }
-     closeModal();
-   } catch (err) {
-     console.error('Submit failed:', err);
-     // TODO: Show error to user
-   }
+    try {
+      if (isEditing.value) {
+        // Update existing agent
+        const updateRequest: UpdateAgentRequest = {
+          name: agentData.name,
+          description: agentData.task_description,
+          supervisor: {
+            type: agentData.supervisor?.provider || 'openai',
+            api: agentData.supervisor?.api,
+            model: agentData.supervisor?.model,
+            provider: agentData.supervisor?.provider
+          },
+          worker: {
+            type: agentData.worker?.provider || 'ollama',
+            api: agentData.worker?.api,
+            model: agentData.worker?.model,
+            provider: agentData.worker?.provider
+          },
+          config: agentData.generation_config
+        };
+        await SmartAgentsService.updateAgent(String(editingAgentId.value), updateRequest);
+        emit('agent-updated');
+      } else {
+        // Create new agent
+        const createRequest: CreateAgentRequest = {
+          name: agentData.name,
+          description: agentData.task_description,
+          supervisor: {
+            type: agentData.supervisor?.provider || 'openai',
+            api: agentData.supervisor?.api,
+            model: agentData.supervisor?.model,
+            provider: agentData.supervisor?.provider
+          },
+          worker: {
+            type: agentData.worker?.provider || 'ollama',
+            api: agentData.worker?.api,
+            model: agentData.worker?.model,
+            provider: agentData.worker?.provider
+          },
+          config: agentData.generation_config
+        };
+        await SmartAgentsService.createAgent(createRequest);
+        emit('agent-created');
+      }
+      closeModal();
+    } catch (err) {
+      console.error('Submit failed:', err);
+      // TODO: Show error to user
+    }
  };
 
 const openModal = async (agentId?: string) => {
   if (agentId) {
     // Edit mode
     isEditing.value = true;
-    editingAgentId.value = Number(agentId);
+    editingAgentId.value = agentId;
     // Fetch agent data from API
     try {
-      const response = await fetch(`http://localhost:8910/agents/${agentId}`);
-      if (!response.ok) throw new Error('Failed to fetch agent');
-      const agent = await response.json();
+      const agent = await SmartAgentsService.getAgent(agentId);
+      if (!agent) throw new Error('Agent not found');
          formData.value = {
-           remoteProvider: agent.supervisor?.provider || '',
+           remoteProvider: agent.supervisor?.provider || agent.supervisor?.type || '',
            remoteApiKey: agent.supervisor?.api || '',
            remoteModel: agent.supervisor?.model || '',
-           localProvider: agent.worker?.provider || '',
+           localProvider: agent.worker?.provider || agent.worker?.type || '',
            localApiKey: agent.worker?.api || '',
            localModel: agent.worker?.model || '',
            agentName: agent.name || '',
            agentDescription: agent.task_description || agent.description || '',
-           agentContext: agent.worker?.context?.[0] || '',
+            agentContext: agent.context?.[0] || '',
            mcpIntegration: agent.mcp_integration || false,
            costBalance: Number(agent.cost_balance) || 5,
            customGroqUrl: '',

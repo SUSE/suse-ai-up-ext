@@ -534,6 +534,7 @@ export default defineComponent({
       clusters,
       repositories,
       repositoryOptions,
+      repoLoading,
 
       // Methods
       refresh,

@@ -47,7 +47,7 @@
         <div class="findings-list">
           <div
             v-for="finding in filteredFindings"
-            :key="finding.rule_id || Math.random()"
+            :key="finding.ruleId || finding.rule_id || Math.random()"
             class="finding-item"
             :class="finding.severity"
           >
@@ -56,7 +56,7 @@
                 <span class="severity-badge" :class="finding.severity">
                   {{ finding.severity.toUpperCase() }}
                 </span>
-                {{ finding.vulnerability_type.replace('_', ' ').toUpperCase() }}
+                {{ (finding.vulnerability_type || finding.category || '').replace('_', ' ').toUpperCase() }}
               </div>
               <div class="finding-actions">
                 <button class="btn btn-sm btn-link" @click="toggleFindingDetail(finding)">
@@ -72,15 +72,15 @@
             <div v-if="expandedFindings.has(finding)" class="finding-details">
               <div class="detail-section">
                 <strong>Evidence:</strong>
-                <pre>{{ finding.evidence }}</pre>
+                <pre>{{ finding.evidence || 'No evidence available' }}</pre>
               </div>
               <div class="detail-section">
                 <strong>Recommendation:</strong>
                 <p>{{ finding.recommendation }}</p>
               </div>
-              <div v-if="finding.rule_id" class="detail-section">
+              <div v-if="finding.ruleId || finding.rule_id" class="detail-section">
                 <strong>Rule ID:</strong>
-                <code>{{ finding.rule_id }}</code>
+                <code>{{ finding.ruleId || finding.rule_id }}</code>
               </div>
             </div>
           </div>

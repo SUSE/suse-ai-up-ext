@@ -1,14 +1,14 @@
 // MCP Service
 
 import axios from 'axios';
+import { API_BASE_URLS, MCP_ENDPOINTS, getApiConfig } from '../config/api-config';
 
-const apiClient = axios.create({
-  baseURL: 'http://localhost:8911',
-  timeout: 10000,
+export const apiClient = axios.create({
+  baseURL: API_BASE_URLS.MCP_GATEWAY,
+  timeout: getApiConfig().timeout,
 });
 
 export interface AdapterData {
-  id: string;
   name: string;
   imageName: string;
   imageVersion: string;
@@ -18,7 +18,19 @@ export interface AdapterData {
   replicaCount: number;
   useWorkloadIdentity: boolean;
   environmentVariables?: Record<string, string>;
+  command?: string;
+  args?: string[];
   originalServer?: DiscoveredServer;
+  remoteUrl?: string;
+  authentication?: {
+    required: boolean;
+    type: string;
+    bearerToken?: {
+      token: string;
+      dynamic: boolean;
+      expiresAt: string;
+    };
+  };
 }
 
 export interface ScanConfig {
@@ -27,13 +39,14 @@ export interface ScanConfig {
   scanRanges: string[];
   ports: (string | number)[];
   security_test?: boolean;
-  security_rules?: string; // Changed from security_rules_file to match backend API
+  security_rules?: string;
 }
 
 export interface ScanResult {
-  scan_id: string;
+  scanId: string;
   status: 'running' | 'completed' | 'failed';
-  discovered_servers?: DiscoveredServer[];
+  serverCount?: number;
+  results?: DiscoveredServer[];
   security_summary?: {
     total_servers: number;
     servers_with_findings: number;
@@ -41,33 +54,50 @@ export interface ScanResult {
     warning_findings: number;
   };
   error?: string;
+  message?: string;
+  // Legacy fields for backward compatibility
+  scan_id?: string;
+  discovered_servers?: DiscoveredServer[];
 }
 
 export interface AdapterResource {
-  id: string;
   name: string;
   status: string;
+  description?: string;
   protocol: string;
-  endpoint: string;
+  connectionType: string;
+  command?: string;
+  args?: string[];
+  environmentVariables?: Record<string, string>;
+  replicaCount: number;
+  useWorkloadIdentity: boolean;
   createdAt: string;
-  lastActive?: string;
-  errorCount?: number;
-  requestCount?: number;
+  lastActivity?: string;
+  phase?: string;
+  message?: string;
+  lastCheck?: string;
   imageName?: string;
   imageVersion?: string;
-  description?: string;
-  connectionType?: string;
-  replicaCount?: number;
-  useWorkloadIdentity?: boolean;
-  lastUpdatedAt?: string;
   originalServer?: DiscoveredServer;
+  remoteUrl?: string;
   authentication?: {
+    required: boolean;
     type: string;
-    token: string;
+    bearerToken?: {
+      token: string;
+      dynamic: boolean;
+      expiresAt: string;
+    };
   };
+  createdBy?: string;
+  lastUpdatedAt?: string;
+  // Legacy fields for backward compatibility
+  id?: string;
+  endpoint?: string;
+  errorCount?: number;
+  requestCount?: number;
+  lastActive?: string;
 }
-
-
 
 export interface DiscoveredServer {
   id: string;
@@ -83,8 +113,9 @@ export interface DiscoveredServer {
   name?: string;
   metadata?: {
     auth_type?: string;
+    detectionMethod?: string;
   };
-  security_findings?: any[]; // Will be defined by backend API
+  security_findings?: any[];
 }
 
 export interface RegistryServer {
@@ -129,10 +160,101 @@ export interface RegistryTool {
   input_schema: Record<string, any>;
 }
 
+// Session Management Interfaces
+export interface SessionInfo {
+  sessionId: string;
+  adapterName: string;
+  targetAddress: string;
+  connectionType: string;
+  createdAt: string;
+  lastActivity: string;
+  status: 'active' | 'inactive' | 'error';
+  metadata?: {
+    protocolVersion?: string;
+    clientInfo?: {
+      name: string;
+      version: string;
+    };
+  };
+}
+
+export interface SessionListResponse {
+  adapterName: string;
+  sessions: SessionInfo[];
+}
+
+export interface CreateSessionRequest {
+  forceReinitialize?: boolean;
+  clientInfo?: {
+    name: string;
+    version: string;
+  };
+}
+
+export interface CreateSessionResponse {
+  sessionId: string;
+  message: string;
+  adapterName: string;
+}
+
+// Plugin Service Management Interfaces
+export interface PluginService {
+  service_id: string;
+  service_type: string;
+  service_url: string;
+  version: string;
+  status: 'healthy' | 'unhealthy' | 'unknown';
+  capabilities: PluginCapability[];
+  registered_at: string;
+  last_health_check: string;
+}
+
+export interface PluginCapability {
+  path: string;
+  methods: string[];
+  description: string;
+}
+
+export interface PluginServiceListResponse {
+  services: PluginService[];
+}
+
+export interface RegisterServiceRequest {
+  service_id: string;
+  service_type: string;
+  service_url: string;
+  version: string;
+  capabilities: PluginCapability[];
+}
+
+export interface ServiceHealthResponse {
+  service_id: string;
+  status: 'healthy' | 'unhealthy' | 'unknown';
+  message: string;
+  timestamp: string;
+  version: string;
+  uptime?: string;
+}
+
+// MCP Communication Interfaces
+export interface MCPMessage {
+  jsonrpc: string;
+  id?: number | string;
+  method?: string;
+  params?: Record<string, any>;
+  result?: any;
+  error?: any;
+}
+
+export interface MCPSessionRequest {
+  sessionId: string;
+  message: MCPMessage;
+}
+
 export class MCPService {
   static async createAdapter(data: AdapterData) {
     try {
-      const response = await apiClient.post('/adapters', data);
+      const response = await apiClient.post(MCP_ENDPOINTS.ADAPTERS, data);
       return response.data;
     } catch (error) {
       console.error('Failed to create adapter:', error);
@@ -142,7 +264,7 @@ export class MCPService {
 
   static async registerDiscoveredServer(serverId: string) {
     try {
-      const response = await apiClient.post('/register', { DiscoveredServerId: serverId });
+      const response = await apiClient.post(MCP_ENDPOINTS.REGISTER_SERVER, { discoveredServerId: serverId });
       return response.data;
     } catch (error) {
       console.error('Failed to register discovered server:', error);
@@ -152,7 +274,7 @@ export class MCPService {
 
   static async startScan(config: ScanConfig): Promise<ScanResult> {
     try {
-      const response = await apiClient.post('/scan', config);
+      const response = await apiClient.post(MCP_ENDPOINTS.SCAN_START, config);
       return response.data;
     } catch (error) {
       console.error('Failed to start scan:', error);
@@ -162,7 +284,7 @@ export class MCPService {
 
   static async getScanStatus(scanId: string): Promise<ScanResult> {
     try {
-      const response = await apiClient.get(`/scan/${scanId}/status`);
+      const response = await apiClient.get(MCP_ENDPOINTS.SCAN_STATUS(scanId));
       return response.data;
     } catch (error) {
       console.error('Failed to get scan status:', error);
@@ -172,7 +294,7 @@ export class MCPService {
 
   static async getScanResults(scanId: string): Promise<ScanResult> {
     try {
-      const response = await apiClient.get(`/scan/${scanId}/results`);
+      const response = await apiClient.get(MCP_ENDPOINTS.SCAN_STATUS(scanId));
       return response.data;
     } catch (error) {
       console.error('Failed to get scan results:', error);
@@ -182,7 +304,7 @@ export class MCPService {
 
   static async getAdapters(): Promise<AdapterResource[]> {
     try {
-      const response = await apiClient.get('/adapters');
+      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTERS);
       return response.data || [];
     } catch (error) {
       console.error('Failed to fetch adapters:', error);
@@ -192,7 +314,7 @@ export class MCPService {
 
   static async getDiscoveredServers(): Promise<DiscoveredServer[]> {
     try {
-      const response = await apiClient.get('/servers');
+      const response = await apiClient.get(MCP_ENDPOINTS.SERVERS);
       return response.data || [];
     } catch (error) {
       console.error('Failed to fetch discovered servers:', error);
@@ -200,9 +322,9 @@ export class MCPService {
     }
   }
 
-  static async getAdapterLogs(id: string): Promise<string> {
+  static async getAdapterLogs(name: string): Promise<string> {
     try {
-      const response = await apiClient.get(`/adapters/${id}/logs`);
+      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTER_LOGS(name));
       return response.data || '';
     } catch (error) {
       console.error('Failed to fetch adapter logs:', error);
@@ -210,9 +332,9 @@ export class MCPService {
     }
   }
 
-  static async deleteAdapter(id: string) {
+  static async deleteAdapter(name: string) {
     try {
-      await apiClient.delete(`/adapters/${id}`);
+      await apiClient.delete(MCP_ENDPOINTS.ADAPTER_DELETE(name));
     } catch (error) {
       console.error('Failed to delete adapter:', error);
       throw error;
@@ -221,7 +343,7 @@ export class MCPService {
 
   static async ping(): Promise<boolean> {
     try {
-      await apiClient.get('/ping');
+      await apiClient.get(MCP_ENDPOINTS.PING);
       return true;
     } catch (error) {
       return false;
@@ -230,7 +352,7 @@ export class MCPService {
 
   static async getMetrics() {
     try {
-      const response = await apiClient.get('/metrics');
+      const response = await apiClient.get(MCP_ENDPOINTS.METRICS);
       return response.data;
     } catch (error) {
       console.error('Failed to fetch metrics:', error);
@@ -240,7 +362,7 @@ export class MCPService {
 
   static async getRegistryServers(): Promise<RegistryServer[]> {
     try {
-      const response = await apiClient.get('/registry');
+      const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY);
       return response.data || [];
     } catch (error) {
       console.error('Failed to fetch registry servers:', error);
@@ -250,7 +372,7 @@ export class MCPService {
 
   static async getPublicRegistryServers(): Promise<RegistryServer[]> {
     try {
-      const response = await apiClient.get('/public/registry');
+      const response = await apiClient.get(MCP_ENDPOINTS.PUBLIC_REGISTRY);
       return response.data || [];
     } catch (error) {
       console.error('Failed to fetch public registry servers:', error);
@@ -260,7 +382,7 @@ export class MCPService {
 
   static async getPublicRegistryServersBySource(source: string): Promise<RegistryServer[]> {
     try {
-      const response = await apiClient.get(`/public/registry?source=${source}`);
+      const response = await apiClient.get(`${MCP_ENDPOINTS.PUBLIC_REGISTRY}?source=${source}`);
       return response.data || [];
     } catch (error) {
       console.error(`Failed to fetch registry servers for source ${source}:`, error);
@@ -270,7 +392,7 @@ export class MCPService {
 
   static async getRegistryServer(id: string): Promise<RegistryServer | null> {
     try {
-      const response = await apiClient.get(`/registry/${id}`);
+      const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY_DETAILS(id));
       return response.data;
     } catch (error) {
       console.error('Failed to fetch registry server details:', error);
@@ -280,7 +402,7 @@ export class MCPService {
 
   static async browseRegistryServers(): Promise<RegistryServer[]> {
     try {
-      const response = await apiClient.get('/registry/browse');
+      const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY_BROWSE);
       return response.data || [];
     } catch (error) {
       console.error('Failed to browse registry servers:', error);
@@ -288,4 +410,153 @@ export class MCPService {
     }
   }
 
+  // Adapter Details and Status
+  static async getAdapterDetails(name: string): Promise<AdapterResource | null> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTER_DETAILS(name));
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch adapter details:', error);
+      return null;
+    }
+  }
+
+  static async getAdapterStatus(name: string): Promise<AdapterResource | null> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTER_STATUS(name));
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch adapter status:', error);
+      return null;
+    }
+  }
+
+  static async updateAdapter(name: string, updates: Partial<AdapterData>): Promise<AdapterResource> {
+    try {
+      const response = await apiClient.put(MCP_ENDPOINTS.ADAPTER_UPDATE(name), updates);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to update adapter:', error);
+      throw error;
+    }
+  }
+
+  // Session Management
+  static async listSessions(adapterName: string): Promise<SessionListResponse> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.SESSIONS(adapterName));
+      return response.data;
+    } catch (error) {
+      console.error('Failed to list sessions:', error);
+      throw error;
+    }
+  }
+
+  static async getSessionDetails(adapterName: string, sessionId: string): Promise<SessionInfo> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.SESSION_DETAILS(adapterName, sessionId));
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get session details:', error);
+      throw error;
+    }
+  }
+
+  static async createSession(adapterName: string, request: CreateSessionRequest): Promise<CreateSessionResponse> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.SESSION_CREATE(adapterName), request);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      throw error;
+    }
+  }
+
+  static async deleteSession(adapterName: string, sessionId: string) {
+    try {
+      await apiClient.delete(MCP_ENDPOINTS.SESSION_DELETE(adapterName, sessionId));
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      throw error;
+    }
+  }
+
+  static async deleteAllSessions(adapterName: string) {
+    try {
+      await apiClient.delete(MCP_ENDPOINTS.SESSION_DELETE_ALL(adapterName));
+    } catch (error) {
+      console.error('Failed to delete all sessions:', error);
+      throw error;
+    }
+  }
+
+  // Plugin Service Management
+  static async listPluginServices(): Promise<PluginServiceListResponse> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.PLUGIN_SERVICES);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to list plugin services:', error);
+      throw error;
+    }
+  }
+
+  static async registerPluginService(request: RegisterServiceRequest) {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.PLUGIN_REGISTER, request);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to register plugin service:', error);
+      throw error;
+    }
+  }
+
+  static async getServiceHealth(serviceId: string): Promise<ServiceHealthResponse> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.PLUGIN_HEALTH(serviceId));
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get service health:', error);
+      throw error;
+    }
+  }
+
+  static async unregisterPluginService(serviceId: string) {
+    try {
+      await apiClient.delete(MCP_ENDPOINTS.PLUGIN_UNREGISTER(serviceId));
+    } catch (error) {
+      console.error('Failed to unregister plugin service:', error);
+      throw error;
+    }
+  }
+
+  // MCP Communication
+  static async sendMCPMessage(adapterName: string, sessionId: string, message: MCPMessage): Promise<MCPMessage> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.ADAPTER_MESSAGES(adapterName), message, {
+        headers: {
+          'mcp-session-id': sessionId,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to send MCP message:', error);
+      throw error;
+    }
+  }
+
+  static async establishMCPConnection(adapterName: string, message: MCPMessage): Promise<any> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.ADAPTER_MCP(adapterName), message, {
+        headers: {
+          'Accept': 'application/json, text/event-stream'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to establish MCP connection:', error);
+      throw error;
+    }
+  }
 }
