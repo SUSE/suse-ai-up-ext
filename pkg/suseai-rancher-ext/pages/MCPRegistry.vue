@@ -164,15 +164,16 @@
 
       <!-- Modal Components -->
       <ServerDetailsModal
-        v-if="showViewModal"
+        :show="showViewModal"
         :server="selectedServer"
         @close="showViewModal = false"
       />
 
       <RegistryManagementModal
-        v-if="showRegistryModal"
+        :show="showRegistryModal"
         :registries="publicRegistries"
         :syncing-registry="syncingRegistry"
+        :is-custom-registry="isCustomRegistry"
         @close="showRegistryModal = false"
         @toggle-registry="toggleRegistry"
         @sync-registry="syncRegistry"
@@ -183,7 +184,7 @@
       />
 
       <AdvancedRegistryModal
-        v-if="showAdvancedModal"
+        :show="showAdvancedModal"
         @close="showAdvancedModal = false"
         @clear-all="clearAllEntries"
         @check-availability="checkAvailability"
@@ -191,8 +192,7 @@
       />
 
       <AddRegistryModal
-        v-if="showAddRegistryModal"
-        :registry="newRegistry"
+        :show="showAddRegistryModal"
         @close="showAddRegistryModal = false"
         @submit="addCustomRegistry"
       />
