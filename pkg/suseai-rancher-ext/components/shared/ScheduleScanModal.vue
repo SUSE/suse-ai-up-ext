@@ -65,14 +65,17 @@
 
          <div class="form-group">
            <label>Ports to Scan:</label>
+           <div class="form-help">
+             Enter single ports (e.g., "8000") or port ranges (e.g., "8000-8010")
+           </div>
            <div class="scan-ports">
              <div v-for="(port, index) in scanConfig.ports || []" :key="index" class="port-item">
                <input
-                 type="number"
-                 v-model.number="scanConfig.ports![index]"
+                 type="text"
+                 v-model="scanConfig.ports![index]"
                  class="form-control"
-                 min="1"
-                 max="65535"
+                 :class="{ 'is-invalid': !isValidPort(port) }"
+                 placeholder="8000 or 8000-8010"
                />
                <button
                  type="button"
@@ -84,8 +87,11 @@
                </button>
              </div>
              <button type="button" class="btn btn-sm btn-secondary" @click="addPort">
-               Add Port
+               Add Port/Range
              </button>
+           </div>
+           <div v-if="hasInvalidPorts" class="error-message">
+             Invalid port format. Use single ports (1-65535) or ranges (e.g., "8000-8010").
            </div>
          </div>
 
@@ -200,8 +206,40 @@ const isValid = computed(() => {
   // Validate scan configuration
   return scanConfig.value.scanRanges.length > 0 &&
          scanConfig.value.ports.length > 0 &&
-         scanConfig.value.maxConcurrent > 0;
+         Number(scanConfig.value.maxConcurrent) > 0 &&
+         !hasInvalidPorts.value;
 });
+
+const hasInvalidPorts = computed(() => {
+  return (scanConfig.value.ports || []).some(port => !isValidPort(port));
+});
+
+// Port validation function
+const isValidPort = (port: string | number): boolean => {
+  if (typeof port === 'number') {
+    return port >= 1 && port <= 65535;
+  }
+  
+  if (typeof port === 'string') {
+    const trimmedPort = port.trim();
+    
+    // Single port
+    if (/^\d{1,5}$/.test(trimmedPort)) {
+      const num = parseInt(trimmedPort, 10);
+      return num >= 1 && num <= 65535;
+    }
+    
+    // Port range
+    const rangeMatch = /^(\d{1,5})-(\d{1,5})$/.exec(trimmedPort);
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1], 10);
+      const end = parseInt(rangeMatch[2], 10);
+      return start >= 1 && start <= 65535 && end >= 1 && end <= 65535 && start <= end;
+    }
+  }
+  
+  return false;
+};
 
 // Methods
 const openModal = () => {
@@ -219,7 +257,7 @@ const reset = () => {
   error.value = '';
   scanConfig.value = {
     maxConcurrent: 10,
-    ports: [8911],
+    ports: ['8000', '3000-3010'],
     scanRanges: ['192.168.1.0/24'],
     timeout: '30s',
     security_test: false
@@ -246,7 +284,7 @@ const addPort = () => {
   if (!scanConfig.value.ports) {
     scanConfig.value.ports = [];
   }
-  scanConfig.value.ports.push(8000);
+  scanConfig.value.ports.push('8080');
 };
 
 const removePort = (index: number) => {
@@ -293,12 +331,12 @@ const handleRulesFileChange = async (event: Event) => {
     };
 
     // Store file content for submission (in a real implementation, you'd upload or store it)
-    scanConfig.value.security_rules_file = content;
+    scanConfig.value.security_rules = content;
 
   } catch (err) {
     rulesValidationError.value = `Invalid YAML file: ${err instanceof Error ? err.message : 'Unknown error'}`;
     rulesPreview.value = null;
-    scanConfig.value.security_rules_file = undefined;
+    scanConfig.value.security_rules = undefined;
   }
 };
 
@@ -306,7 +344,7 @@ const clearRulesFile = () => {
   rulesFileName.value = '';
   rulesValidationError.value = '';
   rulesPreview.value = null;
-  scanConfig.value.security_rules_file = undefined;
+  scanConfig.value.security_rules = undefined;
   if (rulesFileInput.value) {
     rulesFileInput.value.value = '';
   }
@@ -319,10 +357,8 @@ const clearRulesFile = () => {
 
         // Prepare scan config for backend API
         const backendConfig = {
-          ...scanConfig.value,
-          security_rules: scanConfig.value.security_rules_file // Rename for backend API
+          ...scanConfig.value
         };
-        delete backendConfig.security_rules_file; // Remove old field
 
         const scanResult = await MCPService.startScan(backendConfig);
 
@@ -521,6 +557,17 @@ defineExpose({
 
 .btn-link:hover {
   color: var(--primary-hover, #1d4ed8);
+}
+
+/* Port Input Styles */
+.is-invalid {
+  border-color: var(--error, #dc2626);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);
+}
+
+.is-invalid:focus {
+  border-color: var(--error, #dc2626);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
 }
 
 /* Security Testing Styles */

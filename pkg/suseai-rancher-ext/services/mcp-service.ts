@@ -61,6 +61,10 @@ export interface AdapterResource {
   useWorkloadIdentity?: boolean;
   lastUpdatedAt?: string;
   originalServer?: DiscoveredServer;
+  authentication?: {
+    type: string;
+    token: string;
+  };
 }
 
 

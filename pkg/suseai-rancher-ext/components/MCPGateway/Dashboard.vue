@@ -24,7 +24,6 @@
       :adapters="adapters"
       :loading="loading"
       :error="error || undefined"
-      @view-details="handleViewAdapterDetails"
       @view-logs="handleViewAdapterLogs"
       @edit-adapter="handleEditAdapter"
       @delete-adapter="handleDeleteAdapter"
@@ -75,7 +74,6 @@ export default defineComponent({
       // Methods
       onScanStarted,
       openRuleManagement,
-      viewAdapterDetails,
       viewAdapterLogs,
       editAdapter,
       deleteAdapter,
@@ -91,9 +89,7 @@ export default defineComponent({
       emit('rule-modal-open');
     };
 
-    const handleViewAdapterDetails = (adapter: any) => {
-      viewAdapterDetails(adapter);
-    };
+
 
     const handleViewAdapterLogs = (adapter: any) => {
       viewAdapterLogs(adapter);
@@ -134,7 +130,6 @@ export default defineComponent({
       // Handlers
       handleScanStart,
       handleRuleManagement,
-      handleViewAdapterDetails,
       handleViewAdapterLogs,
       handleEditAdapter,
       handleDeleteAdapter,

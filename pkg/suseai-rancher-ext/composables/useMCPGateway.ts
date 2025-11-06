@@ -357,14 +357,15 @@ export function useMCPGateway() {
       // Register discovered server by ID - the /register endpoint handles the rest
       const result = await MCPService.registerDiscoveredServer(server.id);
 
-      // Refresh adapters list
+      // Refresh adapters list to get the updated adapter with server_name
       await fetchAdapters();
 
       logger.info('Server registered successfully', {
         data: {
           serverId: server.id,
           adapterId: result.adapter?.id,
-          adapterName: result.adapter?.name
+          adapterName: result.adapter?.name || result.adapter?.server_name,
+          serverName: result.adapter?.server_name
         }
       });
 
@@ -375,21 +376,9 @@ export function useMCPGateway() {
   };
 
   const viewAdapterDetails = (adapter: AdapterResource) => {
-    // For now, just show an alert with adapter details
-    // TODO: Create a proper modal for adapter details
-    const details = `
-Name: ${adapter.name}
-Image: ${adapter.imageName}:${adapter.imageVersion}
-Status: ${adapter.replicaCount && adapter.replicaCount > 0 ? 'Active' : 'Inactive'}
-Replicas: ${adapter.replicaCount || 0}
-Connection: ${adapter.connectionType || 'N/A'}
-Protocol: ${adapter.protocol || 'MCP'}
-Description: ${adapter.description || 'N/A'}
-Created: ${adapter.createdAt ? new Date(adapter.createdAt).toLocaleString() : 'Unknown'}
-Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleString() : 'Unknown'}
-    `.trim();
-
-    alert(`Adapter Details:\n\n${details}`);
+    // This is now handled by the AdapterDetailsModal component
+    // Keeping this function for backward compatibility
+    logger.info('View adapter details', { adapterName: adapter.name });
   };
 
   const viewAdapterLogs = async (adapter: AdapterResource) => {
@@ -678,7 +667,6 @@ Updated: ${adapter.lastUpdatedAt ? new Date(adapter.lastUpdatedAt).toLocaleStrin
     // MCP Gateway methods
     loadData,
     registerServer,
-    viewAdapterDetails,
     viewAdapterLogs,
     editAdapter,
     deleteAdapter,

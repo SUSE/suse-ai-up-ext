@@ -53,55 +53,66 @@
          </tr>
        </tbody>
      </table>
+    
+    <!-- Adapter Details Modal -->
+    <AdapterDetailsModal ref="adapterDetailsModal" />
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
-import type { AdapterResource } from '../../services/mcp-service';
+ import { defineComponent, ref } from 'vue';
+ import type { AdapterResource } from '../../services/mcp-service';
+ import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
 
-export default defineComponent({
-  name: 'AdaptersTable',
-  props: {
-    adapters: {
-      type: Array as () => AdapterResource[],
-      default: () => []
-    },
-    loading: {
-      type: Boolean,
-      default: false
-    },
-    error: {
-      type: String,
-      default: null
-    }
-  },
-  emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter'],
-  setup(props, { emit }) {
-    const handleViewDetails = (adapter: AdapterResource) => {
-      emit('view-details', adapter);
-    };
+ export default defineComponent({
+   name: 'AdaptersTable',
+   components: {
+     AdapterDetailsModal
+   },
+   props: {
+     adapters: {
+       type: Array as () => AdapterResource[],
+       default: () => []
+     },
+     loading: {
+       type: Boolean,
+       default: false
+     },
+     error: {
+       type: String,
+       default: null
+     }
+   },
+   emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter'],
+   setup(props, { emit }) {
+     const adapterDetailsModal = ref();
 
-    const handleViewLogs = (adapter: AdapterResource) => {
-      emit('view-logs', adapter);
-    };
+     const handleViewDetails = (adapter: AdapterResource) => {
+       // Open the modal instead of emitting event
+       adapterDetailsModal.value?.openModal(adapter);
+     };
 
-    const handleEditAdapter = (adapter: AdapterResource) => {
-      emit('edit-adapter', adapter);
-    };
+     const handleViewLogs = (adapter: AdapterResource) => {
+       emit('view-logs', adapter);
+     };
 
-    const handleDeleteAdapter = (adapter: AdapterResource) => {
-      emit('delete-adapter', adapter);
-    };
+     const handleEditAdapter = (adapter: AdapterResource) => {
+       emit('edit-adapter', adapter);
+     };
 
-    return {
-      handleViewDetails,
-      handleViewLogs,
-      handleEditAdapter,
-      handleDeleteAdapter
-    };
-  }
-});
+     const handleDeleteAdapter = (adapter: AdapterResource) => {
+       emit('delete-adapter', adapter);
+     };
+
+     return {
+       adapterDetailsModal,
+       handleViewDetails,
+       handleViewLogs,
+       handleEditAdapter,
+       handleDeleteAdapter
+     };
+   }
+ });
 </script>
 
 <style scoped>
