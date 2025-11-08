@@ -6,7 +6,7 @@
 // Base URLs for different services
 export const API_BASE_URLS = {
   MCP_GATEWAY: 'http://localhost:8911/api/v1',
-  SMART_AGENTS: 'http://localhost:8910',
+  SMART_AGENTS: window.location.origin + '/api/smart-agents',
   RANCHER: window.location.origin
 } as const;
 
@@ -73,8 +73,8 @@ export const MCP_ENDPOINTS = {
   PLUGIN_UNREGISTER: (serviceId: string) => `/plugins/services/${serviceId}`,
   PLUGIN_SERVICES_BY_TYPE: (serviceType: string) => `/plugins/services/type/${serviceType}`,
   
-  // System
-  PING: '/ping',
+   // System
+   HEALTH: '/health',
   METRICS: '/metrics',
   DOCS: '/docs',
   SWAGGER_JSON: '/swagger/doc.json'

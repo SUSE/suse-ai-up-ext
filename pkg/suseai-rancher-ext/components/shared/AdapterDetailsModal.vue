@@ -195,7 +195,7 @@ const mcpUrl = computed(() => {
 
 // Extract token from authentication object in API response
 const token = computed(() => {
-  return adapter.value?.authentication?.bearerToken?.token || '';
+  return adapter.value?.authentication?.token || '';
 });
 
 const openModal = (adapterData: AdapterResource) => {

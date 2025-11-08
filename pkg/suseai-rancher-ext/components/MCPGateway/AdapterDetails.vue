@@ -73,15 +73,10 @@
           <span class="label">Type:</span>
           <span class="value">{{ adapter.authentication.type }}</span>
         </div>
-        <div v-if="adapter.authentication?.bearerToken" class="detail-row">
-          <span class="label">Token:</span>
-          <span class="value">
-            {{ adapter.authentication.bearerToken.dynamic ? 'Dynamic' : 'Static' }}
-            <span v-if="adapter.authentication.bearerToken.expiresAt">
-              (Expires: {{ formatDate(adapter.authentication.bearerToken.expiresAt) }})
-            </span>
-          </span>
-        </div>
+         <div v-if="adapter.authentication?.token" class="detail-row">
+           <span class="label">Token:</span>
+           <span class="value">Present</span>
+         </div>
       </div>
 
       <!-- Environment Variables -->

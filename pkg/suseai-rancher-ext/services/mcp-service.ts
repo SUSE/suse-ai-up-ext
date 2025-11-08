@@ -11,7 +11,7 @@ import type {
   AdapterToken,
   TokenValidationResult,
   ClientTokenRequest,
-  DiscoveredServer as EnhancedDiscoveredServer,
+
   DiscoveryScan,
   DiscoveryScanConfig,
   RegisterServerRequest,
@@ -30,6 +30,9 @@ import type {
 export const apiClient = axios.create({
   baseURL: API_BASE_URLS.MCP_GATEWAY,
   timeout: getApiConfig().timeout,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 export interface AdapterData {
@@ -44,17 +47,12 @@ export interface AdapterData {
   environmentVariables?: Record<string, string>;
   command?: string;
   args?: string[];
-  originalServer?: DiscoveredServer;
-  remoteUrl?: string;
-  authentication?: {
-    required: boolean;
-    type: string;
-    bearerToken?: {
-      token: string;
-      dynamic: boolean;
-      expiresAt: string;
-    };
-  };
+   originalServer?: DiscoveredServer;
+   remoteUrl?: string;
+   authentication?: {
+     required: boolean;
+     type: string;
+   };
 }
 
 export interface ScanConfig {
@@ -68,9 +66,12 @@ export interface ScanConfig {
 
 export interface ScanResult {
   id: string;
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'pending';
   startTime?: string;
+  endTime?: string;
   config?: ScanConfig;
+  progress?: number;
+  message?: string;
   results?: DiscoveredServer[];
   error?: string;
   // Legacy fields for backward compatibility
@@ -97,18 +98,14 @@ export interface AdapterResource {
   lastCheck?: string;
   imageName?: string;
   imageVersion?: string;
-  originalServer?: DiscoveredServer;
-  remoteUrl?: string;
-  authentication?: {
-    required: boolean;
-    type: string;
-    bearerToken?: {
-      token: string;
-      dynamic: boolean;
-      expiresAt: string;
-    };
-  };
-  createdBy?: string;
+   originalServer?: DiscoveredServer;
+   remoteUrl?: string;
+   authentication?: {
+     required: boolean;
+     type: string;
+     token?: string;
+   };
+   createdBy?: string;
   lastUpdatedAt?: string;
   // Legacy fields for backward compatibility
   id?: string;
@@ -283,7 +280,7 @@ export class MCPService {
 
   static async registerDiscoveredServer(serverId: string) {
     try {
-      const response = await apiClient.post(MCP_ENDPOINTS.REGISTER_SERVER, { discoveredServerId: serverId });
+      const response = await apiClient.post(MCP_ENDPOINTS.REGISTER_SERVER, { DiscoveredServerID: serverId });
       // API returns 201 Created with no content, so return success status
       return { success: response.status === 201, status: response.status };
     } catch (error) {
@@ -562,27 +559,45 @@ export class MCPService {
   }
 
   // Enhanced Discovery Methods
-  static async startDiscoveryScan(config: DiscoveryScanConfig): Promise<DiscoveryScan> {
+  static async startDiscoveryScan(config: any): Promise<any> {
     try {
       const response = await apiClient.post(MCP_ENDPOINTS.DISCOVERY_SCAN, config);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to start discovery scan:', error);
+      // Check if it's a CORS error
+      if (error.code === 'ERR_NETWORK' || error.message?.includes('CORS')) {
+        throw new Error('CORS error: Unable to connect to MCP Gateway. Please ensure the MCP Gateway server is running and configured to allow cross-origin requests from this domain.');
+      }
       throw error;
     }
   }
 
-  static async getDiscoveryServers(): Promise<EnhancedDiscoveredServer[]> {
+  static async getDiscoveryServers(): Promise<DiscoveredServer[]> {
     try {
+      console.log('Calling getDiscoveryServers with URL:', apiClient.defaults.baseURL + MCP_ENDPOINTS.DISCOVERY_SERVERS);
       const response = await apiClient.get(MCP_ENDPOINTS.DISCOVERY_SERVERS);
-      return response.data || [];
+      console.log('getDiscoveryServers response:', response);
+      const data = response.data;
+      console.log('getDiscoveryServers data:', data);
+
+      // API returns {count: number, servers: DiscoveredServer[]}
+      if (data && typeof data === 'object' && Array.isArray(data.servers)) {
+        return data.servers;
+      } else if (Array.isArray(data)) {
+        // Fallback for legacy format
+        return data;
+      } else {
+        console.warn('getDiscoveryServers returned unexpected format:', data);
+        return [];
+      }
     } catch (error) {
       console.error('Failed to get discovery servers:', error);
       return [];
     }
   }
 
-  static async getDiscoveryServerDetails(id: string): Promise<EnhancedDiscoveredServer | null> {
+  static async getDiscoveryServerDetails(id: string): Promise<DiscoveredServer | null> {
     try {
       const response = await apiClient.get(MCP_ENDPOINTS.DISCOVERY_SERVER_DETAILS(id));
       return response.data;
@@ -718,10 +733,10 @@ export class MCPService {
   // System Health
   static async ping(): Promise<boolean> {
     try {
-      // Ping endpoint is at root level, not under /api/v1
-      const response = await axios.get(`${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}/ping`);
-      // Check if the service responds with "pong"
-      return response.data?.message === 'pong' || response.data?.status === 'pong' || response.data === 'pong';
+      // Health endpoint is at root level, not under /api/v1
+      const response = await axios.get(`${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}${MCP_ENDPOINTS.HEALTH}`);
+      // Check if the service responds with healthy status
+      return response.data?.status === 'healthy';
     } catch (error) {
       console.error('Failed to ping MCP Gateway:', error);
       return false;

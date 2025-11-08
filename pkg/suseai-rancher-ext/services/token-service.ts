@@ -9,8 +9,10 @@ import { logger } from '../utils/logger'
 
 export interface AdapterToken {
   token: string
-  expiresAt: string
-  permissions: string[]
+  expiresAt?: string
+  type?: string
+  message?: string
+  permissions?: string[]
   metadata?: Record<string, any>
 }
 

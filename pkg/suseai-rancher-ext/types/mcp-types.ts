@@ -116,27 +116,25 @@ export interface DiscoveredServer {
 
 export interface DiscoveryScan {
   id: string
-  status: 'running' | 'completed' | 'failed' | 'cancelled'
-  startedAt: string
-  completedAt?: string
-  config: DiscoveryScanConfig
-  results: {
-    servers: DiscoveredServer[]
-    total: number
-    errors?: string[]
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | 'pending'
+  startTime?: string
+  endTime?: string
+  config: {
+    scanRanges?: string[]
+    ports?: string[]
+    timeout?: string
+    maxConcurrent?: number
+    excludeProxy?: boolean
   }
-  progress?: {
-    percentage: number
-    current: string
-    estimated?: number
-  }
+  progress?: number
+  message?: string
 }
 
 export interface DiscoveryScanConfig {
   networks: string[]
-  ports: number[]
+  ports: string[]
   protocols: ('http' | 'https' | 'tcp')[]
-  timeout: number
+  timeout: string
   maxConcurrent: number
   filters?: {
     excludeHosts?: string[]

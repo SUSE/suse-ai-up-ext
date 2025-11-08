@@ -18,6 +18,7 @@
     ref="securityModal"
     :findings="selectedServerFindings"
     :server-name="selectedServerName"
+    :server="selectedServer"
   />
 
   <!-- Rule Management Modal -->
@@ -25,7 +26,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue';
+import { defineComponent, ref, watch } from 'vue';
 import { useMCPGateway } from '../composables/useMCPGateway';
 import { ExperimentalBanner, InstallWizard, Dashboard } from '../components/MCPGateway';
 import ScheduleScanModal from '../components/shared/ScheduleScanModal.vue';
@@ -52,6 +53,10 @@ export default defineComponent({
       // Modal data
       selectedServerFindings,
       selectedServerName,
+      selectedServer,
+
+      // Scan state
+      scanning,
 
       // Methods
       onScanStarted,
@@ -62,6 +67,20 @@ export default defineComponent({
     const scanModal = ref<any>();
     const securityModal = ref<any>();
     const ruleModal = ref<any>();
+
+    // Track if scan was running to detect completion
+    const scanWasRunning = ref(false);
+
+    // Track scan state for modal management
+    watch(scanning, (newScanning, oldScanning) => {
+      if (newScanning && !oldScanning) {
+        // Scan just started
+        scanWasRunning.value = true;
+      } else if (oldScanning && !newScanning) {
+        // Scan completed
+        scanWasRunning.value = false;
+      }
+    });
 
     const openScanModal = () => {
       if (scanModal.value) {
@@ -90,6 +109,7 @@ export default defineComponent({
       // Modal data
       selectedServerFindings,
       selectedServerName,
+      selectedServer,
 
       // Modal refs
       scanModal,

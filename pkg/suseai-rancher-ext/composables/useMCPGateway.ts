@@ -1,12 +1,12 @@
 import { computed, ref, getCurrentInstance, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useStore } from 'vuex';
 import { logger } from '../utils/logger';
-import { MCPService } from '../services/mcp-service';
+import { MCPService, type DiscoveredServer } from '../services/mcp-service';
+import type { SecurityFinding } from '../services/security-engine';
 import { tokenService } from '../services/token-service';
 import { API_BASE_URLS } from '../config/api-config';
-import type { 
-  AdapterResource, 
-  DiscoveredServer, 
+import type {
+  AdapterResource,
   AdapterData,
   SessionInfo,
   SessionListResponse
@@ -67,10 +67,17 @@ export function useMCPGateway() {
   const scanProgress = ref(0);
   const scanStatus = ref('');
   const currentScanId = ref<string | null>(null);
+  const scanCompleted = ref(false);
+  const scanError = ref<string | null>(null);
 
   // Modal refs and data
   const selectedServerFindings = ref<any[]>([]);
   const selectedServerName = ref('');
+  const selectedServer = ref<DiscoveredServer | null>(null);
+
+  // Scan completion callbacks
+  const scanCompletedCallbacks = ref<(() => void)[]>([]);
+  const scanFailedCallbacks = ref<((error: string) => void)[]>([]);
 
   // Session Management
   const sessions = ref<Record<string, SessionInfo[]>>({});
@@ -333,16 +340,35 @@ export function useMCPGateway() {
   // MCP Gateway methods
   const fetchDiscoveredServers = async () => {
     try {
-      // Always fetch from discovery servers API to get current results
+      // Fetch from discovery servers API to get current results
       const servers = await MCPService.getDiscoveryServers();
-      discoveredServers.value = (servers as any).sort((a: any, b: any) => {
-        const nameA = a.name || a.address;
-        const nameB = b.name || b.address;
-        return nameA.localeCompare(nameB);
-      });
+      if (Array.isArray(servers) && typeof servers.sort === 'function' && servers.length > 0) {
+        try {
+          // Apply security analysis to each server
+          const serversWithFindings = servers.map((server: DiscoveredServer) => {
+            if (!server.security_findings) {
+              server.security_findings = generateSecurityFindings(server);
+            }
+            return server;
+          });
+
+          discoveredServers.value = serversWithFindings.sort((a: any, b: any) => {
+            const nameA = (a && (a.name || a.address)) || '';
+            const nameB = (b && (b.name || b.address)) || '';
+            return nameA.localeCompare(nameB);
+          });
+        } catch (sortError) {
+          logger.error('Failed to sort discovered servers:', sortError);
+          discoveredServers.value = servers as DiscoveredServer[];
+        }
+      } else {
+        logger.warn('getDiscoveryServers returned invalid data:', servers);
+        discoveredServers.value = [];
+      }
     } catch (err) {
       logger.error('Failed to fetch discovered servers', err);
-      // Continue - this is not critical
+      // If the /discovery/servers endpoint fails, servers will only be updated from scan results
+      // This is acceptable as the primary way to get servers is through scanning
     }
   };
 
@@ -379,26 +405,66 @@ export function useMCPGateway() {
     return server.name || server.address;
   };
 
+  // Helper function to sanitize adapter names
+  const sanitizeAdapterName = (name: string): string => {
+    return name
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .replace(/[(){}[\]*\\]/g, '') // Remove special characters (){}[]*\
+      .toLowerCase(); // Convert to lowercase for consistency
+  };
+
   const registerServer = async (server: DiscoveredServer) => {
     try {
-      // Register discovered server by ID - the /register endpoint handles the rest
-      const result = await MCPService.registerDiscoveredServer(server.id);
+      const adapterName = server.name ? sanitizeAdapterName(server.name) : `adapter-${server.id}`;
 
-      // Refresh adapters list to get the updated adapter with server_name
+      // Create adapter data from discovered server with authentication required
+      const adapterData: AdapterData = {
+        name: adapterName,
+        imageName: 'mcp/adapter',
+        imageVersion: '1.0.0',
+        description: `Adapter for ${server.name || server.address}`,
+        connectionType: 'RemoteHttp', // Always use RemoteHttp for remote HTTP-based MCP servers
+        protocol: server.protocol || 'MCP',
+        replicaCount: 1,
+        useWorkloadIdentity: false,
+        originalServer: server,
+        remoteUrl: server.address,
+        authentication: {
+          required: true,
+          type: 'bearer'
+        }
+      };
+
+      // Create the adapter directly - MCP Gateway will generate token automatically
+      const result = await MCPService.createAdapter(adapterData);
+
+      // Refresh adapters list to get the complete adapter data and retrieve the correct name
       await fetchAdapters();
 
-      // Find the newly created adapter from the refreshed list
-      const newAdapter = adapters.value.find(adapter => 
-        adapter.originalServer?.id === server.id || 
-        adapter.name === server.name
-      );
+      // Find the newly created adapter in the refreshed list using the expected name
+      const createdAdapter = adapters.value.find(a => a.name === adapterName);
+      if (createdAdapter) {
+        // Fetch the token using the name from the adapters list
+        await fetchAdapterToken(createdAdapter.name);
+      } else {
+        logger.error('Created adapter not found in refreshed list', {
+          expectedName: adapterName,
+          createResult: result,
+          availableAdapters: adapters.value.map(a => ({ name: a.name, status: a.status }))
+        });
+        // Try to use the name from the create result as fallback
+        if (result && result.name) {
+          logger.info('Attempting to fetch token using create result name', { name: result.name });
+          await fetchAdapterToken(result.name);
+        }
+      }
 
       logger.info('Server registered successfully', {
         data: {
           serverId: server.id,
-          adapterId: newAdapter?.name,
-          adapterName: newAdapter?.name,
-          serverName: newAdapter?.originalServer?.name || server.name
+          adapterId: result.name,
+          adapterName: result.name,
+          serverName: server.name || server.address
         }
       });
 
@@ -551,9 +617,68 @@ export function useMCPGateway() {
     return 'Secure';
   };
 
+  const generateSecurityFindings = (server: DiscoveredServer): SecurityFinding[] => {
+    const findings: any[] = [];
+
+    // Check for high vulnerability score (Risk Status)
+    if (server.vulnerability_score === 'high') {
+      findings.push({
+        id: `high-risk-${server.id}`,
+        title: 'High Risk Vulnerability',
+        description: 'Server has been identified with high-risk vulnerabilities',
+        severity: 'critical',
+        category: 'VULNERABILITY',
+        ruleId: 'MCP-RISK-001',
+        vulnerability_type: 'high_risk_vulnerability',
+        evidence: `Server ${server.name} has vulnerability_score: ${server.vulnerability_score}`,
+        status: 'open',
+        discoveredAt: new Date().toISOString(),
+        adapterName: server.name || 'Unknown',
+        recommendation: 'Immediate security assessment and remediation required. Review server configuration, update dependencies, and apply security patches.',
+        references: ['MCP Security Assessment'],
+        metadata: {
+          vulnerability_score: server.vulnerability_score,
+          vulnerability_type: 'high_risk_vulnerability'
+        }
+      });
+    }
+
+    // Check for missing authentication (Security Status)
+    if (server.metadata?.auth_type === 'none') {
+      findings.push({
+        id: `missing-auth-${server.id}`,
+        title: 'Missing Authentication',
+        description: 'MCP server does not implement authentication',
+        severity: 'critical',
+        category: 'AUTHENTICATION',
+        ruleId: 'MCP-AUTH-001',
+        vulnerability_type: 'authentication_bypass',
+        evidence: `Server ${server.name} has auth_type: ${server.metadata.auth_type}`,
+        status: 'open',
+        discoveredAt: new Date().toISOString(),
+        adapterName: server.name || 'Unknown',
+        recommendation: `Missing Authentication: To prevent session hijacking and event injection attacks, the following mitigations should be implemented:
+MCP servers that implement authorization MUST verify all inbound requests. MCP Servers MUST NOT use sessions for authentication.
+MCP servers MUST use secure, non-deterministic session IDs. Generated session IDs (e.g., UUIDs) SHOULD use secure random number generators. Avoid predictable or sequential session identifiers that could be guessed by an attacker. Rotating or expiring session IDs can also reduce the risk.
+MCP servers SHOULD bind session IDs to user-specific information. When storing or transmitting session-related data (e.g., in a queue), combine the session ID with information unique to the authorized user, such as their internal user ID. Use a key format like <user_id>:<session_id>. This ensures that even if an attacker guesses a session ID, they cannot impersonate another user as the user ID is derived from the user token and not provided by the client.`,
+        references: ['MCP Security Specification'],
+        metadata: {
+          auth_type: server.metadata.auth_type,
+          vulnerability_type: 'authentication_bypass'
+        }
+      });
+    }
+
+    return findings;
+  };
+
   const viewServerDetails = (server: DiscoveredServer) => {
     selectedServerName.value = server.name || server.address;
-    selectedServerFindings.value = server.security_findings || [];
+    selectedServer.value = server;
+
+    // Generate security findings based on server characteristics
+    const findings = generateSecurityFindings(server);
+    selectedServerFindings.value = findings;
   };
 
   const openScanModal = () => {
@@ -562,7 +687,7 @@ export function useMCPGateway() {
 
   const onScanStarted = (scanResult: any) => {
     scanning.value = true;
-    currentScanId.value = scanResult.id || scanResult.scan_id;
+    currentScanId.value = scanResult.jobId || scanResult.id || scanResult.scan_id;
 
     // Start polling for scan completion
     pollScanStatus();
@@ -575,24 +700,30 @@ export function useMCPGateway() {
       const status = await MCPService.getScanStatus(currentScanId.value);
 
       if (status.status === 'completed') {
-        // Scan completed, fetch results
+        // Scan completed, poll /api/v1/discovery/servers to get results
+        logger.info('Scan completed, polling discovered servers from /api/v1/discovery/servers');
         await fetchDiscoveredServers();
+
+        // Reset scan state
         scanning.value = false;
         currentScanId.value = null;
+
+        logger.info('Scan completed successfully, servers table updated');
       } else if (status.status === 'failed') {
         // Scan failed
-        logger.error('Scan failed', status.error);
+        logger.error('Scan failed', status.message || 'Unknown error');
         scanning.value = false;
         currentScanId.value = null;
-        error.value = status.error || 'Scan failed';
+        error.value = status.message || 'Scan failed';
       } else {
-        // Still running, continue polling
+        // Still running or pending, continue polling
         setTimeout(pollScanStatus, 2000);
       }
     } catch (err) {
       logger.error('Failed to poll scan status', err);
       scanning.value = false;
       currentScanId.value = null;
+      error.value = 'Failed to check scan status';
     }
   };
 
@@ -903,6 +1034,7 @@ export function useMCPGateway() {
     // Modal data
     selectedServerFindings,
     selectedServerName,
+    selectedServer,
 
     // MCP Gateway data
     discoveredServers,

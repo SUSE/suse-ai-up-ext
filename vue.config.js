@@ -3,4 +3,17 @@ const config = require('@rancher/shell/vue.config'); // eslint-disable-line @typ
 module.exports = config(__dirname, {
   excludes: [],
   // excludes: ['fleet', 'example']
+}, {
+  // Add proxy configuration for MCP Gateway API to avoid CORS issues
+  devServer: {
+    proxy: {
+      '/api/mcp': {
+        target: 'http://localhost:8911',
+        changeOrigin: true,
+        pathRewrite: {
+          '^/api/mcp': '/api/v1'
+        }
+      }
+    }
+  }
 });

@@ -25,11 +25,11 @@
          </tr>
          <tr v-else v-for="adapter in adapters" :key="adapter.id">
            <td>{{ adapter.name }}</td>
-           <td>
-             <span :class="adapter.status === 'active' || adapter.status === 'healthy' ? 'status-active' : 'status-inactive'">
-               {{ adapter.status || 'unknown' }}
-             </span>
-           </td>
+            <td>
+              <span class="status-active">
+                Available
+              </span>
+            </td>
            <td>{{ adapter.protocol || 'MCP' }}</td>
            <td>{{ adapter.endpoint || '-' }}</td>
            <td>{{ adapter.errorCount || 0 }}</td>

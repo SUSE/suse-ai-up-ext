@@ -128,18 +128,20 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="closeModal">Cancel</button>
-        <button class="btn btn-primary" @click="scheduleScan" :disabled="!isValid || scanning">
-          {{ scanning ? 'Scanning...' : 'Start' }}
-        </button>
+         <button class="btn btn-secondary" @click="closeModal" :disabled="scanning && !scanCompleted">Cancel</button>
+          <button class="btn btn-primary" @click="scanCompleted ? closeModal() : scheduleScan()" :disabled="!isValid || (scanning && !scanCompleted)">
+            <span v-if="scanning && !scanCompleted" class="spinner"></span>
+            {{ scanCompleted ? 'Close' : scanning ? 'Scanning...' : 'Start' }}
+          </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { MCPService, type ScanConfig } from '../../services/mcp-service';
+import type { DiscoveryScanConfig } from '../../types/mcp-types';
 import { logger } from '../../utils/logger';
 import yaml from 'js-yaml';
 
@@ -152,6 +154,7 @@ const emit = defineEmits<{
 
 const isVisible = ref(false);
 const scanning = ref(false);
+const scanCompleted = ref(false);
 const error = ref<string>('');
 
 // Exclude addresses handling
@@ -162,7 +165,7 @@ const excludeAddressesText = ref<string>('');
 // Scan configuration
 const scanConfig = ref<ScanConfig>({
   maxConcurrent: 10,
-  ports: ['8000', '3000', '5000'],
+  ports: ['8000', '8002', '3000', '5000'],
   scanRanges: ['192.168.1.0/24'],
   timeout: '30s',
   excludeProxy: true
@@ -179,6 +182,14 @@ const isValid = computed(() => {
 
 const hasInvalidPorts = computed(() => {
   return (scanConfig.value.ports || []).some(port => !isValidPort(port));
+});
+
+// Watch for scan completion
+watch(scanning, (newScanning, oldScanning) => {
+  if (oldScanning && !newScanning) {
+    // Scan was running and now stopped - scan completed
+    scanCompleted.value = true;
+  }
 });
 
 // Port validation function
@@ -208,6 +219,33 @@ const isValidPort = (port: string | number): boolean => {
   return false;
 };
 
+// Function to expand port ranges into individual ports
+const expandPorts = (ports: string[]): number[] => {
+  const expandedPorts: number[] = [];
+
+  for (const port of ports) {
+    const trimmedPort = port.trim();
+
+    // Single port
+    if (/^\d{1,5}$/.test(trimmedPort)) {
+      expandedPorts.push(parseInt(trimmedPort, 10));
+    }
+    // Port range
+    else if (/^(\d{1,5})-(\d{1,5})$/.test(trimmedPort)) {
+      const rangeMatch = /^(\d{1,5})-(\d{1,5})$/.exec(trimmedPort);
+      if (rangeMatch) {
+        const start = parseInt(rangeMatch[1], 10);
+        const end = parseInt(rangeMatch[2], 10);
+        for (let p = start; p <= end; p++) {
+          expandedPorts.push(p);
+        }
+      }
+    }
+  }
+
+  return expandedPorts;
+};
+
 // Methods
 const openModal = () => {
   isVisible.value = true;
@@ -222,6 +260,8 @@ const closeModal = () => {
 
 const reset = () => {
   error.value = '';
+  scanning.value = false;
+  scanCompleted.value = false;
   scanConfig.value = {
     maxConcurrent: 10,
     ports: ['8000', '3000-3010'],
@@ -265,20 +305,31 @@ const removePort = (index: number) => {
       try {
         error.value = '';
 
-        // Prepare scan config for backend API
+        // Prepare scan config for backend API using DiscoveryScanConfig format
+        const excludeHosts = [];
+        if (excludeAddressesText.value) {
+          excludeHosts.push(...excludeAddressesText.value.split('\n').map(addr => addr.trim()).filter(addr => addr));
+        }
+        if (scanConfig.value.excludeProxy) {
+          // Add localhost/127.0.0.1 to exclude hosts when excludeProxy is enabled
+          excludeHosts.push('localhost', '127.0.0.1', '::1');
+        }
+
         const backendConfig = {
-          ...scanConfig.value,
-          excludeAddresses: excludeAddressesText.value 
-            ? excludeAddressesText.value.split('\n').map(addr => addr.trim()).filter(addr => addr)
-            : undefined
+          scanRanges: scanConfig.value.scanRanges || [],
+          ports: expandPorts(scanConfig.value.ports || []).map(p => p.toString()),
+          timeout: (parseInt(scanConfig.value.timeout?.replace('s', '') || '30', 10)).toString(),
+          maxConcurrent: scanConfig.value.maxConcurrent || 10,
+          excludeProxy: scanConfig.value.excludeProxy,
+          excludeAddresses: excludeHosts.length > 0 ? excludeHosts : undefined
         };
 
-        const scanResult = await MCPService.startScan(backendConfig);
+        const scanResult = await MCPService.startDiscoveryScan(backendConfig);
 
-        logger.info('Discovery scan started', { scanId: scanResult.scanId || scanResult.scan_id, config: backendConfig });
+        logger.info('Discovery scan started', { scanId: scanResult.id, config: backendConfig });
         emit('scanStarted', scanResult);
 
-        closeModal();
+        // Modal stays open during scan - user will close it manually when complete
       } catch (err) {
         logger.error('Failed to start scan', err);
         error.value = 'Failed to start scan. Please try again.';
@@ -470,6 +521,22 @@ defineExpose({
 
 .btn-link:hover {
   color: var(--primary-hover, #1d4ed8);
+}
+
+/* Spinner Animation */
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Port Input Styles */

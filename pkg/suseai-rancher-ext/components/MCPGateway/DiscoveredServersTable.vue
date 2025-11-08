@@ -24,13 +24,9 @@
          </tr>
           <tr v-else v-for="server in discoveredServers" :key="server.id">
             <td>
-              <span
-                v-if="server.vulnerability_score"
-                :class="getRiskBadgeClass(server.vulnerability_score)"
-              >
-                {{ getRiskLabel(server.vulnerability_score) }}
+              <span :class="getRiskBadgeClass(server)">
+                {{ getRiskLabel(server) }}
               </span>
-              <span v-else class="badge badge-secondary">Unknown</span>
             </td>
             <td>
               <span :class="getSecurityStatusClass(server)">
@@ -86,7 +82,9 @@ export default defineComponent({
   },
   emits: ['view-server-details', 'register-server'],
   setup(props, { emit }) {
-    const getRiskBadgeClass = (score: string) => {
+    // Risk Status based on vulnerability_score from API
+    const getRiskBadgeClass = (server: DiscoveredServer) => {
+      const score = server.vulnerability_score;
       switch (score) {
         case 'high':
           return 'badge badge-danger';
@@ -99,14 +97,54 @@ export default defineComponent({
       }
     };
 
-    const getRiskLabel = (score: string) => {
+    const getRiskLabel = (server: DiscoveredServer) => {
+      const score = server.vulnerability_score;
       switch (score) {
         case 'high':
-          return 'High Risk';
+          return 'High';
         case 'medium':
-          return 'Medium Risk';
+          return 'Medium';
         case 'low':
-          return 'Low Risk';
+          return 'Low';
+        default:
+          return 'Unknown';
+      }
+    };
+
+    // Security Status based on authentication and findings
+    const getSecurityStatus = (server: DiscoveredServer): 'critical' | 'medium' | 'low' => {
+      const hasAuth = server.metadata?.auth_type !== 'none';
+      const hasOtherIssues = server.security_findings &&
+        server.security_findings.some(f => f.category !== 'AUTHENTICATION');
+
+      if (!hasAuth) return 'critical';
+      if (hasAuth && hasOtherIssues) return 'medium';
+      return 'low';
+    };
+
+    const getSecurityStatusClass = (server: DiscoveredServer) => {
+      const status = getSecurityStatus(server);
+      switch (status) {
+        case 'critical':
+          return 'badge badge-danger';
+        case 'medium':
+          return 'badge badge-warning';
+        case 'low':
+          return 'badge badge-success';
+        default:
+          return 'badge badge-secondary';
+      }
+    };
+
+    const getSecurityStatusLabel = (server: DiscoveredServer) => {
+      const status = getSecurityStatus(server);
+      switch (status) {
+        case 'critical':
+          return 'Critical';
+        case 'medium':
+          return 'Medium';
+        case 'low':
+          return 'Low';
         default:
           return 'Unknown';
       }
@@ -134,34 +172,6 @@ export default defineComponent({
     const getAuthTypeLabel = (authType?: string) => {
       if (!authType) return 'None';
       return authType.charAt(0).toUpperCase() + authType.slice(1).toLowerCase();
-    };
-
-    const getSecurityStatusClass = (server: DiscoveredServer) => {
-      if (!server.security_findings || server.security_findings.length === 0) {
-        return 'badge badge-success';
-      }
-
-      const hasHigh = server.security_findings.some(f => f.severity === 'high');
-      const hasMedium = server.security_findings.some(f => f.severity === 'medium');
-
-      if (hasHigh) return 'badge badge-danger';
-      if (hasMedium) return 'badge badge-warning';
-      return 'badge badge-info';
-    };
-
-    const getSecurityStatusLabel = (server: DiscoveredServer) => {
-      if (!server.security_findings || server.security_findings.length === 0) {
-        return 'Secure';
-      }
-
-      const highCount = server.security_findings.filter(f => f.severity === 'high').length;
-      const mediumCount = server.security_findings.filter(f => f.severity === 'medium').length;
-      const lowCount = server.security_findings.filter(f => f.severity === 'low').length;
-
-      if (highCount > 0) return `${highCount} Critical`;
-      if (mediumCount > 0) return `${mediumCount} Warnings`;
-      if (lowCount > 0) return `${lowCount} Info`;
-      return 'Secure';
     };
 
     const handleViewServerDetails = (server: DiscoveredServer) => {

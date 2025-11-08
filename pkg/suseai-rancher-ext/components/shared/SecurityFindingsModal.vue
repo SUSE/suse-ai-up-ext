@@ -2,22 +2,22 @@
   <div v-if="isVisible" class="modal-overlay" @click="closeModal">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h3>Security Findings - {{ serverName }}</h3>
+         <h3>Security Findings {{ serverName }}</h3>
         <button class="btn btn-sm btn-secondary" @click="closeModal">&times;</button>
       </div>
       <div class="modal-body">
         <div class="findings-summary">
           <div class="summary-stats">
             <div class="stat-item">
-              <span class="stat-number high">{{ highCount }}</span>
+              <span class="stat-number critical">{{ realCriticalCount }}</span>
               <span class="stat-label">Critical</span>
             </div>
             <div class="stat-item">
-              <span class="stat-number medium">{{ mediumCount }}</span>
+              <span class="stat-number medium">{{ realWarningCount }}</span>
               <span class="stat-label">Warnings</span>
             </div>
             <div class="stat-item">
-              <span class="stat-number low">{{ lowCount }}</span>
+              <span class="stat-number low">{{ realInfoCount }}</span>
               <span class="stat-label">Info</span>
             </div>
           </div>
@@ -31,8 +31,12 @@
 
         <div class="findings-filters">
           <label>
-            <input type="checkbox" v-model="showHigh" />
+            <input type="checkbox" v-model="showCritical" />
             Critical Issues
+          </label>
+          <label>
+            <input type="checkbox" v-model="showHigh" />
+            High Issues
           </label>
           <label>
             <input type="checkbox" v-model="showMedium" />
@@ -110,18 +114,55 @@ const emit = defineEmits<{
 interface Props {
   findings: SecurityFinding[];
   serverName: string;
+  server?: any; // DiscoveredServer object for real metrics calculation
 }
 
 const props = defineProps<Props>();
 
+// Real metrics based on Risk Status and Security Status badges
+const realCriticalCount = computed(() => {
+  console.log('Calculating realCriticalCount, server:', props.server);
+  if (!props.server) {
+    console.log('No server prop, returning 0');
+    return 0;
+  }
+  let count = 0;
+  if (props.server.vulnerability_score === 'high') count++; // Risk Status High
+  if (props.server.metadata?.auth_type === 'none') count++; // Security Status Critical (missing auth)
+  console.log('realCriticalCount result:', count);
+  return count;
+});
+
+const realWarningCount = computed(() => {
+  // Security Status Medium: has auth but has other issues
+  // For now, we'll consider this as 0 since we don't have other issue detection
+  // This could be expanded later to check for other security issues beyond auth and risk
+  return 0;
+});
+
+const realInfoCount = computed(() => {
+  console.log('Calculating realInfoCount, server:', props.server);
+  if (!props.server) {
+    console.log('No server prop, returning 0');
+    return 0;
+  }
+  const hasAuth = props.server.metadata?.auth_type !== 'none';
+  const isLowRisk = props.server.vulnerability_score !== 'high';
+  const result = (hasAuth && isLowRisk) ? 1 : 0;
+  console.log('realInfoCount result:', result, 'hasAuth:', hasAuth, 'isLowRisk:', isLowRisk);
+  return result;
+});
+
 // Reactive state
 const isVisible = ref(false);
+const showCritical = ref(true);
 const showHigh = ref(true);
 const showMedium = ref(true);
 const showLow = ref(true);
 const expandedFindings = ref(new Set<SecurityFinding>());
 
-// Computed properties
+// Computed properties (keeping old ones for backward compatibility)
+const criticalCount = computed(() => props.findings.filter(f => f.severity === 'critical').length);
 const highCount = computed(() => props.findings.filter(f => f.severity === 'high').length);
 const mediumCount = computed(() => props.findings.filter(f => f.severity === 'medium').length);
 const lowCount = computed(() => props.findings.filter(f => f.severity === 'low' || f.severity === 'info').length);
@@ -129,6 +170,7 @@ const lowCount = computed(() => props.findings.filter(f => f.severity === 'low' 
 const filteredFindings = computed(() => {
   return props.findings.filter(finding => {
     switch (finding.severity) {
+      case 'critical': return showCritical.value;
       case 'high': return showHigh.value;
       case 'medium': return showMedium.value;
       case 'low':
@@ -157,18 +199,18 @@ const toggleFindingDetail = (finding: SecurityFinding) => {
   }
 };
 
-const exportFindings = () => {
-  const data = {
-    server: props.serverName,
-    timestamp: new Date().toISOString(),
-    summary: {
-      total: props.findings.length,
-      critical: highCount.value,
-      warnings: mediumCount.value,
-      info: lowCount.value
-    },
-    findings: props.findings
-  };
+  const exportFindings = () => {
+    const data = {
+      server: props.serverName,
+      timestamp: new Date().toISOString(),
+      summary: {
+        total: props.findings.length,
+        critical: realCriticalCount.value,
+        warnings: realWarningCount.value,
+        info: realInfoCount.value
+      },
+      findings: props.findings
+    };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -273,6 +315,7 @@ defineExpose({
   font-weight: bold;
 }
 
+.stat-number.critical,
 .stat-number.high {
   color: var(--error, #dc2626);
 }
@@ -322,6 +365,7 @@ defineExpose({
   overflow: hidden;
 }
 
+.finding-item.critical,
 .finding-item.high {
   border-color: var(--error, #dc2626);
   background: rgba(220, 38, 38, 0.05);
@@ -360,6 +404,7 @@ defineExpose({
   text-transform: uppercase;
 }
 
+.severity-badge.critical,
 .severity-badge.high {
   background: var(--error, #dc2626);
   color: white;
