@@ -52,20 +52,46 @@ export interface SmartAgent {
 
 export interface CreateAgentRequest {
   name: string;
-  description?: string;
+  task_description?: string;
+  max_rounds?: number;
+  messages?: Array<{role: string, content: string}>;
+  generation_config?: {
+    temperature: number;
+    top_p: number;
+    top_k: number;
+    max_new_tokens: number;
+    stop_sequences?: string[];
+    presence_penalty: number;
+    frequency_penalty: number;
+    repetition_penalty: number;
+    seed: number;
+  };
+  response_format?: { type: string };
+  stream?: boolean;
+  tools?: any[];
+  tool_choice?: string;
+  user?: string;
   supervisor: {
-    type: string;
+    provider: string;
     api?: string;
-    model?: string;
-    provider?: string;
+    model: string;
+    system_prompt: string;
+    developer_prompt: string;
+    url: string;
   };
   worker: {
-    type: string;
+    provider: string;
     api?: string;
-    model?: string;
-    provider?: string;
+    model: string;
+    system_prompt: string;
+    developer_prompt: string;
+    context?: string[];
+    url: string;
   };
-  config?: Record<string, any>;
+  mcp_integration?: boolean;
+  mcp_tools?: any[];
+  cost_balance?: number;
+  user_roles?: Record<string, any>;
 }
 
 export interface UpdateAgentRequest {

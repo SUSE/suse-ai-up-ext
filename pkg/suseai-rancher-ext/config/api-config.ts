@@ -6,7 +6,7 @@
 // Base URLs for different services
 export const API_BASE_URLS = {
   MCP_GATEWAY: 'http://localhost:8911/api/v1',
-  SMART_AGENTS: window.location.origin + '/api/smart-agents',
+  SMART_AGENTS: 'http://localhost:8910',
   RANCHER: window.location.origin
 } as const;
 

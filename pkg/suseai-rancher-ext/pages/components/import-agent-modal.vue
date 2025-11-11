@@ -29,6 +29,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import yaml from 'js-yaml';
+import SmartAgentsService from '../../services/smart-agents-service';
 
 const isVisible = ref(false);
 const file = ref<File | null>(null);
@@ -82,15 +83,63 @@ const importAgent = async () => {
   try {
     const agentData = JSON.parse(preview.value);
     const agentToImport = Array.isArray(agentData) ? agentData[0] : agentData;
-    const response = await fetch('http://localhost:8910/agents', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(agentToImport),
-    });
 
-    if (!response.ok) throw new Error('Failed to import agent');
+    // Transform imported data to match complete CreateAgentRequest format
+    const createRequest = {
+      name: agentToImport.name,
+      task_description: agentToImport.description || agentToImport.task_description,
+      max_rounds: Number(agentToImport.max_rounds) || 3,
+      messages: agentToImport.messages || [],
+      generation_config: agentToImport.generation_config || agentToImport.config ? {
+        temperature: Number((agentToImport.generation_config || agentToImport.config).temperature) || 0.7,
+        top_p: Number((agentToImport.generation_config || agentToImport.config).top_p) || 1.0,
+        top_k: Number((agentToImport.generation_config || agentToImport.config).top_k) || 50,
+        max_new_tokens: Number((agentToImport.generation_config || agentToImport.config).max_new_tokens) || 1000,
+        stop_sequences: (agentToImport.generation_config || agentToImport.config).stop_sequences || [],
+        presence_penalty: Number((agentToImport.generation_config || agentToImport.config).presence_penalty) || 0.0,
+        frequency_penalty: Number((agentToImport.generation_config || agentToImport.config).frequency_penalty) || 0.0,
+        repetition_penalty: Number((agentToImport.generation_config || agentToImport.config).repetition_penalty) || 1.0,
+        seed: Number((agentToImport.generation_config || agentToImport.config).seed) || 0
+      } : {
+        temperature: 0.7,
+        top_p: 1.0,
+        top_k: 50,
+        max_new_tokens: 1000,
+        stop_sequences: [],
+        presence_penalty: 0.0,
+        frequency_penalty: 0.0,
+        repetition_penalty: 1.0,
+        seed: 0
+      },
+      response_format: agentToImport.response_format || { type: 'text' },
+      stream: agentToImport.stream || false,
+      tools: agentToImport.tools || agentToImport.mcp_tools || [],
+      tool_choice: agentToImport.tool_choice || 'auto',
+      user: agentToImport.user || '',
+      supervisor: {
+        provider: agentToImport.supervisor?.provider || agentToImport.supervisor?.type || 'openai',
+        api: agentToImport.supervisor?.api || '',
+        model: agentToImport.supervisor?.model || '',
+        system_prompt: agentToImport.supervisor?.system_prompt || 'Default supervisor system prompt',
+        developer_prompt: agentToImport.supervisor?.developer_prompt || 'Default supervisor developer prompt',
+        url: agentToImport.supervisor?.url || ''
+      },
+      worker: {
+        provider: agentToImport.worker?.provider || agentToImport.worker?.type || 'ollama',
+        api: agentToImport.worker?.api || '',
+        model: agentToImport.worker?.model || '',
+        system_prompt: agentToImport.worker?.system_prompt || 'Default worker system prompt',
+        developer_prompt: agentToImport.worker?.developer_prompt || 'Default worker developer prompt',
+        context: agentToImport.worker?.context || agentToImport.context || [],
+        url: agentToImport.worker?.url || ''
+      },
+      mcp_integration: agentToImport.mcp_integration || false,
+      mcp_tools: agentToImport.mcp_tools || agentToImport.tools || [],
+      cost_balance: Number(agentToImport.cost_balance) || 5,
+      user_roles: agentToImport.user_roles || {}
+    };
+
+    await SmartAgentsService.createAgent(createRequest);
 
     closeModal();
     // Emit event to refresh agents in parent

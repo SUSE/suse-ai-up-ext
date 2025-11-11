@@ -3,11 +3,11 @@
       This service is not enabled. Please enable it from the service selection page.
     </div>
     <div v-else>
-       <div class="experimental-banner">
-         <span class="banner-icon">⚠️</span>
-         <strong>Experimental Feature</strong>
-         <p>This SUSE AI Universal Proxy feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
-       </div>
+      <div class="experimental-banner">
+        <span class="banner-icon">⚠️</span>
+        <strong>Experimental Feature</strong>
+        <p>This SUSE AI Universal Proxy feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
+      </div>
       <main>
         <div class="main-layout">
           <div class="outlet">
@@ -69,7 +69,7 @@
             </header>
 
             <!-- Main content area -->
-             <div class="main-content">
+            <div class="main-content">
                <!-- Results/Loading summary -->
                <div class="results-summary" aria-live="polite">
                  <div v-if="isLoading" class="inline-loading">
@@ -77,8 +77,8 @@
                    <span>Loading MCP servers...</span>
                  </div>
                   <div v-else-if="filteredServers.length" class="results-text">
-                    Showing {{ filteredServers.length }} of {{ registryServers.length }} MCP servers
-                  </div>
+                     Showing {{ certifiedCount }} certified + {{ registryCount }} synced MCP servers
+                   </div>
                  <div v-else-if="!isLoading" class="results-text">
                    No MCP servers found
                  </div>
@@ -111,10 +111,11 @@
                        </div>
                      </div>
                      <div class="tile-info">
-                       <div class="tile-meta">
-                         <span :class="['badge-state badge', getBadgeClass(server.status)]">{{ formatStatus(server.status) }}</span>
-                         <span class="tile-author">{{ server.author }}</span>
-                       </div>
+                        <div class="tile-meta">
+                          <span v-if="server.isCertified" class="badge-certified badge">Certified</span>
+                          <span :class="['badge-state badge', getBadgeClass(server.status)]">{{ formatStatus(server.status) }}</span>
+                          <span class="tile-author">{{ server.author }}</span>
+                        </div>
                        <h3 class="tile-title">{{ server.name }}</h3>
                        <p class="tile-description">{{ server.description }}</p>
                      </div>
@@ -196,8 +197,14 @@
         @close="showAddRegistryModal = false"
         @submit="addCustomRegistry"
       />
-     </div>
-   </template>
+
+      <GitHubEnvModal
+        :show="showGitHubModal"
+        @adapterCreated="onAdapterCreated"
+        @close="showGitHubModal = false"
+      />
+      </div>
+    </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, getCurrentInstance } from 'vue';
@@ -205,12 +212,13 @@ import { useStore } from 'vuex';
 import { MCPService } from '../services/mcp-service';
 import { persistLoad, persistSave, persistClear } from '../services/ui-persist';
 import type { RegistryServer } from '../services/mcp-service';
-import { 
+import {
   ServerDetailsModal,
   RegistryManagementModal,
   AdvancedRegistryModal,
   AddRegistryModal
 } from '../components/MCPGateway';
+import GitHubEnvModal from '../components/shared/GitHubEnvModal.vue';
 
 interface Registry {
   id: string;
@@ -228,7 +236,8 @@ export default defineComponent({
     ServerDetailsModal,
     RegistryManagementModal,
     AdvancedRegistryModal,
-    AddRegistryModal
+    AddRegistryModal,
+    GitHubEnvModal
   },
 
   metaInfo() {
@@ -247,6 +256,7 @@ export default defineComponent({
     const showRegistryModal = ref(false);
     const showAdvancedModal = ref(false);
     const showAddRegistryModal = ref(false);
+    const showGitHubModal = ref(false);
     const isLoading = ref(true);
     const registryServers = ref<any[]>([]);
     const selectedServer = ref<RegistryServer | null>(null);
@@ -285,6 +295,125 @@ export default defineComponent({
 
     // Custom registries added by user
     const customRegistries = ref<Registry[]>([]);
+
+    // Certified scenarios - always shown
+    const certifiedScenarios = ref<any[]>([
+      {
+        id: 'certified-sequential-thinking',
+        name: 'Sequential Thinking MCP',
+        description: 'Secure sequential thinking server with Bearer token authentication',
+        author: 'SUSE AI',
+        stars: 1500,
+        iconClass: 'icon icon-brain',
+        status: 'not-installed',
+        version: '1.0.0',
+        protocol: 'stdio',
+        url: '',
+        validationStatus: 'certified',
+        discoveredAt: new Date().toISOString(),
+        packages: [],
+        tools: ['sequential-thinking-tool'],
+        repository: { source: 'certified', url: '' },
+        availabilityStatus: 'available',
+        securityScanStatus: 'certified',
+        lastSecurityScanId: null,
+        rawData: null,
+        isCertified: true,
+        adapterConfig: {
+          connectionType: 'LocalStdio',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
+          env: {}
+        }
+      },
+      {
+        id: 'certified-filesystem',
+        name: 'Filesystem MCP',
+        description: 'Directory-restricted file operations with authentication',
+        author: 'SUSE AI',
+        stars: 1200,
+        iconClass: 'icon icon-folder',
+        status: 'not-installed',
+        version: '1.0.0',
+        protocol: 'stdio',
+        url: '',
+        validationStatus: 'certified',
+        discoveredAt: new Date().toISOString(),
+        packages: [],
+        tools: ['list_directory', 'read_file', 'search_files'],
+        repository: { source: 'certified', url: '' },
+        availabilityStatus: 'available',
+        securityScanStatus: 'certified',
+        lastSecurityScanId: null,
+        rawData: null,
+        isCertified: true,
+        adapterConfig: {
+          connectionType: 'LocalStdio',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-filesystem', '.'],
+          env: {}
+        }
+      },
+      {
+        id: 'certified-sqlite',
+        name: 'SQLite Database MCP',
+        description: 'Secure database operations with parameterized queries',
+        author: 'SUSE AI',
+        stars: 1000,
+        iconClass: 'icon icon-database',
+        status: 'not-installed',
+        version: '1.0.0',
+        protocol: 'stdio',
+        url: '',
+        validationStatus: 'certified',
+        discoveredAt: new Date().toISOString(),
+        packages: [],
+        tools: ['query', 'insert', 'update', 'delete'],
+        repository: { source: 'certified', url: '' },
+        availabilityStatus: 'available',
+        securityScanStatus: 'certified',
+        lastSecurityScanId: null,
+        rawData: null,
+        isCertified: true,
+        adapterConfig: {
+          connectionType: 'LocalStdio',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-sqlite', '--db-path', '/tmp/test.db'],
+          env: {}
+        }
+      },
+      {
+        id: 'certified-github',
+        name: 'GitHub API MCP',
+        description: 'GitHub repository and issue management with API access',
+        author: 'SUSE AI',
+        stars: 1800,
+        iconClass: 'icon icon-github',
+        status: 'not-installed',
+        version: '1.0.0',
+        protocol: 'stdio',
+        url: '',
+        validationStatus: 'certified',
+        discoveredAt: new Date().toISOString(),
+        packages: [],
+        tools: ['search_repositories', 'get_repository', 'create_issue'],
+        repository: { source: 'certified', url: '' },
+        availabilityStatus: 'available',
+        securityScanStatus: 'certified',
+        lastSecurityScanId: null,
+        rawData: null,
+        isCertified: true,
+        adapterConfig: {
+          connectionType: 'LocalStdio',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-github'],
+          env: { GITHUB_PERSONAL_ACCESS_TOKEN: '' } // Will be filled by modal
+        },
+        requiresEnvVar: true,
+        envVarName: 'GITHUB_PERSONAL_ACCESS_TOKEN',
+        envVarDescription: 'GitHub Personal Access Token with repo, issues, and pull_requests scopes'
+      }
+    ]);
 
     // Combined registries for UI
     const publicRegistries = computed(() => [
@@ -328,17 +457,50 @@ export default defineComponent({
     });
 
     const filteredServers = computed(() => {
-      if (!registryServers.value || registryServers.value.length === 0) {
-        return [];
-      }
       const query = searchQuery.value.toLowerCase();
-      return registryServers.value.filter((server: any) =>
-        // Only hide servers where name is null
+
+      // Always include certified scenarios (filtered by search)
+      const filteredCertified = certifiedScenarios.value.filter((server: any) =>
         server.name != null &&
         (server.name.toLowerCase().includes(query) ||
          server.description.toLowerCase().includes(query) ||
          server.author.toLowerCase().includes(query))
       );
+
+      // Filter registry servers if they exist
+      const filteredRegistry = registryServers.value && registryServers.value.length > 0
+        ? registryServers.value.filter((server: any) =>
+            server.name != null &&
+            (server.name.toLowerCase().includes(query) ||
+             server.description.toLowerCase().includes(query) ||
+             server.author.toLowerCase().includes(query))
+          )
+        : [];
+
+      // Return certified scenarios first, then registry servers
+      return [...filteredCertified, ...filteredRegistry];
+    });
+
+    // Computed for summary counts
+    const certifiedCount = computed(() => {
+      const query = searchQuery.value.toLowerCase();
+      return certifiedScenarios.value.filter((server: any) =>
+        server.name != null &&
+        (server.name.toLowerCase().includes(query) ||
+         server.description.toLowerCase().includes(query) ||
+         server.author.toLowerCase().includes(query))
+      ).length;
+    });
+
+    const registryCount = computed(() => {
+      if (!registryServers.value || registryServers.value.length === 0) return 0;
+      const query = searchQuery.value.toLowerCase();
+      return registryServers.value.filter((server: any) =>
+        server.name != null &&
+        (server.name.toLowerCase().includes(query) ||
+         server.description.toLowerCase().includes(query) ||
+         server.author.toLowerCase().includes(query))
+      ).length;
     });
 
     const processServerData = (serverData: RegistryServer[]) => {
@@ -394,7 +556,49 @@ export default defineComponent({
       }
     };
 
-    const handleInstallServer = (serverId: number) => {
+    const handleInstallServer = async (serverId: string | number) => {
+      // Check if it's a certified scenario by id
+      if (serverId === 'certified-github') {
+        showGitHubModal.value = true;
+        return;
+      }
+
+      // Check if it's any other certified scenario
+      const certifiedServer = certifiedScenarios.value.find(s => s.id === serverId);
+
+      if (certifiedServer) {
+        // Create adapter for other certified scenarios
+        try {
+          const adapterData = {
+            name: `${certifiedServer.id.replace('certified-', '')}-mcp`,
+            imageName: `mcp-${certifiedServer.id.replace('certified-', '')}-adapter`,
+            imageVersion: '1.0.0',
+            description: certifiedServer.description,
+            connectionType: 'LocalStdio' as const,
+            protocol: 'MCP' as const,
+            replicaCount: 1,
+            useWorkloadIdentity: false,
+            environmentVariables: certifiedServer.adapterConfig.env || {},
+            mcpClientConfig: {
+              mcpServers: {
+                [certifiedServer.id.replace('certified-', '')]: {
+                  command: certifiedServer.adapterConfig.command,
+                  args: certifiedServer.adapterConfig.args,
+                  env: certifiedServer.adapterConfig.env
+                }
+              }
+            }
+          };
+
+          await MCPService.createAdapter(adapterData);
+          certifiedServer.status = 'installed';
+        } catch (error) {
+          console.error('Failed to create adapter for certified scenario:', error);
+        }
+        return;
+      }
+
+      // Handle regular registry servers
       const server = registryServers.value.find(s => s.id === serverId);
       if (server) {
         server.status = 'installing';
@@ -412,6 +616,14 @@ export default defineComponent({
         } else {
           registryServers.value = registryServers.value.filter(s => s.id !== serverId);
         }
+      }
+    };
+
+    const onAdapterCreated = () => {
+      // Mark GitHub scenario as installed
+      const githubServer = certifiedScenarios.value.find(s => s.id === 'certified-github');
+      if (githubServer) {
+        githubServer.status = 'installed';
       }
     };
 
@@ -835,10 +1047,11 @@ export default defineComponent({
        showAddModal,
        showImportModal,
        showViewModal,
-       showRegistryModal,
-       showAdvancedModal,
-       showAddRegistryModal,
-      selectedServer,
+        showRegistryModal,
+        showAdvancedModal,
+        showAddRegistryModal,
+        showGitHubModal,
+       selectedServer,
       registryServers,
       filteredServers,
       publicRegistries,
@@ -855,9 +1068,12 @@ export default defineComponent({
        addCustomRegistry,
        removeCustomRegistry,
        isCustomRegistry,
-       newRegistry,
-       hasPerformedInitialSync,
-       refreshFromBrowse,
+        newRegistry,
+        hasPerformedInitialSync,
+        refreshFromBrowse,
+        certifiedCount,
+        registryCount,
+        onAdapterCreated,
       isLoading,
       newMcpServer,
       handleAddMcpServer,
@@ -1113,6 +1329,18 @@ export default defineComponent({
   padding: 4px 8px;
   border-radius: 12px;
   font-weight: 500;
+}
+
+.badge-certified {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
 }
 
 .tile-author {

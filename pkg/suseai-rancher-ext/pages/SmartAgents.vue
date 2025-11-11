@@ -135,14 +135,18 @@ const detailsAgentRef = ref<any>(null);
   const fetchAgents = async () => {
     try {
       const apiAgents = await SmartAgentsService.getAgents();
-      agents.value = apiAgents.map((agent: SmartAgent) => ({
+      agents.value = apiAgents.map((agent: any) => ({
         ...agent,
         type: agent.type || 'smart agent',
-        status: agent.status,
+        status: agent.status || 'inactive',
         state: agent.state || (agent.status === 'active' ? 'available' : 'unavailable'),
         totalTokens: agent.totalTokens || agent.metadata?.totalTokens || 0,
         totalRequests: agent.totalRequests || agent.metadata?.totalRequests || 0,
-        totalCost: agent.totalCost || agent.metadata?.totalCost || 0
+        totalCost: agent.totalCost || agent.metadata?.totalCost || 0,
+        // Ensure required fields exist
+        name: agent.name || 'Unknown Agent',
+        supervisor: agent.supervisor || {},
+        worker: agent.worker || {}
       }));
     } catch (err) {
       console.error('Failed to fetch agents:', err);
@@ -185,16 +189,34 @@ const deleteAgent = async (agentId: string) => {
   }
 };
 
-const onAgentCreated = () => {
-  fetchAgents(); // Refetch after creation
+const onAgentCreated = async () => {
+  try {
+    // Small delay to allow API to process creation
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await fetchAgents();
+  } catch (err) {
+    console.error('Failed to refresh agents after creation:', err);
+    // Fallback: retry after longer delay
+    setTimeout(() => fetchAgents(), 2000);
+  }
 };
 
-const onAgentUpdated = () => {
-  fetchAgents(); // Refetch after update
+const onAgentUpdated = async () => {
+  try {
+    await fetchAgents();
+  } catch (err) {
+    console.error('Failed to refresh agents after update:', err);
+  }
 };
 
-const onAgentImported = () => {
-  fetchAgents(); // Refetch after import
+const onAgentImported = async () => {
+  try {
+    // Small delay for import processing
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await fetchAgents();
+  } catch (err) {
+    console.error('Failed to refresh agents after import:', err);
+  }
 };
 
 // Method to update agent tokens after chat API call

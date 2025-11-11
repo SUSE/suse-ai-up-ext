@@ -2,12 +2,16 @@
   <div class="create-agent-modal" v-if="showModal">
     <div class="modal-overlay" @click="closeModal"></div>
     <div class="modal-content">
-      <div class="modal-header">
-        <h2>Create Smart Agent</h2>
-        <button class="close-btn" @click="closeModal">&times;</button>
-      </div>
+       <div class="modal-header">
+         <h2>Create Smart Agent</h2>
+         <button class="close-btn" @click="closeModal">&times;</button>
+       </div>
 
-      <form @submit.prevent="submitForm" class="create-agent-form">
+       <div v-if="submitError" class="error-message">
+         {{ submitError }}
+       </div>
+
+       <form @submit.prevent="submitForm" class="create-agent-form">
           <div class="form-group">
             <label for="agentName">Smart Agent Name <span class="required-asterisk">*</span></label>
             <input
@@ -71,9 +75,9 @@
                  class="form-control"
                >
                  <option value="">Select a provider...</option>
-                 <option v-for="provider in remoteProviders" :key="provider" :value="provider" :disabled="isProviderNotReady(provider)">
-                   {{ getProviderDisplayName(provider) }}
-                 </option>
+                  <option v-for="provider in remoteProvidersData" :key="provider.provider" :value="provider.provider" :disabled="isProviderNotReady(provider.provider)">
+                    {{ getProviderDisplayName(provider.provider) }}
+                  </option>
                </select>
               </div>
 
@@ -200,17 +204,32 @@
                </label>
              </div>
 
-              <!-- MCP JSON textarea (shown when enabled) -->
-              <div v-if="formData.mcpIntegration" class="form-group">
-                <label for="mcpJson">MCP JSON Configuration</label>
-                <textarea
-                  id="mcpJson"
-                  v-model="formData.mcpJson"
-                  placeholder="Enter JSON configuration for MCP tools..."
-                  rows="4"
-                  class="form-control"
-                ></textarea>
-              </div>
+                <!-- MCP Adapter Selection (shown when enabled) -->
+                <div v-if="formData.mcpIntegration" class="form-group">
+                  <label>MCP Adapters</label>
+                  <div v-if="isLoadingAdapters" class="loading-message">
+                    Loading available adapters...
+                  </div>
+                  <div v-else-if="availableAdapters.length === 0" class="no-adapters-message">
+                    No running MCP adapters found. Please ensure MCP Gateway is running and adapters are available.
+                  </div>
+                  <div v-else>
+                    <div v-for="(adapter, index) in formData.selectedMcpAdapters" :key="index" class="adapter-row">
+                      <select
+                        :value="adapter"
+                        @change="updateAdapter(index, ($event.target as HTMLSelectElement).value)"
+                        class="form-control adapter-select"
+                      >
+                        <option value="">Select an adapter...</option>
+                        <option v-for="availableAdapter in availableAdapters" :key="availableAdapter.name" :value="availableAdapter.name">
+                          {{ availableAdapter.name }} - {{ availableAdapter.description || 'No description' }}
+                        </option>
+                      </select>
+                      <button type="button" @click="removeAdapter(index)" class="btn btn-secondary remove-adapter-btn">Remove</button>
+                    </div>
+                    <button type="button" @click="addAdapter" class="btn btn-primary add-adapter-btn">+ Add Adapter</button>
+                  </div>
+                </div>
 
           </div>
 
@@ -387,6 +406,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import SmartAgentsService, { type SmartAgent, type CreateAgentRequest, type UpdateAgentRequest } from '../../services/smart-agents-service';
+import { MCPService, type AdapterResource } from '../../services/mcp-service';
 
 interface RemoteProviderData {
   provider: string;
@@ -401,41 +421,45 @@ interface ApiModel {
   [key: string]: any; // Allow other properties
 }
 
-  interface FormData {
-       remoteProvider: string;
-       remoteApiKey: string;
-       remoteModel: string;
-       localProvider: string;
-       localApiKey: string;
-       localModel: string;
-       agentName: string;
-       agentDescription: string;
-       agentContext: string;
-       mcpIntegration: boolean;
-       costBalance: number;
-       customGroqUrl: string;
-       customRemoteUrl: string;
+      interface FormData {
+        remoteProvider: string;
+        remoteApiKey: string;
+        remoteModel: string;
+        localProvider: string;
+        localApiKey: string;
+        localModel: string;
+        agentName: string;
+        agentDescription: string;
+        agentContext: string;
+        mcpIntegration: boolean;
+        costBalance: number;
+        customGroqUrl: string;
+        customRemoteUrl: string;
         mcpJson: string;
         maxRounds: number;
         temperature: number;
-       topP: number;
-       topK: number;
-       maxNewTokens: number;
-       stopSequences: string;
-       presencePenalty: number;
-       frequencyPenalty: number;
-       repetitionPenalty: number;
-       seed: number;
-       responseFormatType: string;
-       stream: boolean;
-       toolChoice: string;
-       user: string;
-     }
+        topP: number;
+        topK: number;
+        maxNewTokens: number;
+        stopSequences: string;
+        presencePenalty: number;
+        frequencyPenalty: number;
+        repetitionPenalty: number;
+        seed: number;
+        responseFormatType: string;
+        stream: boolean;
+        toolChoice: string;
+        user: string;
+        selectedMcpAdapters: string[];
+      }
 
-const showModal = ref(false);
+  const showModal = ref(false);
 const isEditing = ref(false);
 const editingAgentId = ref<string | null>(null);
 const showAdvanced = ref(false);
+const submitError = ref<string>('');
+const availableAdapters = ref<AdapterResource[]>([]);
+const isLoadingAdapters = ref(false);
 
 const maxRounds = computed(() => {
   const cb = formData.value.costBalance;
@@ -443,6 +467,15 @@ const maxRounds = computed(() => {
   if (cb === 5) return 3;
   if (cb === 0) return 5;
   return 3; // default
+});
+
+const availableRemoteModels = computed(() => {
+  const provider = remoteProvidersData.value.find(p => p.provider === formData.value.remoteProvider);
+  return provider?.models?.map(m => m.id) || [];
+});
+
+const availableLocalModels = computed(() => {
+  return localModels.value[formData.value.localProvider] || [];
 });
 const remoteProvidersData = ref<RemoteProviderData[]>([]);
 const localModels = ref<Record<string, string[]>>({
@@ -552,229 +585,125 @@ Analyze and then ask.`;
 
 
 
-    const formData = ref<FormData>({
-       remoteProvider: '',
-       remoteApiKey: '',
-       remoteModel: '',
-       localProvider: '',
-       localApiKey: '',
-       localModel: '',
-       agentName: '',
-       agentDescription: '',
-       agentContext: '',
-       mcpIntegration: false,
-       costBalance: 5,
-       customGroqUrl: '',
-       customRemoteUrl: '',
-        mcpJson: '',
-        maxRounds: 10,
-        temperature: 0.7,
-       topP: 1.0,
-       topK: 50,
-       maxNewTokens: 1000,
-       stopSequences: '',
-       presencePenalty: 0.0,
-       frequencyPenalty: 0.0,
-       repetitionPenalty: 1.0,
-       seed: 0,
-       responseFormatType: 'text',
-       stream: false,
-       toolChoice: 'auto',
-       user: ''
-     });
+   const formData = ref<FormData>({
+     remoteProvider: '',
+     remoteApiKey: '',
+     remoteModel: '',
+     localProvider: '',
+     localApiKey: '',
+     localModel: '',
+     agentName: '',
+     agentDescription: '',
+     agentContext: '',
+     mcpIntegration: false,
+     costBalance: 5,
+     customGroqUrl: '',
+     customRemoteUrl: '',
+     mcpJson: '',
+     maxRounds: 10,
+     temperature: 0.7,
+     topP: 1.0,
+     topK: 50,
+     maxNewTokens: 1000,
+     stopSequences: '',
+     presencePenalty: 0.0,
+     frequencyPenalty: 0.0,
+     repetitionPenalty: 1.0,
+     seed: 0,
+     responseFormatType: 'text',
+     stream: false,
+     toolChoice: 'auto',
+     user: '',
+     selectedMcpAdapters: []
+   });
 
+  // Fetch models from Ollama with separate handling for remote and local contexts
+  const fetchOllamaModels = async (target: 'remote' | 'local' = 'local') => {
+    const baseUrl = isCustomUrl.value && customOllamaUrl.value ? customOllamaUrl.value : 'http://localhost:11434';
 
-
-const remoteProviders = computed(() => {
-  // Separate ready and not ready providers
-  const readyProviders = remoteProvidersData.value.filter(p => p.ready).map(p => p.provider);
-  const notReadyProviders = remoteProvidersData.value.filter(p => !p.ready).map(p => p.provider);
-
-  // Put ready providers first, then not ready ones
-  const allProviders = [...readyProviders, ...notReadyProviders];
-  console.log('Ready providers:', readyProviders);
-  console.log('Not ready providers:', notReadyProviders);
-  console.log('Final provider list:', allProviders);
-
-  return allProviders;
-});
-
-const availableRemoteModels = computed(() => {
-  console.log('Computing availableRemoteModels for provider:', formData.value.remoteProvider);
-
-  // For Ollama and vLLM in remote provider, use the models from remote providers data
-  if (formData.value.remoteProvider === 'ollama') {
-    const ollamaProvider = remoteProvidersData.value.find(p => p.provider === 'ollama');
-    const models = ollamaProvider?.models.map(m => m.name) || [];
-    console.log('Returning remote Ollama models:', models.length, 'models');
-    return models;
-  } else if (formData.value.remoteProvider === 'vllm') {
-    const vllmProvider = remoteProvidersData.value.find(p => p.provider === 'vllm');
-    const models = vllmProvider?.models.map(m => m.name) || [];
-    console.log('Returning remote vLLM models:', models.length, 'models');
-    return models;
-  }
-  const providerData = remoteProvidersData.value.find(p => p.provider === formData.value.remoteProvider);
-  const models = providerData?.models.map(m => m.name) || [];
-  console.log('Returning other provider models:', models.length, 'models');
-  return models;
-});
-
-const availableLocalModels = computed(() => {
-  return localModels.value[formData.value.localProvider] || [];
-});
-
-// Initialize providers data with hardcoded list
-const initializeProviders = () => {
-  // Hardcoded list of providers with ready/not ready status
-  const providersList = [
-    { id: 'ollama', name: 'Ollama', ready: true },
-    { id: 'vllm', name: 'vLLM', ready: true },
-    { id: 'moonshotai-cn', name: 'Moonshot AI (China) (not ready)', ready: false },
-    { id: 'lucidquery', name: 'LucidQuery (not ready)', ready: false },
-    { id: 'moonshotai', name: 'Moonshot AI (not ready)', ready: false },
-    { id: 'zai-coding-plan', name: 'Z.AI Coding Plan (not ready)', ready: false },
-    { id: 'alibaba', name: 'Alibaba (not ready)', ready: false },
-    { id: 'xai', name: 'xAI (not ready)', ready: false },
-    { id: 'nvidia', name: 'Nvidia (not ready)', ready: false },
-    { id: 'upstage', name: 'Upstage (not ready)', ready: false },
-    { id: 'groq', name: 'Groq', ready: true },
-    { id: 'github-copilot', name: 'GitHub Copilot', ready: true },
-    { id: 'mistral', name: 'Mistral', ready: false },
-    { id: 'vercel', name: 'Vercel', ready: false },
-    { id: 'nebius', name: 'Nebius (not ready)', ready: false },
-    { id: 'deepseek', name: 'DeepSeek', ready: false },
-    { id: 'alibaba-cn', name: 'Alibaba CN (not ready)', ready: false },
-    { id: 'google-vertex-anthropic', name: 'Google Vertex Anthropic (not ready)', ready: false },
-    { id: 'venice', name: 'Venice (not ready)', ready: false },
-    { id: 'chutes', name: 'Chutes (not ready)', ready: false },
-    { id: 'cortecs', name: 'Cortecs (not ready)', ready: false },
-    { id: 'togetherai', name: 'Together AI', ready: false },
-    { id: 'azure', name: 'Azure', ready: false },
-    { id: 'baseten', name: 'Baseten (not ready)', ready: false },
-    { id: 'huggingface', name: 'Hugging Face', ready: false },
-    { id: 'opencode', name: 'OpenCode (not ready)', ready: false },
-    { id: 'fastrouter', name: 'FastRouter (not ready)', ready: false },
-    { id: 'google', name: 'Google', ready: false },
-    { id: 'cloudflare-workers-ai', name: 'Cloudflare Workers AI (not ready)', ready: false },
-    { id: 'inception', name: 'Inception (not ready)', ready: false },
-    { id: 'wandb', name: 'Wandb (not ready)', ready: false },
-    { id: 'openai', name: 'OpenAI', ready: false },
-    { id: 'zhipuai-coding-plan', name: 'ZhipuAI Coding Plan (not ready)', ready: false },
-    { id: 'perplexity', name: 'Perplexity', ready: false },
-    { id: 'openrouter', name: 'OpenRouter', ready: false },
-    { id: 'v0', name: 'V0 (not ready)', ready: false },
-    { id: 'synthetic', name: 'Synthetic (not ready)', ready: false },
-    { id: 'deepinfra', name: 'DeepInfra (not ready)', ready: false },
-    { id: 'zhipuai', name: 'ZhipuAI (not ready)', ready: false },
-    { id: 'submodel', name: 'Submodel (not ready)', ready: false },
-    { id: 'zai', name: 'Z.AI (not ready)', ready: false },
-    { id: 'inference', name: 'Inference (not ready)', ready: false },
-    { id: 'requesty', name: 'Requesty (not ready)', ready: false },
-    { id: 'morph', name: 'Morph (not ready)', ready: false },
-    { id: 'lmstudio', name: 'LM Studio', ready: false },
-    { id: 'anthropic', name: 'Anthropic', ready: false },
-    { id: 'fireworks-ai', name: 'Fireworks AI (not ready)', ready: false },
-    { id: 'modelscope', name: 'ModelScope (not ready)', ready: false },
-    { id: 'llama', name: 'Llama', ready: false },
-    { id: 'amazon-bedrock', name: 'Amazon Bedrock', ready: false },
-    { id: 'cerebras', name: 'Cerebras (not ready)', ready: false }
-  ];
-
-  // Transform to the expected format
-  remoteProvidersData.value = providersList.map(provider => ({
-    provider: provider.id,
-    name: provider.name,
-    ready: provider.ready,
-    models: [] // Empty for now, will be populated based on provider
-  }));
-
-  console.log('Initialized providers:', remoteProvidersData.value.length, 'providers');
-};
-
-// Check if Ollama is available at the given URL
-const checkOllamaAvailability = async (baseUrl: string): Promise<boolean> => {
-  try {
-    const response = await fetch(`${baseUrl}/api/tags`, { method: 'GET', signal: AbortSignal.timeout(5000) });
-    return response.ok;
-  } catch (error) {
-    console.error('Ollama availability check failed:', error);
-    return false;
-  }
-};
-
-// Fetch models from Ollama with separate handling for remote and local contexts
-const fetchOllamaModels = async (target: 'remote' | 'local' = 'local') => {
-  const baseUrl = isCustomUrl.value && customOllamaUrl.value ? customOllamaUrl.value : 'http://localhost:11434';
-
-  // First, check availability
-  const available = await checkOllamaAvailability(baseUrl);
-  if (!available) {
-    ollamaWarning.value = `Ollama not available at ${baseUrl}. Please check the URL or enable custom URL.`;
-    isOllamaAvailable.value = false;
-    // Clear models
-    if (target === 'remote') {
-      const ollamaProvider = remoteProvidersData.value.find(p => p.provider === 'ollama');
-      if (ollamaProvider) ollamaProvider.models = [];
-      formData.value.remoteModel = '';
-      formData.value = { ...formData.value };
-    } else {
-      localModels.value.ollama = [];
-    }
-    return;
-  }
-
-  // If available, clear warning and proceed
-  ollamaWarning.value = '';
-  isOllamaAvailable.value = true;
-
-  try {
-    console.log(`Fetching Ollama models for ${target} context from ${baseUrl}`);
-    const response = await fetch(`${baseUrl}/api/tags`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
+    // First, check availability
+    const available = await checkOllamaAvailability(baseUrl);
+    if (!available) {
+      ollamaWarning.value = `Ollama not available at ${baseUrl}. Please check the URL or enable custom URL.`;
+      isOllamaAvailable.value = false;
+      // Clear models
+      if (target === 'remote') {
+        const ollamaProvider = remoteProvidersData.value.find(p => p.provider === 'ollama');
+        if (ollamaProvider) ollamaProvider.models = [];
+        formData.value.remoteModel = '';
+        formData.value = { ...formData.value };
+      } else {
+        localModels.value.ollama = [];
       }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    const models = data.models?.map((m: any) => m.name) || [];
-    console.log(`Fetched ${models.length} Ollama models:`, models);
+      return;
+    }
 
-    if (target === 'remote') {
-      // Update models for Ollama in remote providers data
-      const ollamaProvider = remoteProvidersData.value.find(p => p.provider === 'ollama');
-      if (ollamaProvider) {
-        ollamaProvider.models = models.map((model: string) => ({
-          id: model,
-          name: model
-        }));
-        console.log('Updated remote Ollama provider models');
+    // If available, clear warning and proceed
+    ollamaWarning.value = '';
+    isOllamaAvailable.value = true;
+
+    try {
+      console.log(`Fetching Ollama models for ${target} context from ${baseUrl}`);
+      const response = await fetch(`${baseUrl}/api/tags`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const models = data.models?.map((m: any) => m.name) || [];
+      console.log(`Fetched ${models.length} Ollama models:`, models);
+
+      if (target === 'remote') {
+        // Update models for Ollama in remote providers data
+        const ollamaProvider = remoteProvidersData.value.find(p => p.provider === 'ollama');
+        if (ollamaProvider) {
+          ollamaProvider.models = models.map((model: string) => ({
+            id: model,
+            name: model
+          }));
+          console.log('Updated remote Ollama provider models');
+        }
+
+        // Force reactivity update for the remote models dropdown
+        formData.value.remoteModel = '';
+        formData.value = { ...formData.value };
+
+      } else {
+        // Update local models (existing behavior)
+        localModels.value.ollama = models;
+        console.log('Updated local Ollama models');
       }
-
-      // Force reactivity update for the remote models dropdown
-      formData.value.remoteModel = '';
-      formData.value = { ...formData.value };
-
-    } else {
-      // Update local models (existing behavior)
-      localModels.value.ollama = models;
-      console.log('Updated local Ollama models');
+    } catch (error) {
+      console.error(`Failed to fetch Ollama models for ${target}:`, error);
+      ollamaWarning.value = `Connection error: Unable to connect to Ollama at ${baseUrl}. Please ensure Ollama is running and accessible.`;
+      // Clear models on error
+      if (target === 'remote') {
+        const ollamaProvider = remoteProvidersData.value.find(p => p.provider === 'ollama');
+        if (ollamaProvider) ollamaProvider.models = [];
+        formData.value.remoteModel = '';
+        formData.value = { ...formData.value };
+      } else {
+        localModels.value.ollama = [];
+      }
     }
-  } catch (error) {
-    console.error(`Failed to fetch Ollama models for ${target}:`, error);
-    ollamaWarning.value = `Connection error: Unable to connect to Ollama at ${baseUrl}. Please ensure Ollama is running and accessible.`;
-    // Clear models on error
-    if (target === 'remote') {
-      const ollamaProvider = remoteProvidersData.value.find(p => p.provider === 'ollama');
-      if (ollamaProvider) ollamaProvider.models = [];
-      formData.value.remoteModel = '';
-      formData.value = { ...formData.value };
-    } else {
-      localModels.value.ollama = [];
+  };
+
+  // Check if Ollama is available at the given URL
+  const checkOllamaAvailability = async (baseUrl: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${baseUrl}/api/tags`, { method: 'GET', signal: AbortSignal.timeout(5000) });
+      return response.ok;
+    } catch (error) {
+      console.error('Ollama availability check failed:', error);
+      return false;
     }
-  }
-};
+  };
+
+
+
+
 
 // Fetch models from vLLM
 const fetchVllmModels = async (target: 'remote' | 'local' = 'local') => {
@@ -896,134 +825,205 @@ const onLocalProviderChange = () => {
   }
 };
 
-
-
-
-
- const submitForm = async () => {
-   console.log('Form submitted with data:', formData.value);
-
-   // Construct messages for the worker
-   const messages = [
-     { role: 'system', content: workerSystemPrompt.value },
-     { role: 'user', content: formData.value.agentContext || '' }
-   ];
-
-   // Construct generation_config
-   const generationConfig = {
-     temperature: formData.value.temperature,
-     top_p: formData.value.topP,
-     top_k: formData.value.topK,
-     max_new_tokens: formData.value.maxNewTokens,
-     stop_sequences: formData.value.stopSequences ? formData.value.stopSequences.split(',').map(s => s.trim()) : [],
-     presence_penalty: formData.value.presencePenalty,
-     frequency_penalty: formData.value.frequencyPenalty,
-     repetition_penalty: formData.value.repetitionPenalty,
-     seed: formData.value.seed
-   };
-
-   // Construct response_format
-   const responseFormat = {
-     type: formData.value.responseFormatType
-   };
-
-   // Construct tools if MCP integration is enabled
-   const tools = formData.value.mcpIntegration && formData.value.mcpJson ? JSON.parse(formData.value.mcpJson) : [];
-
-   // Construct tool_choice
-   const toolChoice = formData.value.toolChoice === 'none' ? 'none' : 'auto';
-
-   // Map form data to new Agent API model matching the schema
-   const agentData = {
-     model: formData.value.localModel,
-     task_description: formData.value.agentDescription,
-     max_rounds: maxRounds.value,
-     messages: messages,
-     generation_config: generationConfig,
-     response_format: responseFormat,
-     stream: formData.value.stream,
-     tools: tools,
-     tool_choice: toolChoice,
-     user: formData.value.user,
-     // Keep supervisor info separate as it has no context
-     supervisor: {
-       provider: formData.value.remoteProvider,
-       api: formData.value.remoteApiKey,
-       model: formData.value.remoteModel,
-       system_prompt: supervisorSystemPrompt.value,
-       developer_prompt: supervisorDeveloperPrompt.value,
-       url: getProviderUrl(formData.value.remoteProvider)
-     },
-     // Worker info
-     worker: {
-       provider: formData.value.localProvider,
-       api: formData.value.localApiKey,
-       model: formData.value.localModel,
-       system_prompt: workerSystemPrompt.value,
-       developer_prompt: workerDeveloperPrompt.value,
-       context: formData.value.agentContext ? [formData.value.agentContext] : [],
-       url: getProviderUrl(formData.value.localProvider)
-     },
-     // Other fields
-     name: formData.value.agentName,
-     mcp_integration: formData.value.mcpIntegration,
-     mcp_tools: tools,
-     cost_balance: formData.value.costBalance,
-     user_roles: {},
-     created_at: Date.now(),
-     updated_at: Date.now()
-   };
-
+  // Fetch available MCP adapters
+  const fetchAvailableAdapters = async () => {
     try {
-      if (isEditing.value) {
-        // Update existing agent
-        const updateRequest: UpdateAgentRequest = {
-          name: agentData.name,
-          description: agentData.task_description,
-          supervisor: {
-            type: agentData.supervisor?.provider || 'openai',
-            api: agentData.supervisor?.api,
-            model: agentData.supervisor?.model,
-            provider: agentData.supervisor?.provider
-          },
-          worker: {
-            type: agentData.worker?.provider || 'ollama',
-            api: agentData.worker?.api,
-            model: agentData.worker?.model,
-            provider: agentData.worker?.provider
-          },
-          config: agentData.generation_config
-        };
-        await SmartAgentsService.updateAgent(String(editingAgentId.value), updateRequest);
-        emit('agent-updated');
-      } else {
-        // Create new agent
-        const createRequest: CreateAgentRequest = {
-          name: agentData.name,
-          description: agentData.task_description,
-          supervisor: {
-            type: agentData.supervisor?.provider || 'openai',
-            api: agentData.supervisor?.api,
-            model: agentData.supervisor?.model,
-            provider: agentData.supervisor?.provider
-          },
-          worker: {
-            type: agentData.worker?.provider || 'ollama',
-            api: agentData.worker?.api,
-            model: agentData.worker?.model,
-            provider: agentData.worker?.provider
-          },
-          config: agentData.generation_config
-        };
-        await SmartAgentsService.createAgent(createRequest);
-        emit('agent-created');
-      }
-      closeModal();
-    } catch (err) {
-      console.error('Submit failed:', err);
-      // TODO: Show error to user
+      isLoadingAdapters.value = true;
+      const adapters = await MCPService.getAdapters();
+      availableAdapters.value = adapters.filter(adapter => adapter.connectionType && adapter.connectionType !== '');
+    } catch (error) {
+      console.error('Failed to fetch adapters:', error);
+      availableAdapters.value = [];
+    } finally {
+      isLoadingAdapters.value = false;
     }
- };
+  };
+
+  // Watch for MCP integration toggle to fetch adapters
+  watch(() => formData.value.mcpIntegration, (enabled) => {
+    if (enabled && availableAdapters.value.length === 0) {
+      fetchAvailableAdapters();
+    }
+  });
+
+  // Add adapter to selection
+  const addAdapter = () => {
+    formData.value.selectedMcpAdapters.push('');
+  };
+
+  // Remove adapter from selection
+  const removeAdapter = (index: number) => {
+    formData.value.selectedMcpAdapters.splice(index, 1);
+  };
+
+  // Update adapter selection
+  const updateAdapter = (index: number, adapterName: string) => {
+    formData.value.selectedMcpAdapters[index] = adapterName;
+  };
+
+  // Generate MCP configuration from selected adapters
+  const generateMcpConfig = () => {
+    const selectedAdapters = formData.value.selectedMcpAdapters.filter(name => name);
+    if (selectedAdapters.length === 0) return [];
+
+    return selectedAdapters.map(adapterName => {
+      const adapter = availableAdapters.value.find(a => a.name === adapterName);
+      return {
+        type: "function",
+        function: {
+          name: adapterName,
+          description: adapter?.description || `MCP tool for ${adapterName}`,
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "Query to send to the MCP adapter"
+              }
+            },
+            required: ["query"]
+          }
+        }
+      };
+    });
+  };
+
+  const submitForm = async () => {
+    console.log('Form submitted with data:', formData.value);
+    submitError.value = ''; // Clear previous errors
+
+    // Construct messages for the worker
+    const messages = [
+      { role: 'system', content: workerSystemPrompt.value },
+      { role: 'user', content: formData.value.agentContext || '' }
+    ];
+
+    // Construct generation_config
+    const generationConfig = {
+      temperature: Number(formData.value.temperature),
+      top_p: Number(formData.value.topP),
+      top_k: Number(formData.value.topK),
+      max_new_tokens: Number(formData.value.maxNewTokens),
+      stop_sequences: formData.value.stopSequences ? formData.value.stopSequences.split(',').map(s => s.trim()) : [],
+      presence_penalty: Number(formData.value.presencePenalty),
+      frequency_penalty: Number(formData.value.frequencyPenalty),
+      repetition_penalty: Number(formData.value.repetitionPenalty),
+      seed: Number(formData.value.seed)
+    };
+
+    // Construct response_format
+    const responseFormat = {
+      type: formData.value.responseFormatType || 'text'
+    };
+
+    // Construct tools if MCP integration is enabled
+    const tools = formData.value.mcpIntegration ? generateMcpConfig() : [];
+
+    // Construct tool_choice
+    const toolChoice = formData.value.toolChoice === 'none' ? 'none' : 'auto';
+
+    // Map form data to new Agent API model matching the schema
+    const agentData = {
+      name: formData.value.agentName,
+      task_description: formData.value.agentDescription,
+      max_rounds: Number(maxRounds.value),
+      messages: messages,
+      generation_config: generationConfig,
+      response_format: responseFormat,
+      stream: formData.value.stream,
+      tools: tools,
+      tool_choice: toolChoice,
+      user: formData.value.user || '',
+      supervisor: {
+        provider: formData.value.remoteProvider,
+        api: formData.value.remoteApiKey,
+        model: formData.value.remoteModel,
+        system_prompt: supervisorSystemPrompt.value,
+        developer_prompt: supervisorDeveloperPrompt.value,
+        url: getProviderUrl(formData.value.remoteProvider)
+      },
+      worker: {
+        provider: formData.value.localProvider,
+        api: formData.value.localApiKey,
+        model: formData.value.localModel,
+        system_prompt: workerSystemPrompt.value,
+        developer_prompt: workerDeveloperPrompt.value,
+        context: formData.value.agentContext ? [formData.value.agentContext] : [],
+        url: getProviderUrl(formData.value.localProvider)
+      },
+      mcp_integration: formData.value.mcpIntegration,
+      mcp_tools: tools,
+      cost_balance: Number(formData.value.costBalance),
+      user_roles: {}
+    };
+
+     try {
+       if (isEditing.value) {
+         // Update existing agent
+         const updateRequest: UpdateAgentRequest = {
+           name: agentData.name,
+           description: agentData.task_description,
+           supervisor: {
+             type: agentData.supervisor?.provider || 'openai',
+             api: agentData.supervisor?.api,
+             model: agentData.supervisor?.model,
+             provider: agentData.supervisor?.provider
+           },
+           worker: {
+             type: agentData.worker?.provider || 'ollama',
+             api: agentData.worker?.api,
+             model: agentData.worker?.model,
+             provider: agentData.worker?.provider
+           },
+           config: agentData.generation_config
+         };
+         await SmartAgentsService.updateAgent(String(editingAgentId.value), updateRequest);
+         emit('agent-updated');
+       } else {
+         // Create new agent with complete schema
+         const createRequest: CreateAgentRequest = {
+           name: agentData.name,
+           task_description: agentData.task_description,
+           max_rounds: agentData.max_rounds,
+           messages: agentData.messages,
+           generation_config: agentData.generation_config,
+           response_format: agentData.response_format,
+           stream: agentData.stream,
+           tools: agentData.tools,
+           tool_choice: agentData.tool_choice,
+           user: agentData.user,
+           supervisor: {
+             provider: agentData.supervisor.provider,
+             api: agentData.supervisor.api,
+             model: agentData.supervisor.model,
+             system_prompt: agentData.supervisor.system_prompt,
+             developer_prompt: agentData.supervisor.developer_prompt,
+             url: agentData.supervisor.url
+           },
+           worker: {
+             provider: agentData.worker.provider,
+             api: agentData.worker.api,
+             model: agentData.worker.model,
+             system_prompt: agentData.worker.system_prompt,
+             developer_prompt: agentData.worker.developer_prompt,
+             context: agentData.worker.context,
+             url: agentData.worker.url
+           },
+           mcp_integration: agentData.mcp_integration,
+           mcp_tools: agentData.mcp_tools,
+           cost_balance: agentData.cost_balance,
+           user_roles: agentData.user_roles
+         };
+         await SmartAgentsService.createAgent(createRequest);
+         emit('agent-created');
+       }
+       closeModal();
+     } catch (err: any) {
+       console.error('Submit failed:', err);
+       // Show user-friendly error message
+       submitError.value = err.response?.data?.message || err.message || 'Failed to create agent. Please check your inputs and try again.';
+     }
+  };
 
 const openModal = async (agentId?: string) => {
   if (agentId) {
@@ -1060,51 +1060,55 @@ const openModal = async (agentId?: string) => {
            repetitionPenalty: agent.generation_config?.repetition_penalty || 1.0,
            seed: agent.generation_config?.seed || 0,
            responseFormatType: agent.response_format?.type || 'text',
-           stream: agent.stream || false,
-           toolChoice: agent.tool_choice || 'auto',
-           user: agent.user || ''
-         };
+            stream: agent.stream || false,
+            toolChoice: agent.tool_choice || 'auto',
+            user: agent.user || '',
+            selectedMcpAdapters: agent.mcp_tools ? agent.mcp_tools.map((tool: any) => tool.function?.name || '').filter((name: string) => name) : []
+          };
          showAdvanced.value = false;
-    } catch (err) {
-      console.error('Failed to fetch agent for edit:', err);
-    }
+     } catch (err: any) {
+       console.error('Submit failed:', err);
+       // Show user-friendly error message
+       submitError.value = err.response?.data?.message || err.message || 'Failed to create agent. Please check your inputs and try again.';
+     }
   } else {
     // Create mode
     isEditing.value = false;
     editingAgentId.value = null;
-   // Reset form
-   formData.value = {
-     remoteProvider: '',
-     remoteApiKey: '',
-     remoteModel: '',
-     localProvider: '',
-     localApiKey: '',
-     localModel: '',
-     agentName: '',
-     agentDescription: '',
-     agentContext: '',
-     mcpIntegration: false,
-     costBalance: 5,
-     customGroqUrl: '',
-     customRemoteUrl: '',
+    // Reset form
+    formData.value = {
+      remoteProvider: '',
+      remoteApiKey: '',
+      remoteModel: '',
+      localProvider: '',
+      localApiKey: '',
+      localModel: '',
+      agentName: '',
+      agentDescription: '',
+      agentContext: '',
+      mcpIntegration: false,
+      costBalance: 5,
+      customGroqUrl: '',
+      customRemoteUrl: '',
       mcpJson: '',
       maxRounds: 10,
       temperature: 0.7,
-     topP: 1.0,
-     topK: 50,
-     maxNewTokens: 1000,
-     stopSequences: '',
-     presencePenalty: 0.0,
-     frequencyPenalty: 0.0,
-     repetitionPenalty: 1.0,
-     seed: 0,
-     responseFormatType: 'text',
-     stream: false,
-     toolChoice: 'auto',
-     user: ''
-   };
-   showAdvanced.value = false;
-      showAdvanced.value = false;
+      topP: 1.0,
+      topK: 50,
+      maxNewTokens: 1000,
+      stopSequences: '',
+      presencePenalty: 0.0,
+      frequencyPenalty: 0.0,
+      repetitionPenalty: 1.0,
+      seed: 0,
+      responseFormatType: 'text',
+      stream: false,
+      toolChoice: 'auto',
+      user: '',
+      selectedMcpAdapters: []
+    };
+    showAdvanced.value = false;
+       showAdvanced.value = false;
   }
   showModal.value = true;
 };
@@ -1113,37 +1117,38 @@ const closeModal = () => {
   showModal.value = false;
   isEditing.value = false;
   editingAgentId.value = null;
-   // Reset form
-   formData.value = {
-     remoteProvider: '',
-     remoteApiKey: '',
-     remoteModel: '',
-     localProvider: '',
-     localApiKey: '',
-     localModel: '',
-     agentName: '',
-     agentDescription: '',
-     agentContext: '',
-     mcpIntegration: false,
-     costBalance: 5,
-     customGroqUrl: '',
-     customRemoteUrl: '',
-     mcpJson: '',
-     maxRounds: 10,
-     temperature: 0.7,
-     topP: 1.0,
-     topK: 50,
-     maxNewTokens: 1000,
-     stopSequences: '',
-     presencePenalty: 0.0,
-     frequencyPenalty: 0.0,
-     repetitionPenalty: 1.0,
-     seed: 0,
-     responseFormatType: 'text',
-     stream: false,
-     toolChoice: 'auto',
-     user: ''
-   };
+    // Reset form
+    formData.value = {
+      remoteProvider: '',
+      remoteApiKey: '',
+      remoteModel: '',
+      localProvider: '',
+      localApiKey: '',
+      localModel: '',
+      agentName: '',
+      agentDescription: '',
+      agentContext: '',
+      mcpIntegration: false,
+      costBalance: 5,
+      customGroqUrl: '',
+      customRemoteUrl: '',
+      mcpJson: '',
+      maxRounds: 10,
+      temperature: 0.7,
+      topP: 1.0,
+      topK: 50,
+      maxNewTokens: 1000,
+      stopSequences: '',
+      presencePenalty: 0.0,
+      frequencyPenalty: 0.0,
+      repetitionPenalty: 1.0,
+      seed: 0,
+      responseFormatType: 'text',
+      stream: false,
+      toolChoice: 'auto',
+      user: '',
+      selectedMcpAdapters: []
+    };
 };
 
 // Watcher for custom URL checkbox
@@ -1182,10 +1187,21 @@ watch(() => formData.value.remoteApiKey, (newKey) => {
   }
 });
 
- onMounted(() => {
-   initializeProviders();
-   loadPrompts();
- });
+  // Initialize remote providers data
+  const initializeProviders = () => {
+    remoteProvidersData.value = [
+      { provider: 'openai', name: 'OpenAI', models: [], ready: true },
+      { provider: 'anthropic', name: 'Anthropic', models: [], ready: true },
+      { provider: 'groq', name: 'Groq', models: [], ready: true },
+      { provider: 'ollama', name: 'Ollama', models: [], ready: true },
+      { provider: 'vllm', name: 'vLLM', models: [], ready: true }
+    ];
+  };
+
+  onMounted(() => {
+    initializeProviders();
+    loadPrompts();
+  });
 
 
 
@@ -1335,6 +1351,28 @@ defineExpose({
   border-radius: 4px;
 }
 
+.error-message {
+  color: #dc3545;
+  font-size: 14px;
+  margin: 16px 24px 0;
+  padding: 12px 16px;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 14px;
+  margin: 16px 24px 0;
+  padding: 12px 16px;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
 .form-control {
   width: 100%;
   padding: 8px 12px;
@@ -1460,6 +1498,41 @@ defineExpose({
 textarea.form-control {
   resize: vertical;
   min-height: 80px;
+}
+
+/* MCP Adapter selection styles */
+.adapter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.adapter-select {
+  flex: 1;
+}
+
+.remove-adapter-btn {
+  flex-shrink: 0;
+}
+
+.add-adapter-btn {
+  margin-top: 8px;
+}
+
+.loading-message {
+  color: #6c757d;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.no-adapters-message {
+  color: #dc3545;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 14px;
 }
 
 /* Responsive */
