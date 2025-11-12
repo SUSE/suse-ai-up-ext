@@ -4,6 +4,7 @@ interface SUSEAIState {
   settings: {
     proxyInstalled: boolean;
     selectedServices: string[];
+    serviceUrl: string;
   };
   apps: {
     items: any[];
@@ -19,7 +20,8 @@ export default {
     return {
       settings: {
         proxyInstalled: false,
-        selectedServices: []
+        selectedServices: [],
+        serviceUrl: ''
       },
       apps: {
         items: [],
@@ -36,6 +38,10 @@ export default {
 
     SET_SELECTED_SERVICES(state: SUSEAIState, services: string[]) {
       state.settings.selectedServices = services;
+    },
+
+    SET_SERVICE_URL(state: SUSEAIState, url: string) {
+      state.settings.serviceUrl = url;
     },
 
     SET_APPS_LOADING(state: SUSEAIState, loading: boolean) {
@@ -58,6 +64,10 @@ export default {
 
     setSelectedServices({ commit }: any, services: string[]) {
       commit('SET_SELECTED_SERVICES', services);
+    },
+
+    setServiceUrl({ commit }: any, url: string) {
+      commit('SET_SERVICE_URL', url);
     },
 
     async fetchAllApps({ commit }: any, { clusterId }: { clusterId: string }) {
@@ -85,6 +95,7 @@ export default {
   getters: {
     proxyInstalled: (state: SUSEAIState) => state.settings.proxyInstalled,
     selectedServices: (state: SUSEAIState) => state.settings.selectedServices,
+    serviceUrl: (state: SUSEAIState) => state.settings.serviceUrl,
     apps: (state: SUSEAIState) => state.apps.items,
     appsLoading: (state: SUSEAIState) => state.apps.loading,
     appsError: (state: SUSEAIState) => state.apps.error

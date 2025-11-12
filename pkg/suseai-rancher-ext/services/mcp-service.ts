@@ -35,6 +35,11 @@ export const apiClient = axios.create({
   },
 });
 
+// Function to update the base URL
+export const updateApiBaseUrl = (newBaseUrl: string) => {
+  apiClient.defaults.baseURL = `${newBaseUrl}/api/v1`;
+};
+
 export interface AdapterData {
   name: string;
   imageName: string;

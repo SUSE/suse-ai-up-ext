@@ -108,6 +108,24 @@ export const SETTINGS_DEFINITIONS: Record<string, SettingDefinition> = {
     category: SETTING_CATEGORIES.GENERAL
   },
 
+  serviceUrl: {
+    key: 'serviceUrl',
+    name: 'Service URL',
+    description: 'Base URL for the SUSE AI Universal Proxy service',
+    type: 'string',
+    defaultValue: '',
+    category: SETTING_CATEGORIES.DISCOVERY,
+    validation: (value: string) => {
+      if (!value.trim()) return null; // Allow empty for auto-detection
+      try {
+        new URL(value);
+        return null;
+      } catch {
+        return 'Invalid URL format';
+      }
+    }
+  },
+
   discoveryTimeout: {
     key: 'discoveryTimeout',
     name: 'Discovery Timeout',

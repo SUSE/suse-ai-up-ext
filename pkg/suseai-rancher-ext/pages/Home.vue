@@ -1,4 +1,10 @@
 <template>
+  <CustomUrlModal
+    :show="showCustomUrlModal"
+    :initial-url="currentServiceUrl"
+    @close="showCustomUrlModal = false"
+    @save="handleSaveCustomUrl"
+  />
   <div v-if="!proxyInstalled" class="blank-page">
     <p>Please install the SUSE AI Universal Proxy first via the MCP Gateway page.</p>
   </div>
@@ -58,6 +64,11 @@
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onMounted } from 'vue'
 import { useStore } from 'vuex'
+import { useServiceDiscovery } from '../composables/useServiceDiscovery'
+import { useRoute } from 'vue-router'
+import CustomUrlModal from '../components/shared/CustomUrlModal.vue'
+import { logger } from '../utils/logger'
+import { updateApiBaseUrl } from '../services/mcp-service'
 
 export default defineComponent({
   name: 'Home',
@@ -68,8 +79,17 @@ export default defineComponent({
     }
   },
 
+  components: {
+    CustomUrlModal
+  },
+
   setup() {
     const store = useStore()
+    const route = useRoute()
+    const { discoverServices, hasDetectedServices, getPrimaryService, isLoading, error } = useServiceDiscovery()
+
+    const showCustomUrlModal = ref(false)
+    const currentServiceUrl = ref('')
 
     // Check if proxy is installed
     const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled)
@@ -107,9 +127,60 @@ export default defineComponent({
     )
 
     // Initialize menu visibility on mount
-    onMounted(() => {
+    onMounted(async () => {
       setTimeout(updateMenuVisibility, 100)
+      await checkServiceUrl()
     })
+
+    // Check and configure service URL
+    const checkServiceUrl = async () => {
+      const existingUrl = store.getters['suseai/serviceUrl']
+      if (existingUrl) {
+        logger.info('Service URL already configured:', existingUrl)
+        updateApiBaseUrl(existingUrl)
+        return
+      }
+
+      const clusterId = route.params.cluster as string
+      if (!clusterId) {
+        logger.warn('No cluster ID found in route')
+        showCustomUrlModal.value = true
+        return
+      }
+
+      try {
+        logger.info('Discovering SUSE AI Universal Proxy service...')
+        const detected = await discoverServices(store, clusterId)
+
+        if (hasDetectedServices.value) {
+          const primary = getPrimaryService.value
+          if (primary?.url) {
+            logger.info('Detected service URL:', primary.url)
+            await store.dispatch('suseai/setServiceUrl', primary.url)
+            updateApiBaseUrl(primary.url)
+            currentServiceUrl.value = primary.url
+          } else {
+            logger.warn('Service detected but no accessible URL found')
+            showCustomUrlModal.value = true
+          }
+        } else {
+          logger.info('No service detected, prompting for custom URL')
+          showCustomUrlModal.value = true
+        }
+      } catch (err) {
+        logger.error('Service discovery failed:', err)
+        showCustomUrlModal.value = true
+      }
+    }
+
+    // Handle saving custom URL
+    const handleSaveCustomUrl = async (url: string) => {
+      await store.dispatch('suseai/setServiceUrl', url)
+      updateApiBaseUrl(url)
+      currentServiceUrl.value = url
+      showCustomUrlModal.value = false
+      logger.info('Custom service URL saved:', url)
+    }
 
     // Update selected services in store and refresh menu visibility
     const updateSelectedServices = () => {
@@ -173,7 +244,10 @@ export default defineComponent({
       selectedServices,
       updateSelectedServices,
       getServiceName,
-      updateMenuVisibility
+      updateMenuVisibility,
+      showCustomUrlModal,
+      currentServiceUrl,
+      handleSaveCustomUrl
     }
   }
 })

@@ -4,11 +4,13 @@
  */
 
 // Base URLs for different services
-export const API_BASE_URLS = {
-  MCP_GATEWAY: 'http://localhost:8911/api/v1',
+export const getApiBaseUrls = (serviceUrl?: string) => ({
+  MCP_GATEWAY: serviceUrl ? `${serviceUrl}/api/v1` : 'http://localhost:8911/api/v1',
   SMART_AGENTS: 'http://localhost:8910',
   RANCHER: window.location.origin
-} as const;
+});
+
+export const API_BASE_URLS = getApiBaseUrls();
 
 // API Endpoints for MCP Gateway
 export const MCP_ENDPOINTS = {
