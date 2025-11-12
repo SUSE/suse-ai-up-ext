@@ -37,7 +37,8 @@ export const apiClient = axios.create({
 
 // Function to update the base URL
 export const updateApiBaseUrl = (newBaseUrl: string) => {
-  apiClient.defaults.baseURL = `${newBaseUrl}/api/v1`;
+  const cleanUrl = newBaseUrl.replace(/\/$/, ''); // Remove trailing slash
+  apiClient.defaults.baseURL = `${cleanUrl}/api/v1`;
 };
 
 export interface AdapterData {
@@ -739,7 +740,8 @@ export class MCPService {
   static async ping(): Promise<boolean> {
     try {
       // Health endpoint is at root level, not under /api/v1
-      const response = await axios.get(`${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}${MCP_ENDPOINTS.HEALTH}`);
+      const baseUrl = apiClient.defaults.baseURL?.replace('/api/v1', '') || 'http://localhost:8911';
+      const response = await axios.get(`${baseUrl}/health`);
       // Check if the service responds with healthy status
       return response.data?.status === 'healthy';
     } catch (error) {

@@ -13,7 +13,7 @@
             <p><strong>Description:</strong> {{ server.description }}</p>
             <p><strong>Version:</strong> {{ server.version }}</p>
             <p><strong>Protocol:</strong> {{ server.protocol }}</p>
-            <p><strong>URL:</strong> {{ server.url }}</p>
+             <p><strong>URL:</strong> {{ server.url }}</p>
             <p><strong>Validation Status:</strong> {{ server.validation_status }}</p>
             <p><strong>Discovered At:</strong> {{ server.discovered_at }}</p>
           </div>
@@ -60,12 +60,13 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from 'vue';
+import { defineComponent, type PropType, computed } from 'vue';
+import { useStore } from 'vuex';
 import type { RegistryServer } from '../../services/mcp-service';
 
 export default defineComponent({
   name: 'ServerDetailsModal',
-  
+
   props: {
     show: {
       type: Boolean,
@@ -77,7 +78,11 @@ export default defineComponent({
     }
   },
 
-  emits: ['close']
+  emits: ['close'],
+
+   setup() {
+     return {};
+   }
 });
 </script>
 

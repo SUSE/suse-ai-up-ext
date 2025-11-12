@@ -15,7 +15,7 @@
 
         <div class="checking-message">
           <h3>Checking for existing instance...</h3>
-          <p>Looking for a running SUSE AI Universal Proxy instance on localhost:8911</p>
+          <p>Looking for a running SUSE AI Universal Proxy instance</p>
         </div>
       </div>
     </div>
@@ -35,7 +35,7 @@
 
         <div class="found-message">
           <h3>Instance Found</h3>
-          <p>A SUSE AI Universal Proxy instance is running and responding on localhost:8911.</p>
+          <p>A SUSE AI Universal Proxy instance is running and responding.</p>
         </div>
 
         <div class="next-action">

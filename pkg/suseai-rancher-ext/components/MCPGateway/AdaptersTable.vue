@@ -31,7 +31,7 @@
               </span>
             </td>
            <td>{{ adapter.protocol || 'MCP' }}</td>
-           <td>{{ adapter.endpoint || '-' }}</td>
+            <td>{{ adapter.endpoint || '-' }}</td>
            <td>{{ adapter.errorCount || 0 }}</td>
            <td>{{ adapter.lastActive ? new Date(adapter.lastActive).toLocaleString() : 'Never' }}</td>
            <td>
@@ -55,54 +55,55 @@
      </table>
     
     <!-- Adapter Details Modal -->
-    <AdapterDetailsModal ref="adapterDetailsModal" />
+    <AdapterDetailsModal
+      :show="showAdapterDetailsModal"
+      :adapter-data="selectedAdapter"
+      @close="closeAdapterDetailsModal"
+    />
   </div>
 </template>
 
-<script lang="ts">
- import { defineComponent, ref } from 'vue';
- import type { AdapterResource } from '../../services/mcp-service';
- import { MCPService } from '../../services/mcp-service';
- import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
+ <script lang="ts">
+  import { defineComponent, ref } from 'vue';
+  import type { AdapterResource } from '../../services/mcp-service';
+  import { MCPService } from '../../services/mcp-service';
+  import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
 
- export default defineComponent({
-   name: 'AdaptersTable',
-   components: {
-     AdapterDetailsModal
-   },
-   props: {
-     adapters: {
-       type: Array as () => AdapterResource[],
-       default: () => []
-     },
-     loading: {
-       type: Boolean,
-       default: false
-     },
-     error: {
-       type: String,
-       default: null
-     }
-   },
-   emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter'],
+export default defineComponent({
+  name: 'AdaptersTable',
+  components: {
+    AdapterDetailsModal
+  },
+  props: {
+    adapters: {
+      type: Array as () => AdapterResource[],
+      default: () => []
+    },
+    loading: {
+      type: Boolean,
+      default: false
+    },
+    error: {
+      type: String,
+      default: null
+    }
+  },
+  emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter'],
    setup(props, { emit }) {
-     const adapterDetailsModal = ref();
+      const showAdapterDetailsModal = ref(false);
+      const selectedAdapter = ref<AdapterResource | null>(null);
 
       const handleViewDetails = async (adapter: AdapterResource) => {
         try {
           // Fetch full adapter details including authentication token
           const adapterDetails = await MCPService.getAdapterDetails(adapter.name);
-          if (adapterDetails) {
-            adapterDetailsModal.value?.openModal(adapterDetails);
-          } else {
-            console.error('Failed to fetch adapter details');
-            // Fallback to basic adapter info if details fetch fails
-            adapterDetailsModal.value?.openModal(adapter);
-          }
+          selectedAdapter.value = adapterDetails || adapter;
+          showAdapterDetailsModal.value = true;
         } catch (error) {
           console.error('Error fetching adapter details:', error);
           // Fallback to basic adapter info if details fetch fails
-          adapterDetailsModal.value?.openModal(adapter);
+          selectedAdapter.value = adapter;
+          showAdapterDetailsModal.value = true;
         }
       };
 
@@ -114,16 +115,23 @@
        emit('edit-adapter', adapter);
      };
 
-     const handleDeleteAdapter = (adapter: AdapterResource) => {
-       emit('delete-adapter', adapter);
-     };
+      const handleDeleteAdapter = (adapter: AdapterResource) => {
+        emit('delete-adapter', adapter);
+      };
+
+      const closeAdapterDetailsModal = () => {
+        showAdapterDetailsModal.value = false;
+        selectedAdapter.value = null;
+      };
 
      return {
-       adapterDetailsModal,
+       showAdapterDetailsModal,
+       selectedAdapter,
        handleViewDetails,
        handleViewLogs,
        handleEditAdapter,
-       handleDeleteAdapter
+       handleDeleteAdapter,
+       closeAdapterDetailsModal
      };
    }
  });

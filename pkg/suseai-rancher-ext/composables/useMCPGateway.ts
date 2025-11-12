@@ -1,10 +1,9 @@
 import { computed, ref, getCurrentInstance, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useStore } from 'vuex';
 import { logger } from '../utils/logger';
-import { MCPService, type DiscoveredServer } from '../services/mcp-service';
+import { MCPService, type DiscoveredServer, apiClient } from '../services/mcp-service';
 import type { SecurityFinding } from '../services/security-engine';
 import { tokenService } from '../services/token-service';
-import { API_BASE_URLS } from '../config/api-config';
 import type {
   AdapterResource,
   AdapterData,
@@ -937,7 +936,8 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
     }
 
     try {
-      eventSource.value = new EventSource(`${API_BASE_URLS.MCP_GATEWAY}/events`);
+      const baseUrl = apiClient.defaults.baseURL?.replace('/api/v1', '') || 'http://localhost:8911';
+      eventSource.value = new EventSource(`${baseUrl}/events`);
       
       eventSource.value.onmessage = (event) => {
         try {

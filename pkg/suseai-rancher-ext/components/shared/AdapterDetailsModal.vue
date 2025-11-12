@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isVisible" class="modal-overlay" @click="closeModal">
+  <div v-if="props.show" class="modal-overlay" @click="closeModal">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
         <h3>Adapter Details: {{ adapter?.name }}</h3>
@@ -177,15 +177,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { AdapterResource } from '../../services/mcp-service';
 import { API_BASE_URLS } from '../../config/api-config';
 
-const isVisible = ref(false);
+interface Props {
+  show: boolean;
+  adapterData: AdapterResource | null;
+}
+
+const props = defineProps<Props>();
+
+const emit = defineEmits<{
+  close: [];
+}>();
+
 const adapter = ref<AdapterResource | null>(null);
 const showToken = ref(false);
 const copying = ref(false);
 const copiedField = ref<string | null>(null);
+
+// Watch for prop changes to update local state
+watch(() => props.adapterData, (newAdapter) => {
+  if (newAdapter) {
+    adapter.value = newAdapter;
+  }
+});
 
 // Generate MCP URL
 const mcpUrl = computed(() => {
@@ -198,14 +215,8 @@ const token = computed(() => {
   return adapter.value?.authentication?.token || '';
 });
 
-const openModal = (adapterData: AdapterResource) => {
-  adapter.value = adapterData;
-  isVisible.value = true;
-  resetState();
-};
-
 const closeModal = () => {
-  isVisible.value = false;
+  emit('close');
   resetState();
   setTimeout(() => {
     adapter.value = null;
@@ -284,9 +295,7 @@ const getStatusLabel = (status?: string) => {
   }
 };
 
-defineExpose({
-  openModal
-});
+
 </script>
 
 <style scoped>

@@ -91,43 +91,23 @@ export function useServiceDiscovery() {
   };
 
   /**
-   * Construct accessible URL from service and ingress data
-   */
-  const constructServiceUrl = (service: KubernetesService, ingresses: any[]): string | undefined => {
-    // Check for LoadBalancer external IPs
-    if (service.spec.type === 'LoadBalancer' && service.spec.loadBalancer?.ingress) {
-      const ingress = service.spec.loadBalancer.ingress[0];
-      if (ingress.hostname) {
-        return `http://${ingress.hostname}:${service.spec.ports[0].port}`;
-      }
-      if (ingress.ip) {
-        return `http://${ingress.ip}:${service.spec.ports[0].port}`;
-      }
-    }
+    * Construct accessible URL from service and ingress data
+    */
+   const constructServiceUrl = (service: KubernetesService, ingresses: any[], clusterId: string): string | undefined => {
+     // For LoadBalancer services, use the external IP
+     if (service.spec.type === 'LoadBalancer' && service.spec.loadBalancer?.ingress) {
+       const ingress = service.spec.loadBalancer.ingress[0];
+       if (ingress.hostname) {
+         return `http://${ingress.hostname}:${service.spec.ports[0].port}`;
+       }
+       if (ingress.ip) {
+         return `http://${ingress.ip}:${service.spec.ports[0].port}`;
+       }
+     }
 
-    // Check for external IPs
-    if (service.spec.externalIPs && service.spec.externalIPs.length > 0) {
-      return `http://${service.spec.externalIPs[0]}:${service.spec.ports[0].port}`;
-    }
-
-    // Check for ingress hosts
-    if (ingresses.length > 0) {
-      const ingress = ingresses[0];
-      const host = ingress.spec?.rules?.[0]?.host;
-      if (host) {
-        // Assume HTTPS if TLS is configured
-        const protocol = ingress.spec?.tls ? 'https' : 'http';
-        return `${protocol}://${host}`;
-      }
-    }
-
-    // Fallback to cluster IP (won't work from browser, but for detection)
-    if (service.spec.clusterIP && service.spec.clusterIP !== 'None') {
-      return `http://${service.spec.clusterIP}:${service.spec.ports[0].port}`;
-    }
-
-    return undefined;
-  };
+     // For all other services, use localhost:8911 as default
+     return 'http://localhost:8911';
+   };
 
   /**
    * Discover services with port 8911
@@ -139,15 +119,21 @@ export function useServiceDiscovery() {
     try {
       const services = await queryKubernetesServices(store, clusterId);
 
+      logger.info(`Found ${services.length} total services in cluster ${clusterId}`)
       const proxyServices = services.filter(service =>
+        service.metadata.name === 'suse-ai-up' &&
+        service.metadata.namespace === 'suse-ai' &&
         service.spec.ports?.some(port => port.port === 8911)
       );
+      logger.info(`Found SUSE AI UP service: ${proxyServices.length > 0 ? 'yes' : 'no'}`)
 
       const detected: DetectedService[] = [];
 
       for (const service of proxyServices) {
+        logger.info(`Processing service: ${service.metadata.name} in ${service.metadata.namespace}`)
         const ingresses = await queryIngressesForService(store, clusterId, service.metadata.name, service.metadata.namespace);
-        const url = constructServiceUrl(service, ingresses);
+        const url = constructServiceUrl(service, ingresses, clusterId);
+        logger.info(`Constructed URL for ${service.metadata.name}: ${url || 'none'}`)
 
         detected.push({
           name: service.metadata.name,
@@ -178,22 +164,26 @@ export function useServiceDiscovery() {
   const hasDetectedServices = computed(() => detectedServices.value.length > 0);
 
   /**
-   * Get the first detected service (prioritize LoadBalancer, then with URL)
-   */
-  const getPrimaryService = computed((): DetectedService | null => {
-    if (!hasDetectedServices.value) return null;
+    * Get the first detected service (prioritize localhost/clusterIP, then LoadBalancer)
+    */
+   const getPrimaryService = computed((): DetectedService | null => {
+     if (!hasDetectedServices.value) return null;
 
-    // Prefer LoadBalancer services
-    const loadBalancer = detectedServices.value.find(s => s.type === 'LoadBalancer');
-    if (loadBalancer) return loadBalancer;
+     // Prefer services with clusterIP (localhost accessible)
+     const clusterIPService = detectedServices.value.find(s => s.clusterIP && s.clusterIP !== 'None');
+     if (clusterIPService) return clusterIPService;
 
-    // Then services with constructed URLs
-    const withUrl = detectedServices.value.find(s => s.url);
-    if (withUrl) return withUrl;
+     // Then LoadBalancer services
+     const loadBalancer = detectedServices.value.find(s => s.type === 'LoadBalancer');
+     if (loadBalancer) return loadBalancer;
 
-    // Otherwise, first one
-    return detectedServices.value[0];
-  });
+     // Then services with constructed URLs
+     const withUrl = detectedServices.value.find(s => s.url);
+     if (withUrl) return withUrl;
+
+     // Otherwise, first one
+     return detectedServices.value[0];
+   });
 
   return {
     isLoading: readonly(isLoading),

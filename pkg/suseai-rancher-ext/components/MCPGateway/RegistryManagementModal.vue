@@ -54,7 +54,7 @@
                     <span class="checkbox-text">Enabled</span>
                   </label>
                 </div>
-                <p class="registry-url">{{ registry.url }}</p>
+                 <p class="registry-url">{{ registry.url }}</p>
                 <div class="registry-stats">
                   <span v-if="registry.lastSync" class="registry-sync">
                     Last sync: {{ new Date(registry.lastSync).toLocaleString() }}
@@ -93,7 +93,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from 'vue';
+import { defineComponent, type PropType, computed } from 'vue';
+import { useStore } from 'vuex';
 
 interface Registry {
   id: string;
@@ -107,6 +108,8 @@ interface Registry {
 
 export default defineComponent({
   name: 'RegistryManagementModal',
+
+
   
   props: {
     show: {

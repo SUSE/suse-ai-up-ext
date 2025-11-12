@@ -20,17 +20,20 @@
               placeholder="https://example.com:8911"
               required
               class="form-control"
-              :class="{ 'is-invalid': !!error }"
+              :class="{ 'is-invalid': !!error || !!validationError }"
+              :disabled="isValidating"
             >
             <small class="form-help">Full URL including protocol and port</small>
             <div v-if="error" class="invalid-feedback">{{ error }}</div>
+            <div v-if="validationError" class="invalid-feedback">{{ validationError }}</div>
           </div>
         </form>
       </div>
       <div class="modal-footer">
         <button @click="$emit('close')" class="btn btn-secondary">Cancel</button>
-        <button @click="handleSubmit" class="btn btn-primary" :disabled="!url.trim() || !!error">
-          Save URL
+        <button @click="handleSubmit" class="btn btn-primary" :disabled="!url.trim() || !!error || isValidating">
+          <span v-if="isValidating" class="spinner"></span>
+          {{ isValidating ? 'Validating...' : 'Validate and Save' }}
         </button>
       </div>
     </div>
@@ -39,6 +42,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch } from 'vue';
+import axios from 'axios';
 
 export default defineComponent({
   name: 'CustomUrlModal',
@@ -56,13 +60,22 @@ export default defineComponent({
   setup(props, { emit }) {
     const url = ref(props.initialUrl);
     const error = ref('');
+    const isValidating = ref(false);
+    const validationError = ref('');
 
     // Reset form when modal opens
     watch(() => props.show, (newVal) => {
       if (newVal) {
         url.value = props.initialUrl;
         error.value = '';
+        validationError.value = '';
+        isValidating.value = false;
       }
+    });
+
+    // Clear validation error when URL changes
+    watch(url, () => {
+      validationError.value = '';
     });
 
     const validateUrl = (value: string): boolean => {
@@ -80,16 +93,59 @@ export default defineComponent({
       }
     };
 
-    const handleSubmit = () => {
-      if (validateUrl(url.value)) {
+    const validateServiceUrl = async (serviceUrl: string): Promise<boolean> => {
+      const baseUrl = serviceUrl.replace(/\/$/, '');
+      const endpoints = ['/health', '/api/v1/health', '/'];
+
+      for (const endpoint of endpoints) {
+        try {
+          const testUrl = `${baseUrl}${endpoint}`;
+          console.log('Validating service URL:', testUrl);
+          const response = await axios.get(testUrl, {
+            timeout: 10000, // 10 second timeout
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          if (response.status >= 200 && response.status < 300) {
+            console.log('Service validation successful with endpoint:', endpoint);
+            return true;
+          }
+        } catch (err) {
+          console.log('Endpoint', endpoint, 'failed:', err);
+          // Continue to next endpoint
+        }
+      }
+
+      // All endpoints failed
+      validationError.value = 'Unable to validate service. Please check the URL and ensure the service is running and accessible.';
+      return false;
+    };
+
+    const handleSubmit = async () => {
+      if (!validateUrl(url.value)) {
+        return;
+      }
+
+      isValidating.value = true;
+      validationError.value = '';
+
+      const isValid = await validateServiceUrl(url.value);
+
+      isValidating.value = false;
+
+      if (isValid) {
         emit('save', url.value);
         emit('close');
       }
+      // If not valid, validationError is already set
     };
 
     return {
       url,
       error,
+      isValidating,
+      validationError,
       handleSubmit
     };
   }
@@ -226,6 +282,21 @@ export default defineComponent({
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .btn-secondary {
