@@ -1,9 +1,11 @@
 // SUSE AI Store
+import { persistLoad, persistSave } from '../services/ui-persist';
 
 interface SUSEAIState {
   settings: {
     proxyInstalled: boolean;
     selectedServices: string[];
+    selectedInstance: any; // ServiceInstance
     serviceUrl: string;
   };
   apps: {
@@ -13,16 +15,22 @@ interface SUSEAIState {
   };
 }
 
+const SETTINGS_KEY = 'suseai-settings';
+
 export default {
   namespaced: true,
 
   state(): SUSEAIState {
+    // Load persisted settings
+    const persistedSettings = persistLoad(SETTINGS_KEY, {
+      proxyInstalled: false,
+      selectedServices: [],
+      selectedInstance: null,
+      serviceUrl: ''
+    });
+
     return {
-      settings: {
-        proxyInstalled: false,
-        selectedServices: [],
-        serviceUrl: ''
-      },
+      settings: persistedSettings,
       apps: {
         items: [],
         loading: false,
@@ -34,14 +42,22 @@ export default {
   mutations: {
     SET_PROXY_INSTALLED(state: SUSEAIState, value: boolean) {
       state.settings.proxyInstalled = value;
+      persistSave(SETTINGS_KEY, state.settings);
     },
 
     SET_SELECTED_SERVICES(state: SUSEAIState, services: string[]) {
       state.settings.selectedServices = services;
+      persistSave(SETTINGS_KEY, state.settings);
+    },
+
+    SET_SELECTED_INSTANCE(state: SUSEAIState, instance: any) {
+      state.settings.selectedInstance = instance;
+      persistSave(SETTINGS_KEY, state.settings);
     },
 
     SET_SERVICE_URL(state: SUSEAIState, url: string) {
       state.settings.serviceUrl = url;
+      persistSave(SETTINGS_KEY, state.settings);
     },
 
     SET_APPS_LOADING(state: SUSEAIState, loading: boolean) {
@@ -64,6 +80,10 @@ export default {
 
     setSelectedServices({ commit }: any, services: string[]) {
       commit('SET_SELECTED_SERVICES', services);
+    },
+
+    setSelectedInstance({ commit }: any, instance: any) {
+      commit('SET_SELECTED_INSTANCE', instance);
     },
 
     setServiceUrl({ commit }: any, url: string) {
@@ -95,6 +115,7 @@ export default {
   getters: {
     proxyInstalled: (state: SUSEAIState) => state.settings.proxyInstalled,
     selectedServices: (state: SUSEAIState) => state.settings.selectedServices,
+    selectedInstance: (state: SUSEAIState) => state.settings.selectedInstance,
     serviceUrl: (state: SUSEAIState) => state.settings.serviceUrl,
     apps: (state: SUSEAIState) => state.apps.items,
     appsLoading: (state: SUSEAIState) => state.apps.loading,

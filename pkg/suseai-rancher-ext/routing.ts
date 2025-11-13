@@ -27,7 +27,7 @@ export default [
   {
     name:     `c-cluster-${PRODUCT}-home-root`,
     path:     `/c/:cluster/${PRODUCT}`,
-    redirect: { name: `c-cluster-${PRODUCT}-${PAGE_TYPES.UP}`, params: { product: PRODUCT } },
+    redirect: { name: `c-cluster-${PRODUCT}-universal-adapter`, params: { product: PRODUCT } },
     meta:     { product: PRODUCT }
   },
 
@@ -67,6 +67,14 @@ export default [
     path:      `/c/:cluster/${PRODUCT}/smart-agents`,
     component: () => import('./pages/SmartAgents.vue'),
     meta:      { product: PRODUCT, category: 'smart-agents' }
+  },
+
+   // Settings page
+  {
+    name:      `c-cluster-${PRODUCT}-settings`,
+    path:      `/c/:cluster/${PRODUCT}/settings`,
+    component: () => import('./pages/Settings.vue'),
+    meta:      { product: PRODUCT, category: 'settings' }
   },
 
   // Test wizard route
@@ -112,13 +120,13 @@ export default [
   //   meta:      { product: PRODUCT, category: 'repositories' }
   // },
 
-  // // Settings management (future)
-  // {
-  //   name:      `c-cluster-${PRODUCT}-${PAGE_TYPES.SETTINGS}`,
-  //   path:      `/c/:cluster/${PRODUCT}/${PAGE_TYPES.SETTINGS}`,
-  //   component: () => import('./pages/Apps.vue'), // Placeholder for now
-  //   meta:      { product: PRODUCT, category: 'settings' }
-  // },
+   // Settings management
+   {
+     name:      `c-cluster-${PRODUCT}-${PAGE_TYPES.SETTINGS}`,
+     path:      `/c/:cluster/${PRODUCT}/${PAGE_TYPES.SETTINGS}`,
+     component: () => import('./pages/Settings.vue'),
+     meta:      { product: PRODUCT, category: 'settings' }
+   },
 
   // Legacy routes (kept for compatibility during transition)
   // {
@@ -127,10 +135,10 @@ export default [
   //   redirect:  { name: `c-cluster-${PRODUCT}-${PAGE_TYPES.APPS}`, params: { product: PRODUCT } },
   //   meta:      { product: PRODUCT }
   // }
-  {
-    name:      `c-cluster-${PRODUCT}-home`,
-    path:      `/c/:cluster/${PRODUCT}/home`,
-    redirect:  { name: `c-cluster-${PRODUCT}-${PAGE_TYPES.UP}`, params: { product: PRODUCT } },
-    meta:      { product: PRODUCT }
-  }
+  // {
+  //   name:      `c-cluster-${PRODUCT}-home`,
+  //   path:      `/c/:cluster/${PRODUCT}/home`,
+  //   redirect:  { name: `c-cluster-${PRODUCT}-${PAGE_TYPES.UP}`, params: { product: PRODUCT } },
+  //   meta:      { product: PRODUCT }
+  // }
 ];

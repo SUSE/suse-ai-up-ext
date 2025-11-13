@@ -14,7 +14,12 @@ export const FEATURE_FLAGS = {
   MULTI_CLUSTER: 'multi-cluster',
   OFFLINE_MODE: 'offline-mode',
   BACKUP_RESTORE: 'backup-restore',
-  SECURITY_SCANNING: 'security-scanning'
+  SECURITY_SCANNING: 'security-scanning',
+  // Service-specific features
+  MCP_GATEWAY: 'mcp-gateway',
+  MCP_REGISTRY: 'mcp-registry',
+  VIRTUAL_MCP: 'virtual-mcp',
+  SMART_AGENTS: 'smart-agents'
 } as const;
 
 export type FeatureFlag = typeof FEATURE_FLAGS[keyof typeof FEATURE_FLAGS];

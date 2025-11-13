@@ -154,6 +154,43 @@ export const FEATURE_DEFINITIONS: Record<FeatureFlag, FeatureFlagDefinition> = {
       kubernetes: '1.21.0'
     },
     documentation: '/docs/features/security-scanning'
+  },
+
+  // Service-specific features (dynamically enabled based on user selection)
+  [FEATURE_FLAGS.MCP_GATEWAY]: {
+    flag: FEATURE_FLAGS.MCP_GATEWAY,
+    name: 'MCP Gateway',
+    description: 'Model Context Protocol gateway for AI interactions',
+    category: FEATURE_CATEGORIES.CORE,
+    defaultEnabled: false,
+    documentation: '/docs/services/mcp-gateway'
+  },
+
+  [FEATURE_FLAGS.MCP_REGISTRY]: {
+    flag: FEATURE_FLAGS.MCP_REGISTRY,
+    name: 'MCP Registry',
+    description: 'Registry for managing MCP connections and installations',
+    category: FEATURE_CATEGORIES.CORE,
+    defaultEnabled: false,
+    documentation: '/docs/services/mcp-registry'
+  },
+
+  [FEATURE_FLAGS.VIRTUAL_MCP]: {
+    flag: FEATURE_FLAGS.VIRTUAL_MCP,
+    name: 'Virtual MCP',
+    description: 'Virtual Model Context Protocol servers',
+    category: FEATURE_CATEGORIES.CORE,
+    defaultEnabled: false,
+    documentation: '/docs/services/virtual-mcp'
+  },
+
+  [FEATURE_FLAGS.SMART_AGENTS]: {
+    flag: FEATURE_FLAGS.SMART_AGENTS,
+    name: 'SmartAgents',
+    description: 'Intelligent agents for automated tasks and workflows',
+    category: FEATURE_CATEGORIES.CORE,
+    defaultEnabled: false,
+    documentation: '/docs/services/smart-agents'
   }
 };
 
@@ -238,6 +275,23 @@ export function getFeatureConflicts(flag: FeatureFlag): FeatureFlag[] {
 export function featureEnabled(feature: FeatureFlag, clusterVersion?: string, store?: any): boolean {
   const definition = FEATURE_DEFINITIONS[feature];
   if (!definition) return false;
+
+  // Check service-specific features based on selected services in store
+  const serviceFeatureMap: Record<string, string> = {
+    [FEATURE_FLAGS.MCP_GATEWAY]: 'mcp-gateway',
+    [FEATURE_FLAGS.MCP_REGISTRY]: 'mcp-registry',
+    [FEATURE_FLAGS.VIRTUAL_MCP]: 'virtual-mcp',
+    [FEATURE_FLAGS.SMART_AGENTS]: 'smart-agents'
+  };
+
+  if (feature in serviceFeatureMap) {
+    if (!store) return false;
+    const selectedServices = (store.state as any).suseai?.settings?.selectedServices || [];
+    const serviceId = serviceFeatureMap[feature];
+    return selectedServices.includes(serviceId);
+  }
+
+  // For other features, use default enabled state
   return definition.defaultEnabled;
 }
 

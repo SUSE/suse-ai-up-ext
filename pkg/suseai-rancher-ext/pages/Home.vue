@@ -1,9 +1,28 @@
 <template>
+  <!-- Discovery Wizard - shown when authenticated but no instances discovered yet -->
+  <APIDiscoveryWizard
+    v-if="showDiscoveryWizard"
+    @complete="onDiscoveryComplete"
+    @install-new="onInstallNew"
+  />
 
-  <div v-if="!proxyInstalled" class="blank-page">
-    <p>Please install the SUSE AI Universal Proxy first via the MCP Gateway page.</p>
-  </div>
-   <main v-else class="main-layout">
+  <!-- Service Selection Wizard - shown when user connects to a discovered instance -->
+  <!-- <ServiceSelectionWizard
+    v-if="showServiceSelectionWizard"
+    :selected-instance="selectedInstance"
+    @complete="onServiceSelectionComplete"
+    @cancel="onServiceSelectionCancel"
+  /> -->
+
+  <!-- Installation Wizard - shown when authenticated but no proxy installed -->
+  <InstallWizard
+    v-else-if="showInstallWizard"
+    @install-complete="onInstallComplete"
+  />
+
+  <!-- Main application - shown when proxy is installed and instances are available -->
+  <div v-else-if="showMainLayout" class="main-layout">
+    <main class="main-content-wrapper">
       <div class="experimental-banner">
        <span class="banner-icon">⚠️</span>
        <strong>Experimental Feature</strong>
@@ -18,169 +37,140 @@
 
       <div class="main-content">
          <div class="welcome-section">
-           <h2>Configure SUSE AI Universal Proxy Services</h2>
-           <p>Select the services you want to enable in your universal adapter:</p>
+           <h2>SUSE AI Universal Proxy is Installed</h2>
+           <p>Your SUSE AI Universal Proxy is running and configured. Use the sidebar menu to access individual services.</p>
 
-           <div class="services-selection">
-             <div class="service-option" v-for="service in availableServices" :key="service.id">
-               <label class="service-checkbox">
-                 <input
-                   type="checkbox"
-                   :value="service.id"
-                   v-model="selectedServices"
-                   @change="updateSelectedServices"
-                 />
-                 <span class="checkmark"></span>
-                 <div class="service-info">
-                   <h3>{{ service.name }}</h3>
-                   <p>{{ service.description }}</p>
-                 </div>
-               </label>
+           <div class="status-summary">
+             <div class="status-item">
+               <h3>Installation Status</h3>
+               <p class="status-success">✅ Proxy Installed</p>
              </div>
-           </div>
-
-           <div class="selection-summary" v-if="selectedServices.length > 0">
-             <h3>Enabled Services ({{ selectedServices.length }})</h3>
-             <ul>
-               <li v-for="serviceId in selectedServices" :key="serviceId">
-                 {{ getServiceName(serviceId) }}
-               </li>
-             </ul>
-             <p class="info-text">
-                These services are available in the sidebar menu under "SUSE AI Universal Proxy".
-             </p>
+             <div class="status-item">
+               <h3>Service Discovery</h3>
+               <p class="status-success">✅ Completed</p>
+             </div>
+             <div class="status-item">
+               <h3>Configuration</h3>
+               <p class="status-success">✅ Ready</p>
+             </div>
            </div>
          </div>
        </div>
      </div>
-  </main>
+    </main>
+  </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onMounted } from 'vue'
+import { defineComponent, computed, ref } from 'vue'
+import { useAuth } from '../composables/useAuth'
+// import { useClusterDiscovery } from '../composables/useClusterDiscovery'
+import { useMCPGateway } from '../composables/useMCPGateway'
 import { useStore } from 'vuex'
-
+import APIDiscoveryWizard from './components/wizard/APIDiscoveryWizard.vue'
+// import ServiceSelectionWizard from './components/wizard/ServiceSelectionWizard.vue'
+import InstallWizard from '../components/MCPGateway/InstallWizard.vue'
 
 export default defineComponent({
   name: 'Home',
-
-  metaInfo() {
-    return {
-      title: 'Service Configuration'
-    }
+  components: {
+    APIDiscoveryWizard,
+    // ServiceSelectionWizard,
+    InstallWizard
   },
 
-
-
   setup() {
+    const { isAuthenticated, hasAdminPrivileges } = useAuth()
+    // const { hasDiscoveredInstances } = useClusterDiscovery()
+    const hasDiscoveredInstances = ref(false) // Mock for development
+    const { proxyInstalled } = useMCPGateway()
     const store = useStore()
 
+    // Get selected services from store
+    const selectedServices = computed(() => store.getters.selectedServices)
 
-    // Check if proxy is installed
-    const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled)
-
-    // Available services
-    const availableServices = [
-      {
-        id: 'mcp-registry',
-        name: 'MCP Registry',
-        description: 'Manage MCP server registries and installations'
-      },
-      {
-        id: 'virtual-mcp',
-        name: 'Virtual MCP',
-        description: 'Create and manage virtual MCP server instances'
-      },
-      {
-        id: 'smart-agents',
-        name: 'SmartAgents',
-        description: 'Configure and monitor intelligent agent services'
-      }
-    ]
-
-    // Reactive selected services from store
-    const selectedServices = ref([...store.state.suseai.settings.selectedServices])
-
-    // Watch for store changes
-    watch(
-      () => store.state.suseai.settings.selectedServices,
-      (newSelected) => {
-        selectedServices.value = [...newSelected]
-        // Update menu visibility when store changes
-        setTimeout(updateMenuVisibility, 50)
-      }
-    )
-
-    // Initialize menu visibility on mount
-    onMounted(() => {
-      setTimeout(updateMenuVisibility, 100)
+    // Debug logging
+    console.log('Home.vue setup - auth state:', {
+      isAuthenticated: isAuthenticated.value,
+      hasAdminPrivileges: hasAdminPrivileges.value,
+      hasDiscoveredInstances: hasDiscoveredInstances.value,
+      proxyInstalled: proxyInstalled.value
     })
 
+    // Determine when to show discovery wizard
+    const showDiscoveryWizard = computed(() => {
+      // For now, always show discovery wizard if not proxy installed
+      const result = !proxyInstalled.value
+      console.log('showDiscoveryWizard:', result, { proxyInstalled: proxyInstalled.value })
+      return result
+    })
 
+    // Determine when to show installation wizard
+    const showInstallWizard = computed(() => {
+      const result = isAuthenticated.value &&
+             hasAdminPrivileges.value &&
+             !proxyInstalled.value &&
+             !hasDiscoveredInstances.value
+      console.log('showInstallWizard:', result)
+      return result
+    })
 
-    // Update selected services in store and refresh menu visibility
-    const updateSelectedServices = () => {
-      store.dispatch('suseai/setSelectedServices', selectedServices.value)
-      // Update menu visibility after a short delay to allow store to update
-      setTimeout(updateMenuVisibility, 100)
-    }
+    // Determine when to show main layout
+    const showMainLayout = computed(() => {
+      const result = proxyInstalled.value
+      console.log('showMainLayout:', result)
+      return result
+    })
 
-    // Update menu item visibility based on selected services
-    const updateMenuVisibility = () => {
-      const currentSelected = store.state.suseai.settings.selectedServices
+    // Event handlers
+    const onDiscoveryComplete = (config: any) => {
+      console.log('Discovery completed with configuration:', config)
+      if (config && config.instance && config.services) {
+        // Store the selected configuration
+        console.log('Selected instance:', config.instance.name, 'Services:', config.services)
 
-      // Service name mappings for menu text
-      const serviceLabels = {
-        'mcp-registry': 'MCP Registry',
-        'virtual-mcp': 'Virtual MCP',
-        'smart-agents': 'SmartAgents'
+        // Store selected services in Vuex store
+        store.dispatch('suseai/setSelectedServices', config.services)
+
+        // Store selected instance
+        store.dispatch('suseai/setSelectedInstance', config.instance)
+
+        // Mark proxy as installed since we have a configuration
+        store.dispatch('suseai/setProxyInstalled', true)
+
+        // Store service URL for the selected instance
+        const serviceUrl = `http://${config.instance.externalIPs?.[0] || 'localhost'}:${config.instance.port}`
+        store.dispatch('suseai/setServiceUrl', serviceUrl)
+
+        console.log('Configuration stored in Vuex:', {
+          selectedServices: config.services,
+          proxyInstalled: true,
+          serviceUrl
+        })
       }
-
-      // Find menu items by their text content and toggle visibility
-      Object.entries(serviceLabels).forEach(([serviceId, label]) => {
-        // Look for menu links containing the service label
-        const menuLinks = document.querySelectorAll('a[href*="' + serviceId + '"]')
-        menuLinks.forEach(link => {
-          const menuItem = link.closest('.side-menu-item, [role="menuitem"], li') as HTMLElement
-          if (menuItem) {
-            if (currentSelected.includes(serviceId)) {
-              menuItem.classList.remove('suse-menu-hidden')
-            } else {
-              menuItem.classList.add('suse-menu-hidden')
-            }
-          }
-        })
-
-        // Also try to find by text content
-        const textElements = document.querySelectorAll('*')
-        textElements.forEach(element => {
-          if (element.textContent?.trim() === label) {
-            const menuItem = element.closest('.side-menu-item, [role="menuitem"], li') as HTMLElement
-            if (menuItem) {
-              if (currentSelected.includes(serviceId)) {
-                menuItem.classList.remove('suse-menu-hidden')
-              } else {
-                menuItem.classList.add('suse-menu-hidden')
-              }
-            }
-          }
-        })
-      })
     }
 
-    // Get service name by ID
-    const getServiceName = (serviceId: string) => {
-      const service = availableServices.find(s => s.id === serviceId)
-      return service ? service.name : serviceId
+    const onInstallNew = (manualUrl?: string) => {
+      console.log('User chose to install new instance', manualUrl ? `with manual URL: ${manualUrl}` : '')
+      // TODO: Pass manual URL to InstallWizard if provided
+    }
+
+    const onInstallComplete = () => {
+      console.log('Installation completed')
     }
 
     return {
+      isAuthenticated,
+      hasAdminPrivileges,
+      hasDiscoveredInstances,
       proxyInstalled,
-      availableServices,
       selectedServices,
-      updateSelectedServices,
-      getServiceName,
-      updateMenuVisibility
+      showDiscoveryWizard,
+      showInstallWizard,
+      showMainLayout,
+      onDiscoveryComplete,
+      onInstallNew,
+      onInstallComplete
     }
   }
 })
@@ -421,5 +411,43 @@ export default defineComponent({
 
 .experimental-banner a:hover {
   color: #b02a5b;
+}
+
+/* Status Summary Styles */
+.status-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 32px;
+}
+
+.status-item {
+  background: var(--card-bg, var(--body-bg));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.status-item h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--body-text);
+  margin: 0 0 12px 0;
+}
+
+.status-item p {
+  font-size: 14px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.status-success {
+  color: var(--success, #28a745) !important;
+  font-weight: 500;
+}
+
+.main-content-wrapper {
+  flex: 1;
 }
 </style>

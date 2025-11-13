@@ -88,13 +88,14 @@ export const PAGE_TYPES = {
   // INSTALL: 'install',
   // MANAGE: 'manage',
   // REPOSITORIES: 'repositories',
-  // SETTINGS: 'settings',
-  UP: "SUSE AI Universal Proxy",
-  MCPGATEWAY: "MCP gateway",
-  MCPREGISTRY: "MCP registry",
-  VIRTUALMCP: "Virtual MCP",
-  SMARTAGENTS: "Smart Agents",
-  QUICKSTARTS: "QuickStarts"
+  SETTINGS: 'settings',
+   UP: "SUSE AI",
+  HOME: "Home",
+  MCPGATEWAY: "mcp-gateway",
+  MCPREGISTRY: "mcp-registry",
+  VIRTUALMCP: "virtual-mcp",
+  SMARTAGENTS: "smart-agents",
+  QUICKSTARTS: "quickstarts"
 
 } as const;
 
@@ -129,7 +130,7 @@ export const VIRTUAL_TYPES: VirtualTypeConfig[] = [
   // },
   {
     name: PAGE_TYPES.UP,
-    label: 'SUSE AI Universal Proxy',
+    label: 'SUSE AI',
     route: {
       name: `c-cluster-${PRODUCT}-universal-adapter`,
       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
@@ -163,16 +164,25 @@ export const VIRTUAL_TYPES: VirtualTypeConfig[] = [
       meta: { product: PRODUCT }
     }
   },
-  {
-    name: PAGE_TYPES.SMARTAGENTS,
-    label: 'SmartAgents',
-    route: {
-      name: `c-cluster-${PRODUCT}-smart-agents`,
-      params: { product: PRODUCT, cluster: BLANK_CLUSTER },
-      meta: { product: PRODUCT }
-    }
-  }
-];
+   {
+     name: PAGE_TYPES.SMARTAGENTS,
+     label: 'SmartAgents',
+     route: {
+       name: `c-cluster-${PRODUCT}-smart-agents`,
+       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
+       meta: { product: PRODUCT }
+     }
+   },
+   {
+     name: PAGE_TYPES.SETTINGS,
+     label: 'Settings',
+     route: {
+       name: `c-cluster-${PRODUCT}-settings`,
+       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
+       meta: { product: PRODUCT }
+     }
+   }
+ ];
 
 // === Basic Types Configuration ===
 // export const BASIC_TYPES = [

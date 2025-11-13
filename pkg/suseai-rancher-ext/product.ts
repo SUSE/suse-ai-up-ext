@@ -39,7 +39,7 @@ export function init($plugin: IPlugin, store: RancherStore) {
     inStore: SUSEAI_PRODUCT.inStore,
     weight: SUSEAI_PRODUCT.weight,
     to: {
-      name: `c-cluster-${PRODUCT}-${PAGE_TYPES.UP}`,
+      name: `c-cluster-${PRODUCT}-universal-adapter`,
       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
       meta: { product: PRODUCT }
     }
@@ -56,7 +56,7 @@ export function init($plugin: IPlugin, store: RancherStore) {
   // Register basic types
   // basicType(BASIC_TYPES);
   // registering some of the defined pages as side-menu entries in a group
-  basicType([PAGE_TYPES.MCPGATEWAY,PAGE_TYPES.MCPREGISTRY,PAGE_TYPES.VIRTUALMCP,PAGE_TYPES.SMARTAGENTS], PAGE_TYPES.UP);
+  basicType([PAGE_TYPES.MCPGATEWAY,PAGE_TYPES.MCPREGISTRY,PAGE_TYPES.VIRTUALMCP,PAGE_TYPES.SMARTAGENTS, PAGE_TYPES.SETTINGS], PAGE_TYPES.UP);
   // // => => => ordering of the grouped entry
   // weightGroup(UP_TYPES, 1001, true);
 }

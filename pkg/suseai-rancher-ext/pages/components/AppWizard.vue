@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { defineProps, withDefaults, ref, computed, onMounted, watch, getCurrentInstance } from 'vue';
 import yaml from 'js-yaml';
-import Banner from '@components/Banner';
+import { Banner } from '@rancher/shell/rancher-components/Banner';
 import Loading from '@shell/components/Loading';
 import AsyncButton from '@shell/components/AsyncButton';
 import BasicInfoStep from './wizard/BasicInfoStep.vue';

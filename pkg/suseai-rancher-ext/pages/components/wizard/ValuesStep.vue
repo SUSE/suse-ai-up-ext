@@ -20,7 +20,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 import YamlEditor from '@shell/components/YamlEditor';
-import Banner from '@components/Banner';
+import { Banner } from '@rancher/shell/rancher-components/Banner';
 
 interface Props {
   values: Record<string, any>;
