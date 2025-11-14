@@ -1,5 +1,6 @@
 annotations:
   catalog.cattle.io/certified: rancher
+  catalog.cattle.io/display-name: 'SUSE AI Universal Proxy'
   catalog.cattle.io/namespace: cattle-ui-plugin-system
   catalog.cattle.io/os: linux
   catalog.cattle.io/permits-os: linux, windows
@@ -9,7 +10,7 @@ annotations:
   catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
 apiVersion: v2
 appVersion: 0.1.0
-description: suseai-rancher-ext plugin
-name: suseai-rancher-ext
+description: SUSE AI Universal Proxy extension for Rancher - provides unified access to AI services and model context protocols
+name: universal-proxy
 type: application
 version: 0.1.0
