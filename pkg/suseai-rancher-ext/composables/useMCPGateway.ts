@@ -751,16 +751,18 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
 
   // Lifecycle
   onMounted(async () => {
-    // Always try to load MCP data on initial mount
-    await loadData();
+    // Only load MCP data if proxy is installed
+    if (proxyInstalled.value) {
+      await loadData();
 
-    // Start polling for real-time updates every 5 seconds
-    pollInterval = window.setInterval(() => {
-      if (!loading.value) {
-        fetchDiscoveredServers();
-        fetchAdapters();
-      }
-    }, 5000);
+      // Start polling for real-time updates every 5 seconds
+      pollInterval = window.setInterval(() => {
+        if (!loading.value && proxyInstalled.value) {
+          fetchDiscoveredServers();
+          fetchAdapters();
+        }
+      }, 5000);
+    }
   });
 
   // Watch for service selection changes to trigger data loading

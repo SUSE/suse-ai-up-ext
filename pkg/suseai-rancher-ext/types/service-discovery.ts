@@ -43,6 +43,7 @@ export interface DiscoveryWizardState {
 export interface RancherCluster {
   id: string;
   name: string;
+  nameDisplay?: string;
   state: string;
   transitioning: boolean;
   provider: string;

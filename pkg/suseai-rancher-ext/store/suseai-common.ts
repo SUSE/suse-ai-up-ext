@@ -5,8 +5,10 @@ interface SUSEAIState {
   settings: {
     proxyInstalled: boolean;
     selectedServices: string[];
-    selectedInstance: any; // ServiceInstance
-    serviceUrl: string;
+    availableClusters: any[];
+    serviceUrls: string[];
+    selectedCluster: string;
+    selectedPod: any;
   };
   apps: {
     items: any[];
@@ -25,12 +27,18 @@ export default {
     const persistedSettings = persistLoad(SETTINGS_KEY, {
       proxyInstalled: false,
       selectedServices: [],
-      selectedInstance: null,
-      serviceUrl: ''
+      availableClusters: [],
+      serviceUrls: [],
+      selectedCluster: '',
+      selectedPod: null
     });
 
     return {
-      settings: persistedSettings,
+      settings: {
+        ...persistedSettings,
+        selectedCluster: persistedSettings.selectedCluster || '',
+        selectedPod: persistedSettings.selectedPod || null
+      },
       apps: {
         items: [],
         loading: false,
@@ -50,15 +58,25 @@ export default {
       persistSave(SETTINGS_KEY, state.settings);
     },
 
-    SET_SELECTED_INSTANCE(state: SUSEAIState, instance: any) {
-      state.settings.selectedInstance = instance;
+    SET_AVAILABLE_CLUSTERS(state: SUSEAIState, clusters: any[]) {
+      state.settings.availableClusters = clusters;
       persistSave(SETTINGS_KEY, state.settings);
     },
 
-    SET_SERVICE_URL(state: SUSEAIState, url: string) {
-      state.settings.serviceUrl = url;
-      persistSave(SETTINGS_KEY, state.settings);
-    },
+     SET_SERVICE_URLS(state: SUSEAIState, urls: string[]) {
+       state.settings.serviceUrls = urls;
+       persistSave(SETTINGS_KEY, state.settings);
+     },
+
+     SET_SELECTED_CLUSTER(state: SUSEAIState, clusterId: string) {
+       state.settings.selectedCluster = clusterId;
+       persistSave(SETTINGS_KEY, state.settings);
+     },
+
+     SET_SELECTED_POD(state: SUSEAIState, pod: any) {
+       state.settings.selectedPod = pod;
+       persistSave(SETTINGS_KEY, state.settings);
+     },
 
     SET_APPS_LOADING(state: SUSEAIState, loading: boolean) {
       state.apps.loading = loading;
@@ -82,13 +100,21 @@ export default {
       commit('SET_SELECTED_SERVICES', services);
     },
 
-    setSelectedInstance({ commit }: any, instance: any) {
-      commit('SET_SELECTED_INSTANCE', instance);
+    setAvailableClusters({ commit }: any, clusters: any[]) {
+      commit('SET_AVAILABLE_CLUSTERS', clusters);
     },
 
-    setServiceUrl({ commit }: any, url: string) {
-      commit('SET_SERVICE_URL', url);
-    },
+     setServiceUrls({ commit }: any, urls: string[]) {
+       commit('SET_SERVICE_URLS', urls);
+     },
+
+     setSelectedCluster({ commit }: any, clusterId: string) {
+       commit('SET_SELECTED_CLUSTER', clusterId);
+     },
+
+     setSelectedPod({ commit }: any, pod: any) {
+       commit('SET_SELECTED_POD', pod);
+     },
 
     async fetchAllApps({ commit }: any, { clusterId }: { clusterId: string }) {
       try {
@@ -115,8 +141,8 @@ export default {
   getters: {
     proxyInstalled: (state: SUSEAIState) => state.settings.proxyInstalled,
     selectedServices: (state: SUSEAIState) => state.settings.selectedServices,
-    selectedInstance: (state: SUSEAIState) => state.settings.selectedInstance,
-    serviceUrl: (state: SUSEAIState) => state.settings.serviceUrl,
+    availableClusters: (state: SUSEAIState) => state.settings.availableClusters,
+    serviceUrls: (state: SUSEAIState) => state.settings.serviceUrls,
     apps: (state: SUSEAIState) => state.apps.items,
     appsLoading: (state: SUSEAIState) => state.apps.loading,
     appsError: (state: SUSEAIState) => state.apps.error

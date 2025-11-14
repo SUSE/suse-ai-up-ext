@@ -1,378 +1,296 @@
 <template>
-  <!-- Discovery Wizard - shown when authenticated but no instances discovered yet -->
-  <APIDiscoveryWizard
-    v-if="showDiscoveryWizard"
-    @complete="onDiscoveryComplete"
-    @install-new="onInstallNew"
-  />
+  <div class="home-container">
+    <!-- Experimental Banner -->
+    <div class="experimental-banner">
+      <span class="banner-icon">!</span>
+      <strong>Experimental Feature</strong>
+      <p>This SUSE AI Universal Proxy feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
+    </div>
 
-  <!-- Service Selection Wizard - shown when user connects to a discovered instance -->
-  <!-- <ServiceSelectionWizard
-    v-if="showServiceSelectionWizard"
-    :selected-instance="selectedInstance"
-    @complete="onServiceSelectionComplete"
-    @cancel="onServiceSelectionCancel"
-  /> -->
+    <!-- Step 1: Cluster Selection -->
+    <div v-if="!selectedCluster" class="step cluster-selection">
+      <div class="step-header">
+        <h2>Select Cluster</h2>
+        <p>Choose the Kubernetes cluster where SUSE AI Universal Proxy is running.</p>
+      </div>
+      <div class="step-content">
+        <ClusterSelect v-model="selectedCluster" @update:modelValue="onClusterSelected" />
+      </div>
+    </div>
 
-  <!-- Installation Wizard - shown when authenticated but no proxy installed -->
-  <InstallWizard
-    v-else-if="showInstallWizard"
-    @install-complete="onInstallComplete"
-  />
+    <!-- Step 2: Pod Selection -->
+    <div v-else-if="!selectedPod" class="step pod-selection">
+      <div class="step-header">
+        <h2>Select SUSE AI Proxy Pod</h2>
+        <p>Select the running SUSE AI Universal Proxy pod from cluster <strong>{{ selectedCluster }}</strong>.</p>
+        <button class="btn-secondary back-btn" @click="resetClusterSelection">← Change Cluster</button>
+      </div>
 
-  <!-- Main application - shown when proxy is installed and instances are available -->
-  <div v-else-if="showMainLayout" class="main-layout">
-    <main class="main-content-wrapper">
-      <div class="experimental-banner">
-       <span class="banner-icon">⚠️</span>
-       <strong>Experimental Feature</strong>
-       <p>This SUSE AI Universal Proxy feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
-     </div>
-     <div class="outlet">
-      <header class="fixed-header">
-         <div class="title">
-           <h1 class="m-0" id="page-title">Service Configuration</h1>
-         </div>
-      </header>
+      <div class="step-content">
+        <div v-if="podsLoading" class="loading-section">
+          <Loading />
+          <p>Discovering SUSE AI proxy pods...</p>
+        </div>
 
-      <div class="main-content">
-         <div class="welcome-section">
-           <h2>SUSE AI Universal Proxy is Installed</h2>
-           <p>Your SUSE AI Universal Proxy is running and configured. Use the sidebar menu to access individual services.</p>
+        <div v-else-if="podsError" class="error-section">
+          <Banner color="error">
+            <strong>Pod Discovery Failed</strong>
+            <p>{{ podsError }}</p>
+            <button class="btn btn-sm bg-primary mt-10" @click="retryPodDiscovery">Retry Discovery</button>
+          </Banner>
+        </div>
 
-           <div class="status-summary">
-             <div class="status-item">
-               <h3>Installation Status</h3>
-               <p class="status-success">✅ Proxy Installed</p>
-             </div>
-             <div class="status-item">
-               <h3>Service Discovery</h3>
-               <p class="status-success">✅ Completed</p>
-             </div>
-             <div class="status-item">
-               <h3>Configuration</h3>
-               <p class="status-success">✅ Ready</p>
-             </div>
-           </div>
-         </div>
-       </div>
-     </div>
-    </main>
+        <div v-else-if="discoveredPods.length === 0" class="no-pods-section">
+          <Banner color="warning">
+            <strong>No SUSE AI Proxy Pods Found</strong>
+            <p>No SUSE AI Universal Proxy pods were found in the selected cluster. Please ensure the proxy is installed and running.</p>
+          </Banner>
+        </div>
+
+        <div v-else class="pods-grid">
+          <PodCard
+            v-for="pod in discoveredPods"
+            :key="pod.metadata.name"
+            :pod="pod"
+            @select="onPodSelected"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Pod Info & Service Selection -->
+    <div v-else class="step pod-info">
+      <div class="step-header">
+        <h2>Configure SUSE AI Proxy</h2>
+        <p>Review the selected pod information and configure services.</p>
+        <button class="btn-secondary back-btn" @click="resetPodSelection">← Change Pod</button>
+      </div>
+
+      <div class="step-content">
+        <PodInfoCard v-if="selectedPod" :pod="selectedPod" @save="onPodSave" />
+
+        <div v-if="podSaved" class="service-selection">
+          <div class="service-selection-header">
+            <h3>Configure Services</h3>
+            <p>Select which SUSE AI services to enable for this proxy instance:</p>
+          </div>
+
+          <ServiceSelector
+            v-model="selectedServices"
+            :services="availableServices"
+          />
+
+          <div class="actions">
+            <button
+              class="btn-primary"
+              :disabled="selectedServices.length === 0"
+              @click="onCompleteSetup"
+            >
+              Complete Setup
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref } from 'vue'
-import { useAuth } from '../composables/useAuth'
-// import { useClusterDiscovery } from '../composables/useClusterDiscovery'
-import { useMCPGateway } from '../composables/useMCPGateway'
+import { defineComponent, ref, computed } from 'vue'
+import { useServiceDiscovery } from '../composables/useServiceDiscovery'
 import { useStore } from 'vuex'
-import APIDiscoveryWizard from './components/wizard/APIDiscoveryWizard.vue'
-// import ServiceSelectionWizard from './components/wizard/ServiceSelectionWizard.vue'
-import InstallWizard from '../components/MCPGateway/InstallWizard.vue'
+import ClusterSelect from './components/ClusterSelect.vue'
+import PodCard from './components/PodCard.vue'
+import PodInfoCard from './components/PodInfoCard.vue'
+import ServiceSelector from './components/ServiceSelector.vue'
+import { Banner } from '@rancher/shell/rancher-components/Banner'
+import Loading from '@shell/components/Loading'
+
+interface DetectedPod {
+  metadata: {
+    name: string;
+    namespace: string;
+    annotations?: Record<string, string>;
+  };
+  spec: {
+    containers: Array<{
+      ports?: Array<{
+        containerPort: number;
+        protocol: string;
+      }>;
+    }>;
+  };
+  status: {
+    podIP?: string;
+    hostIP?: string;
+    phase: string;
+    startTime?: string;
+  };
+  primaryIP?: string;
+  clusterIP?: string;
+  externalIPs?: string[];
+}
 
 export default defineComponent({
   name: 'Home',
   components: {
-    APIDiscoveryWizard,
-    // ServiceSelectionWizard,
-    InstallWizard
+    ClusterSelect,
+    PodCard,
+    PodInfoCard,
+    ServiceSelector,
+    Banner,
+    Loading
   },
 
   setup() {
-    const { isAuthenticated, hasAdminPrivileges } = useAuth()
-    // const { hasDiscoveredInstances } = useClusterDiscovery()
-    const hasDiscoveredInstances = ref(false) // Mock for development
-    const { proxyInstalled } = useMCPGateway()
+    const { discoverPodObjects } = useServiceDiscovery()
     const store = useStore()
 
+    // State management
+    const selectedCluster = ref('')
+    const selectedPod = ref<DetectedPod | null>(null)
+    const discoveredPods = ref<DetectedPod[]>([])
+    const podsLoading = ref(false)
+    const podsError = ref('')
+    const podSaved = ref(false)
+    const selectedServices = ref<string[]>([])
+
+    // Available services
+    const availableServices = [
+      {
+        id: 'mcp-gateway',
+        name: 'MCP Gateway',
+        description: 'Model Context Protocol gateway for AI interactions and server management.',
+        iconClass: 'icon icon-server'
+      },
+      {
+        id: 'mcp-registry',
+        name: 'MCP Registry',
+        description: 'Registry for managing MCP connections and installations.',
+        iconClass: 'icon icon-list'
+      },
+      {
+        id: 'virtual-mcp',
+        name: 'Virtual MCP',
+        description: 'Virtual Model Context Protocol servers for enhanced AI interactions.',
+        iconClass: 'icon icon-server'
+      },
+      {
+        id: 'smart-agents',
+        name: 'SmartAgents',
+        description: 'Intelligent agents for automated tasks and workflows.',
+        iconClass: 'icon icon-user'
+      }
+    ]
+
     // Get selected services from store
-    const selectedServices = computed(() => store.getters.selectedServices)
-
-    // Debug logging
-    console.log('Home.vue setup - auth state:', {
-      isAuthenticated: isAuthenticated.value,
-      hasAdminPrivileges: hasAdminPrivileges.value,
-      hasDiscoveredInstances: hasDiscoveredInstances.value,
-      proxyInstalled: proxyInstalled.value
-    })
-
-    // Determine when to show discovery wizard
-    const showDiscoveryWizard = computed(() => {
-      // For now, always show discovery wizard if not proxy installed
-      const result = !proxyInstalled.value
-      console.log('showDiscoveryWizard:', result, { proxyInstalled: proxyInstalled.value })
-      return result
-    })
-
-    // Determine when to show installation wizard
-    const showInstallWizard = computed(() => {
-      const result = isAuthenticated.value &&
-             hasAdminPrivileges.value &&
-             !proxyInstalled.value &&
-             !hasDiscoveredInstances.value
-      console.log('showInstallWizard:', result)
-      return result
-    })
-
-    // Determine when to show main layout
-    const showMainLayout = computed(() => {
-      const result = proxyInstalled.value
-      console.log('showMainLayout:', result)
-      return result
-    })
+    const storedSelectedServices = computed(() => store.getters.selectedServices)
 
     // Event handlers
-    const onDiscoveryComplete = (config: any) => {
-      console.log('Discovery completed with configuration:', config)
-      if (config && config.instance && config.services) {
-        // Store the selected configuration
-        console.log('Selected instance:', config.instance.name, 'Services:', config.services)
+    const onClusterSelected = async (clusterId: string) => {
+      if (!clusterId) return
 
-        // Store selected services in Vuex store
-        store.dispatch('suseai/setSelectedServices', config.services)
+      selectedCluster.value = clusterId
+      podsLoading.value = true
+      podsError.value = ''
 
-        // Store selected instance
-        store.dispatch('suseai/setSelectedInstance', config.instance)
-
-        // Mark proxy as installed since we have a configuration
-        store.dispatch('suseai/setProxyInstalled', true)
-
-        // Store service URL for the selected instance
-        const serviceUrl = `http://${config.instance.externalIPs?.[0] || 'localhost'}:${config.instance.port}`
-        store.dispatch('suseai/setServiceUrl', serviceUrl)
-
-        console.log('Configuration stored in Vuex:', {
-          selectedServices: config.services,
-          proxyInstalled: true,
-          serviceUrl
-        })
+      try {
+        console.log(`Discovering pods in cluster: ${clusterId}`)
+        const pods = await discoverPodObjects(store, clusterId)
+        discoveredPods.value = pods || []
+        console.log(`Found ${discoveredPods.value.length} pods`)
+      } catch (error: any) {
+        console.error('Pod discovery failed:', error)
+        podsError.value = error.message || 'Failed to discover pods'
+        discoveredPods.value = []
+      } finally {
+        podsLoading.value = false
       }
     }
 
-    const onInstallNew = (manualUrl?: string) => {
-      console.log('User chose to install new instance', manualUrl ? `with manual URL: ${manualUrl}` : '')
-      // TODO: Pass manual URL to InstallWizard if provided
+    const onPodSelected = (pod: DetectedPod) => {
+      selectedPod.value = pod
+      console.log('Selected pod:', pod)
     }
 
-    const onInstallComplete = () => {
-      console.log('Installation completed')
+    const onPodSave = () => {
+      podSaved.value = true
+      // Initialize selected services from store or empty array
+      selectedServices.value = [...storedSelectedServices.value]
+      console.log('Pod saved, showing service selection')
+    }
+
+    const onCompleteSetup = () => {
+      if (selectedServices.value.length === 0) {
+        console.warn('No services selected')
+        return
+      }
+
+      // Store configuration in Vuex
+      store.dispatch('suseai/setSelectedServices', selectedServices.value)
+      store.dispatch('suseai/setSelectedCluster', selectedCluster.value)
+      store.dispatch('suseai/setSelectedPod', selectedPod.value)
+      store.dispatch('suseai/setProxyInstalled', true)
+
+      // Generate service URL from pod info
+      const serviceUrl = `http://${selectedPod.value!.primaryIP || selectedPod.value!.clusterIP}:8911`
+      store.dispatch('suseai/setServiceUrls', [serviceUrl])
+
+      console.log('Setup completed:', {
+        cluster: selectedCluster.value,
+        pod: selectedPod.value,
+        services: selectedServices.value,
+        serviceUrl
+      })
+
+      // TODO: Navigate to main application or show success message
+    }
+
+    const resetClusterSelection = () => {
+      selectedCluster.value = ''
+      selectedPod.value = null
+      discoveredPods.value = []
+      podsError.value = ''
+      podSaved.value = false
+      selectedServices.value = []
+    }
+
+    const resetPodSelection = () => {
+      selectedPod.value = null
+      podSaved.value = false
+      selectedServices.value = []
+    }
+
+    const retryPodDiscovery = () => {
+      onClusterSelected(selectedCluster.value)
     }
 
     return {
-      isAuthenticated,
-      hasAdminPrivileges,
-      hasDiscoveredInstances,
-      proxyInstalled,
+      selectedCluster,
+      selectedPod,
+      discoveredPods,
+      podsLoading,
+      podsError,
+      podSaved,
       selectedServices,
-      showDiscoveryWizard,
-      showInstallWizard,
-      showMainLayout,
-      onDiscoveryComplete,
-      onInstallNew,
-      onInstallComplete
+      availableServices,
+      onClusterSelected,
+      onPodSelected,
+      onPodSave,
+      onCompleteSetup,
+      resetClusterSelection,
+      resetPodSelection,
+      retryPodDiscovery
     }
   }
 })
 </script>
 
 <style scoped>
-.main-layout {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.outlet {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.fixed-header {
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--header-border);
-  padding: 16px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  flex-shrink: 0;
-  z-index: 10;
-}
-
-.title h1 {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--header-text);
-  margin: 0;
-}
-
-.main-content {
-  flex: 1;
-  padding: 24px;
-  overflow-y: auto;
-  background: var(--body-bg);
-}
-
-.welcome-section {
-  max-width: 800px;
+.home-container {
+  max-width: 1200px;
   margin: 0 auto;
-}
-
-.welcome-section h2 {
-  font-size: 28px;
-  font-weight: 600;
-  color: var(--body-text);
-  margin-bottom: 16px;
-  text-align: center;
-}
-
-.welcome-section > p {
-  font-size: 16px;
-  color: var(--muted);
-  line-height: 1.5;
-  margin-bottom: 32px;
-  text-align: center;
-}
-
-.services-selection {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.service-option {
-  background: var(--card-bg, var(--body-bg));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 20px;
-  transition: all 0.2s ease;
-}
-
-.service-option:hover {
-  border-color: var(--primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.service-checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  cursor: pointer;
-  width: 100%;
-}
-
-.service-checkbox input[type="checkbox"] {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.checkmark {
-  width: 24px;
-  height: 24px;
-  border: 2px solid var(--border);
-  border-radius: 4px;
-  background: var(--body-bg);
-  position: relative;
-  flex-shrink: 0;
-  margin-top: 2px;
-  transition: all 0.2s ease;
-}
-
-.service-checkbox input[type="checkbox"]:checked ~ .checkmark {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.service-checkbox input[type="checkbox"]:checked ~ .checkmark::after {
-  content: '';
-  position: absolute;
-  left: 7px;
-  top: 3px;
-  width: 6px;
-  height: 10px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-.service-info h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--body-text);
-  margin: 0 0 8px 0;
-}
-
-.service-info p {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.4;
-  margin: 0;
-}
-
-.selection-summary {
-  background: var(--card-bg, var(--body-bg));
-  border: 1px solid var(--border);
-  border-radius: 8px;
   padding: 24px;
-  text-align: left;
-}
-
-.selection-summary h3 {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--body-text);
-  margin: 0 0 16px 0;
-}
-
-.selection-summary ul {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 16px 0;
-}
-
-.selection-summary li {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.1));
-  color: var(--body-text);
-  font-size: 14px;
-}
-
-.selection-summary li:last-child {
-  border-bottom: none;
-}
-
-.info-text {
-  font-size: 14px;
-  color: var(--muted);
-  font-style: italic;
-  margin: 0;
-}
-
-/* Blank page for when proxy not installed */
-.blank-page {
-  text-align: center;
-  padding: 50px;
-  font-size: 18px;
-  color: #666;
-}
-
-/* Utility classes */
-.mr-5 {
-  margin-right: 5px;
-}
-
-.icon-spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 /* Experimental Banner */
@@ -381,7 +299,7 @@ export default defineComponent({
   border: 1px solid #ffeaa7;
   border-radius: 4px;
   padding: 12px 16px;
-  margin: 16px 24px 0;
+  margin-bottom: 24px;
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -413,41 +331,158 @@ export default defineComponent({
   color: #b02a5b;
 }
 
-/* Status Summary Styles */
-.status-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-top: 32px;
-}
-
-.status-item {
-  background: var(--card-bg, var(--body-bg));
+/* Step Styles */
+.step {
+  background: var(--card-bg, #fff);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 20px;
-  text-align: center;
+  padding: 24px;
+  margin-bottom: 24px;
 }
 
-.status-item h3 {
-  font-size: 16px;
+.step-header {
+  margin-bottom: 24px;
+}
+
+.step-header h2 {
+  font-size: 24px;
   font-weight: 600;
   color: var(--body-text);
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
 }
 
-.status-item p {
-  font-size: 14px;
-  margin: 0;
+.step-header p {
+  font-size: 16px;
   color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 16px 0;
 }
 
-.status-success {
-  color: var(--success, #28a745) !important;
+.back-btn {
+  font-size: 14px;
+  padding: 6px 12px;
+  margin-top: 8px;
+}
+
+.step-content {
+  max-width: 800px;
+}
+
+/* Loading Section */
+.loading-section {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+/* Error Section */
+.error-section {
+  margin-bottom: 20px;
+}
+
+/* No Pods Section */
+.no-pods-section {
+  margin-bottom: 20px;
+}
+
+/* Pods Grid */
+.pods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+/* Service Selection */
+.service-selection {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-light, rgba(0,0,0,0.1));
+}
+
+.service-selection-header {
+  margin-bottom: 20px;
+}
+
+.service-selection-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--body-text);
+  margin: 0 0 8px 0;
+}
+
+.service-selection-header p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Actions */
+.actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Button Styles */
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
   font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.main-content-wrapper {
-  flex: 1;
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover, darken(var(--primary), 10%));
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--secondary-bg, #f8f9fa);
+  color: var(--secondary-text, #495057);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--secondary-hover, #e9ecef);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .home-container {
+    padding: 16px;
+  }
+
+  .step {
+    padding: 16px;
+  }
+
+  .pods-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+  }
 }
 </style>
