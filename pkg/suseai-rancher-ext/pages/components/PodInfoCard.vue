@@ -1,5 +1,5 @@
 <template>
-  <div class="pod-info-card">
+  <div class="pod-info-card" :class="{ selected: isSelected }" @click="onCardClick">
     <div class="card-header">
       <div class="pod-icon">
         <i class="icon icon-server"></i>
@@ -8,64 +8,42 @@
         <h3>{{ pod.metadata.name }}</h3>
         <p>Namespace: {{ pod.metadata.namespace }}</p>
       </div>
-      <div class="pod-status">
-        <span :class="getStatusClass(pod.status)">
-          {{ getStatusText(pod.status) }}
-        </span>
+      <div class="card-actions-top">
+        <div class="pod-status">
+          <span :class="getStatusClass(pod.status)">
+            {{ getStatusText(pod.status) }}
+          </span>
+        </div>
+        <div class="selection-indicator">
+          <input
+            type="radio"
+            :id="`pod-${pod.metadata.name}`"
+            :checked="isSelected"
+            class="radio-input"
+            readonly
+          />
+          <label :for="`pod-${pod.metadata.name}`" class="radio-label">
+            <span class="radio-checkmark"></span>
+          </label>
+        </div>
       </div>
     </div>
 
     <div class="card-content">
       <div class="info-section">
-        <h4>Pod Information</h4>
-        <div class="info-grid">
-          <div class="info-item">
-            <strong>Phase:</strong> {{ pod.status?.phase || 'Unknown' }}
-          </div>
-          <div class="info-item">
-            <strong>Pod IP:</strong> {{ pod.status?.podIP || 'N/A' }}
-          </div>
-          <div class="info-item">
-            <strong>Host IP:</strong> {{ pod.status?.hostIP || 'N/A' }}
-          </div>
-          <div class="info-item">
-            <strong>Start Time:</strong> {{ formatStartTime(pod.status?.startTime) }}
-          </div>
-        </div>
-      </div>
-
-      <div class="info-section">
-        <h4>Containers</h4>
-        <div v-if="pod.spec?.containers?.length" class="containers-list">
-          <div
-            v-for="container in pod.spec.containers"
-            :key="container.name"
-            class="container-item"
-          >
-            <div class="container-header">
-              <strong>{{ container.name }}</strong>
-              <span class="container-image">{{ container.image }}</span>
-            </div>
-            <div v-if="container.ports?.length" class="container-ports">
-              <small>Ports: {{ formatPorts(container.ports) }}</small>
-            </div>
-          </div>
-        </div>
-        <div v-else class="no-containers">
-          No containers found
-        </div>
-      </div>
-
-      <div class="info-section">
         <h4>Service Endpoints</h4>
         <div class="endpoints-info">
           <div class="endpoint-item">
             <strong>Primary Endpoint:</strong>
-            <span>{{ pod.primaryIP ? `http://${pod.primaryIP}:8911` : 'N/A' }}</span>
+            <span>{{ getPrimaryEndpoint() }}</span>
           </div>
           <div class="endpoint-item">
             <strong>Health Check:</strong>
-            <span>{{ pod.primaryIP ? `http://${pod.primaryIP}:8911/health` : 'N/A' }}</span>
+            <span>{{ getHealthCheckEndpoint() }}</span>
+          </div>
+          <div class="endpoint-item">
+            <strong>API Documentation:</strong>
+            <a :href="getApiDocsUrl()" target="_blank" class="endpoint-link">{{ getApiDocsDisplay() }}</a>
           </div>
           <div class="endpoint-item">
             <strong>Cluster IP:</strong>
@@ -77,12 +55,6 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="card-actions">
-      <button class="btn-primary" @click="onSave">
-        Save & Configure Services
-      </button>
     </div>
   </div>
 </template>
@@ -97,12 +69,6 @@ interface Pod {
   }
   status?: {
     phase?: string
-    podIP?: string
-    hostIP?: string
-    startTime?: string
-  }
-  spec?: {
-    containers?: any[]
   }
   primaryIP?: string
   clusterIP?: string
@@ -118,9 +84,17 @@ export default defineComponent({
     }
   },
   emits: ['save'],
+  data() {
+    return {
+      isSelected: false
+    }
+  },
   methods: {
-    onSave() {
-      this.$emit('save')
+    onCardClick() {
+      if (!this.isSelected) {
+        this.isSelected = true
+        this.$emit('save')
+      }
     },
 
     getStatusClass(status: any): string {
@@ -143,18 +117,32 @@ export default defineComponent({
       return phase || 'Unknown'
     },
 
-    formatStartTime(startTime: string | undefined): string {
-      if (!startTime) return 'N/A'
-      try {
-        return new Date(startTime).toLocaleString()
-      } catch {
-        return startTime
-      }
+    getPrimaryEndpoint(): string {
+      const externalIP = this.pod.externalIPs?.[0]
+      const primaryIP = this.pod.primaryIP || this.pod.clusterIP
+      const ip = externalIP || primaryIP
+      return ip ? `http://${ip}:8911` : 'N/A'
     },
 
-    formatPorts(ports: any[]): string {
-      if (!ports || ports.length === 0) return 'None'
-      return ports.map(port => `${port.containerPort}/${port.protocol || 'TCP'}`).join(', ')
+    getHealthCheckEndpoint(): string {
+      const externalIP = this.pod.externalIPs?.[0]
+      const primaryIP = this.pod.primaryIP || this.pod.clusterIP
+      const ip = externalIP || primaryIP
+      return ip ? `http://${ip}:8911/health` : 'N/A'
+    },
+
+    getApiDocsUrl(): string {
+      const externalIP = this.pod.externalIPs?.[0]
+      const primaryIP = this.pod.primaryIP || this.pod.clusterIP
+      const ip = externalIP || primaryIP
+      return ip ? `http://${ip}:8911/docs/index.html` : '#'
+    },
+
+    getApiDocsDisplay(): string {
+      const externalIP = this.pod.externalIPs?.[0]
+      const primaryIP = this.pod.primaryIP || this.pod.clusterIP
+      const ip = externalIP || primaryIP
+      return ip ? `http://${ip}:8911/docs` : 'N/A'
     }
   }
 })
@@ -166,6 +154,18 @@ export default defineComponent({
   border-radius: 8px;
   background: var(--card-bg);
   overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pod-info-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.pod-info-card.selected {
+  border-color: var(--primary);
+  background: var(--primary-light, rgba(0, 123, 255, 0.05));
 }
 
 .card-header {
@@ -183,6 +183,10 @@ export default defineComponent({
   min-width: 32px;
 }
 
+.pod-info {
+  flex: 1;
+}
+
 .pod-info h3 {
   margin: 0 0 4px 0;
   font-size: 20px;
@@ -197,7 +201,13 @@ export default defineComponent({
 }
 
 .pod-status {
-  margin-left: auto;
+  margin-right: 12px;
+}
+
+.card-actions-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .pod-status span {
@@ -227,6 +237,47 @@ export default defineComponent({
   color: var(--muted, #6c757d);
 }
 
+.selection-indicator {
+  /* No positioning needed - part of flex layout */
+}
+
+.radio-input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.radio-checkmark {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.radio-input:checked + .radio-label .radio-checkmark {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.radio-input:checked + .radio-label .radio-checkmark::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+}
+
 .card-content {
   padding: 20px;
 }
@@ -246,57 +297,6 @@ export default defineComponent({
 
 .info-section:last-child {
   margin-bottom: 0;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.info-item {
-  font-size: 14px;
-  color: var(--body-text);
-}
-
-.info-item strong {
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.containers-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.container-item {
-  padding: 12px;
-  background: var(--body-bg, #f8f9fa);
-  border: 1px solid var(--border-light, rgba(0,0,0,0.1));
-  border-radius: 4px;
-}
-
-.container-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 4px;
-}
-
-.container-header strong {
-  font-size: 14px;
-  color: var(--body-text);
-}
-
-.container-image {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: normal;
-}
-
-.container-ports {
-  color: var(--muted);
 }
 
 .endpoints-info {
@@ -326,33 +326,24 @@ export default defineComponent({
   font-size: 13px;
 }
 
-.no-containers {
-  color: var(--muted);
-  font-style: italic;
-}
-
-.card-actions {
-  padding: 20px;
-  border-top: 1px solid var(--border-light, rgba(0,0,0,0.1));
-  text-align: center;
-  background: var(--accent-bg, rgba(0, 123, 255, 0.02));
-}
-
-.btn-primary {
-  background: var(--primary);
-  color: white;
-  border: 1px solid var(--primary);
-  border-radius: 4px;
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
+.endpoint-link {
+  color: var(--primary, #007bff);
+  text-decoration: none;
+  font-family: monospace;
+  background: var(--body-bg, #f8f9fa);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 13px;
   transition: all 0.2s ease;
 }
 
-.btn-primary:hover {
-  background: var(--primary-hover, darken(var(--primary), 10%));
+.endpoint-link:hover {
+  color: var(--primary-hover, #0056b3);
+  text-decoration: underline;
+  background: var(--accent-bg, rgba(0, 123, 255, 0.1));
 }
+
+
 
 /* Responsive */
 @media (max-width: 768px) {

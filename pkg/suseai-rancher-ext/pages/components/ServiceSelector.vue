@@ -17,9 +17,16 @@
             <p>{{ service.description }}</p>
           </div>
           <div class="selection-indicator">
-            <div v-if="isSelected(service.id)" class="checkmark">
-              <i class="icon icon-checkmark"></i>
-            </div>
+            <input
+              type="radio"
+              :id="`service-${service.id}`"
+              :checked="isSelected(service.id)"
+              class="radio-input"
+              readonly
+            />
+            <label :for="`service-${service.id}`" class="radio-label">
+              <span class="radio-checkmark"></span>
+            </label>
           </div>
         </div>
       </div>
@@ -133,6 +140,74 @@ export default defineComponent({
   align-items: flex-start;
   padding: 16px;
   gap: 12px;
+  position: relative;
+}
+
+.service-icon {
+  font-size: 24px;
+  color: var(--primary);
+  min-width: 24px;
+}
+
+.service-info {
+  flex: 1;
+}
+
+.service-info h4 {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.service-info p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.selection-indicator {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.radio-input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.radio-checkmark {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.radio-input:checked + .radio-label .radio-checkmark {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.radio-input:checked + .radio-label .radio-checkmark::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
 }
 
 .service-icon {
@@ -160,21 +235,26 @@ export default defineComponent({
   line-height: 1.4;
 }
 
-.selection-indicator {
-  margin-left: auto;
-  margin-top: 2px;
+.card-actions {
+  padding: 16px;
+  text-align: center;
+  border-top: 1px solid var(--border-light, rgba(0,0,0,0.1));
 }
 
-.checkmark {
-  width: 24px;
-  height: 24px;
-  background: var(--primary);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.btn-secondary {
+  background: var(--secondary-bg, #6c757d);
   color: white;
+  border: 1px solid var(--secondary-bg, #6c757d);
+  border-radius: 4px;
+  padding: 8px 16px;
   font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--secondary-hover, #5a6268);
 }
 
 .selection-summary {

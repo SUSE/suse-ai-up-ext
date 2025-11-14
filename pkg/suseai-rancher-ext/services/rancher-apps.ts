@@ -5,7 +5,21 @@ export class RancherAppsService {
 }
 
 export function discoverExistingInstall(store: any, slug: string, chartName: string, cluster: string): Promise<any> { return Promise.resolve(null); }
-export function getClusters(store: any): Promise<any[]> { return Promise.resolve([]); }
+export async function getClusters(store: any): Promise<any[]> {
+  try {
+    const response = await store.dispatch('rancher/request', {
+      url: '/v3/clusters',
+      method: 'GET'
+    });
+
+    // Handle different response structures
+    const clusters = response?.data || response || [];
+    return Array.isArray(clusters) ? clusters : [];
+  } catch (error: any) {
+    console.error('Failed to fetch clusters:', error);
+    throw new Error(`Failed to fetch clusters: ${error?.message || 'Unknown error'}`);
+  }
+}
 export function listCatalogApps(store: any, clusterId: string): Promise<any[]> { return Promise.resolve([]); }
 export function getInstalledAppDetails(store: any, cluster: string, namespace: string, release: string): Promise<any> { return Promise.resolve(null); }
 export function deleteApp(store: any, clusterId: string, namespace: string, releaseName: string): Promise<void> { return Promise.resolve(); }

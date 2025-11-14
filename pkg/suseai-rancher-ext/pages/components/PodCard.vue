@@ -5,7 +5,7 @@
         <i class="icon icon-server"></i>
       </div>
       <div class="pod-info">
-        <h4>{{ pod.metadata.name }}</h4>
+        <h4>SUSE AI Universal Proxy</h4>
         <p>{{ pod.metadata.namespace }}</p>
       </div>
       <div class="pod-status">
