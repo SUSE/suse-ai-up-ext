@@ -233,10 +233,11 @@ export function useServiceDiscovery() {
           );
           const podName = pod.metadata?.name || 'unknown';
           const podNamespace = pod.metadata?.namespace || 'unknown';
+          const isSuseAIPod = podName.startsWith('suse-ai-up');
 
-          console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: port=${hasCorrectPort}`);
+          console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: port=${hasCorrectPort}, name=${isSuseAIPod}`);
 
-          return hasCorrectPort;
+          return hasCorrectPort && isSuseAIPod;
         });
 
        logger.info(`Found ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`)
