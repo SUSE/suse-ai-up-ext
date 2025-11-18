@@ -10,11 +10,7 @@ interface SUSEAIState {
     selectedCluster: string;
     selectedPod: any;
   };
-  apps: {
-    items: any[];
-    loading: boolean;
-    error: string | null;
-  };
+
 }
 
 const SETTINGS_KEY = 'suseai-settings';
@@ -39,11 +35,7 @@ export default {
         selectedCluster: persistedSettings.selectedCluster || '',
         selectedPod: persistedSettings.selectedPod || null
       },
-      apps: {
-        items: [],
-        loading: false,
-        error: null
-      }
+
     };
   },
 
@@ -78,17 +70,7 @@ export default {
        persistSave(SETTINGS_KEY, state.settings);
      },
 
-    SET_APPS_LOADING(state: SUSEAIState, loading: boolean) {
-      state.apps.loading = loading;
-    },
 
-    SET_APPS_ERROR(state: SUSEAIState, error: string | null) {
-      state.apps.error = error;
-    },
-
-    SET_APPS_ITEMS(state: SUSEAIState, items: any[]) {
-      state.apps.items = items;
-    }
   },
 
   actions: {
@@ -116,26 +98,7 @@ export default {
        commit('SET_SELECTED_POD', pod);
      },
 
-    async fetchAllApps({ commit }: any, { clusterId }: { clusterId: string }) {
-      try {
-        commit('SET_APPS_LOADING', true);
-        commit('SET_APPS_ERROR', null);
 
-        // TODO: Implement actual API call
-        const apps: any[] = [];
-
-        commit('SET_APPS_ITEMS', apps);
-      } catch (error: any) {
-        commit('SET_APPS_ERROR', error instanceof Error ? error.message : 'Failed to fetch apps');
-      } finally {
-        commit('SET_APPS_LOADING', false);
-      }
-    },
-
-    async discoverInstallations({ commit }: any) {
-      // TODO: Implement installation discovery
-      console.log('Discovering installations...');
-    }
   },
 
   getters: {
@@ -143,8 +106,6 @@ export default {
     selectedServices: (state: SUSEAIState) => state.settings.selectedServices,
     availableClusters: (state: SUSEAIState) => state.settings.availableClusters,
     serviceUrls: (state: SUSEAIState) => state.settings.serviceUrls,
-    apps: (state: SUSEAIState) => state.apps.items,
-    appsLoading: (state: SUSEAIState) => state.apps.loading,
-    appsError: (state: SUSEAIState) => state.apps.error
+
   }
 };

@@ -142,3 +142,4 @@ vite.config.ts.timestamp-*
 /dist-pkg
 /dist-pkg/suseai-rancher-ext-0.1.0
 /dist-pkg/suseai-rancher-ext-0.1.0
+GEMINI.md
