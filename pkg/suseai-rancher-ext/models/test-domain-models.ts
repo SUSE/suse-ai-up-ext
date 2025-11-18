@@ -3,67 +3,13 @@
  * This file can be run to verify that our domain models work correctly
  */
 
-import AppResource, { AppResourceData } from './app/app-resource';
+
 import ClusterResource, { ClusterResourceData } from './cluster/cluster-resource';
 import ChartResource, { ChartResourceData } from './chart/chart-resource';
 import { ChartValuesProcessor } from './chart/chart-values';
 import { InstallationInfo } from './base/resource-mixin';
 
-/**
- * Test AppResource functionality
- */
-function testAppResource() {
-  console.log('=== Testing AppResource ===');
-  
-  const appData: AppResourceData = {
-    slug_name: 'test-app',
-    name: 'Test Application',
-    logo_url: 'https://example.com/logo.png',
-    project_url: 'https://example.com/project',
-    packaging_format: 'HELM_CHART',
-    last_updated_at: '2023-12-01T00:00:00Z',
-    installations: [
-      {
-        clusterId: 'local',
-        namespace: 'default',
-        releaseName: 'test-app-release',
-        status: 'deployed',
-        version: '1.0.0',
-        lastDeployed: '2023-12-01T00:00:00Z'
-      } as InstallationInfo
-    ]
-  };
 
-  const app = new AppResource(appData);
-  
-  // Test computed properties
-  console.log('✓ App ID:', app.id);
-  console.log('✓ App Name:', app.name);
-  console.log('✓ Display Name:', app.displayName);
-  console.log('✓ Is Installed:', app.isInstalled);
-  console.log('✓ Is Running:', app.isRunning);
-  console.log('✓ State Display:', app.stateDisplay);
-  console.log('✓ State Color:', app.stateColor);
-  console.log('✓ Health Status:', app.healthStatus);
-  console.log('✓ Installation Count:', app.installationCount);
-  console.log('✓ Installed Clusters:', app.installedClusters);
-  
-  // Test action permissions
-  console.log('✓ Can Install:', app.canInstall);
-  console.log('✓ Can Manage:', app.canManage);
-  console.log('✓ Can Upgrade:', app.canUpgrade);
-  console.log('✓ Can Uninstall:', app.canUninstall);
-  
-  // Test available actions
-  const actions = app.availableActions;
-  console.log('✓ Available Actions:', actions.map(a => a.label).join(', '));
-  
-  // Test cluster tracking
-  console.log('✓ Is Installed on local:', app.isInstalledOnCluster('local'));
-  console.log('✓ Is Multi-Cluster:', app.isMultiCluster);
-  
-  console.log('AppResource tests completed successfully!\n');
-}
 
 /**
  * Test ClusterResource functionality  
@@ -272,7 +218,7 @@ export function runDomainModelTests() {
   console.log('🧪 Starting Domain Model Tests...\n');
   
   try {
-    testAppResource();
+
     testClusterResource();
     testChartResource();
     testChartValues();
