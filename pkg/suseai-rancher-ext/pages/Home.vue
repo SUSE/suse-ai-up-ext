@@ -525,6 +525,7 @@ export default defineComponent({
       onCompleteSetup,
       resetClusterSelection,
       resetPodSelection,
+      retryPodDiscovery,
       retryClusterDiscovery,
       editConfiguration,
       getSelectedClusterName,

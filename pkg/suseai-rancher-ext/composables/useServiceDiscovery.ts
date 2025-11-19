@@ -51,23 +51,23 @@ export function useServiceDiscovery() {
   const detectedServices = ref<DetectedService[]>([]);
   const error = ref<string | null>(null);
 
-    /**
-     * Query SUSE AI pods in the suse-ai-up namespace
-     */
+     /**
+      * Query SUSE AI pods across all namespaces
+      */
      const querySUSEAIPods = async (store: any, clusterId: string): Promise<KubernetesPod[]> => {
        try {
-         console.log(`🚀 [ServiceDiscovery] Querying SUSE AI pods in cluster: ${clusterId}`);
-         console.log(`📡 [ServiceDiscovery] API URL: /k8s/clusters/${clusterId}/api/v1/namespaces/suse-ai-up/pods`);
+         console.log(`🚀 [ServiceDiscovery] Querying SUSE AI pods across all namespaces in cluster: ${clusterId}`);
+         console.log(`📡 [ServiceDiscovery] API URL: /k8s/clusters/${clusterId}/api/v1/pods`);
 
          let response;
          try {
            response = await store.dispatch('rancher/request', {
-             url: `/k8s/clusters/${clusterId}/api/v1/namespaces/suse-ai-up/pods`,
+             url: `/k8s/clusters/${clusterId}/api/v1/pods`,
              method: 'GET'
            });
-           console.log(`✅ [ServiceDiscovery] API call succeeded for cluster ${clusterId}`);
+           console.log(`✅ [ServiceDiscovery] Pods list API call succeeded for cluster ${clusterId}`);
          } catch (apiError: any) {
-           console.error(`❌ [ServiceDiscovery] API call failed for cluster ${clusterId}:`, apiError);
+           console.error(`❌ [ServiceDiscovery] Pods list API call failed for cluster ${clusterId}:`, apiError);
            console.error(`❌ [ServiceDiscovery] Error details:`, {
              message: apiError?.message,
              status: apiError?.status,
@@ -77,7 +77,7 @@ export function useServiceDiscovery() {
            throw apiError;
          }
 
-         console.log('🔍 [ServiceDiscovery] Kubernetes services response structure:', {
+         console.log('🔍 [ServiceDiscovery] Kubernetes pods response structure:', {
            hasData: !!response?.data,
            dataType: typeof response?.data,
            hasItems: !!response?.items,
@@ -87,13 +87,29 @@ export function useServiceDiscovery() {
          });
 
         // Handle different response structures (following AppWizard.vue pattern)
-        const items = response?.data?.items || response?.data || response?.items || [];
-        console.log(`📊 [ServiceDiscovery] Extracted ${items.length} items from response`);
+        const allPods = response?.data?.items || response?.data || response?.items || [];
+        console.log(`📊 [ServiceDiscovery] Extracted ${allPods.length} pods from response`);
 
-        logger.info(`Found ${items.length} services in cluster ${clusterId}`);
-        return items;
+        // Filter for SUSE AI UP pods (name starts with 'suse-ai-up' and has port 8911)
+        const suseAIPods = allPods.filter((pod: any) => {
+          const podName = pod.metadata?.name || '';
+          const hasCorrectPort = pod.spec?.containers?.some((container: any) =>
+            container.ports?.some((port: any) => port.containerPort === 8911)
+          );
+          const isSuseAIPod = podName.startsWith('suse-ai-up');
+          
+          if (isSuseAIPod) {
+            console.log(`🔍 [ServiceDiscovery] Checking pod ${podName}: port=${hasCorrectPort}, name=${isSuseAIPod}`);
+          }
+          
+          return hasCorrectPort && isSuseAIPod;
+        });
+
+        console.log(`🎯 [ServiceDiscovery] Found ${suseAIPods.length} SUSE AI UP pods out of ${allPods.length} total pods`);
+        logger.info(`Found ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`);
+        return suseAIPods;
       } catch (err: any) {
-        logger.error('Failed to query Kubernetes services:', err);
+        logger.error('Failed to query Kubernetes pods:', err);
         logger.error('Error details:', {
           message: err?.message,
           status: err?.status,
@@ -103,6 +119,95 @@ export function useServiceDiscovery() {
         throw new Error(`Unable to query cluster pods: ${err?.message || 'Unknown error'}`);
       }
     };
+
+   /**
+    * Query SUSE AI UP service across all namespaces
+    */
+   const querySUSEAIService = async (store: any, clusterId: string): Promise<any> => {
+     try {
+       console.log(`🚀 [ServiceDiscovery] Querying SUSE AI UP services across all namespaces in cluster: ${clusterId}`);
+       console.log(`📡 [ServiceDiscovery] API URL: /k8s/clusters/${clusterId}/v1/services`);
+
+       let response;
+       try {
+         response = await store.dispatch('rancher/request', {
+           url: `/k8s/clusters/${clusterId}/v1/services`,
+           method: 'GET'
+         });
+         console.log(`✅ [ServiceDiscovery] Services list API call succeeded for cluster ${clusterId}`);
+       } catch (apiError: any) {
+         console.error(`❌ [ServiceDiscovery] Services list API call failed for cluster ${clusterId}:`, apiError);
+         console.error(`❌ [ServiceDiscovery] Full error details:`, {
+           message: apiError?.message,
+           status: apiError?.status,
+           statusText: apiError?.statusText,
+           response: apiError?.response,
+           responseStatus: apiError?.response?.status,
+           responseText: apiError?.response?.statusText,
+           responseData: apiError?.response?.data
+         });
+         
+         // For any errors, try pod discovery as fallback
+         console.warn(`⚠️ [ServiceDiscovery] Service discovery failed, trying pod discovery as fallback`);
+         return null;
+       }
+
+       const servicesData = response?.data;
+       if (servicesData && servicesData.items) {
+         const services = servicesData.items;
+         console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for suse-ai-up`);
+
+         // Find services named 'suse-ai-up' with port 8911
+         const suseAIServices = services.filter((service: any) => {
+           const serviceName = service.metadata?.name;
+           const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
+           return serviceName === 'suse-ai-up' && hasPort8911;
+         });
+
+         console.log(`🎯 [ServiceDiscovery] Found ${suseAIServices.length} SUSE AI UP services`);
+
+         // Return the first healthy service
+         for (const service of suseAIServices) {
+           const serviceName = service.metadata?.name;
+           const serviceNamespace = service.metadata?.namespace;
+           console.log(`🔍 [ServiceDiscovery] Checking service: ${serviceNamespace}/${serviceName}`);
+
+           // Get the service IP
+           const serviceIP = service.spec?.clusterIP;
+           if (!serviceIP || serviceIP === 'None') {
+             console.warn(`⚠️ [ServiceDiscovery] Service ${serviceNamespace}/${serviceName} found but no cluster IP available`);
+             continue;
+           }
+
+           // Perform health check
+           let isHealthy = false;
+           try {
+             const healthResponse = await fetch(`http://${serviceIP}:8911/health`, {
+               method: 'GET',
+               mode: 'cors',
+               headers: { 'Content-Type': 'application/json' }
+             });
+             isHealthy = healthResponse.ok;
+             console.log(`🏥 [ServiceDiscovery] Service health check for ${serviceNamespace}/${serviceName} (${serviceIP}): ${isHealthy ? 'PASS' : 'FAIL'}`);
+           } catch (error) {
+             console.warn(`⚠️ [ServiceDiscovery] Service health check failed for ${serviceNamespace}/${serviceName} (${serviceIP}):`, error);
+           }
+
+           if (isHealthy) {
+             console.log(`✅ [ServiceDiscovery] Found healthy SUSE AI UP service: ${serviceNamespace}/${serviceName}`);
+             return service;
+           }
+         }
+
+         console.log(`ℹ️ [ServiceDiscovery] No healthy SUSE AI UP services found`);
+       }
+
+       return null;
+     } catch (err: any) {
+       logger.error('Failed to query Kubernetes services:', err);
+       throw new Error(`Unable to query cluster services: ${err?.message || 'Unknown error'}`);
+     }
+   };
 
   /**
    * Query ingresses that point to a specific service
@@ -225,9 +330,9 @@ export function useServiceDiscovery() {
           throw new Error('Invalid response format from Kubernetes API');
         }
 
-        console.log(`✅ [ServiceDiscovery] Found ${pods.length} total pods in suse-ai-up namespace for cluster ${clusterId}`);
-        logger.info(`Found ${pods.length} total pods in suse-ai-up namespace for cluster ${clusterId}`)
-        const suseAIPods = pods.filter(pod => {
+         console.log(`✅ [ServiceDiscovery] Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`);
+         logger.info(`Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`)
+         const suseAIPods = pods.filter(pod => {
           const hasCorrectPort = pod.spec?.containers?.some(container =>
             container.ports?.some((port: any) => port.containerPort === 8911)
           );
@@ -293,100 +398,167 @@ export function useServiceDiscovery() {
 
   /**
    * Discover SUSE AI pods with port 8911 (returns pod objects for UI)
+   * Uses hybrid approach: tries service discovery first, then falls back to pod discovery
    */
   const discoverPodObjects = async (store: any, clusterId: string): Promise<DetectedPod[]> => {
     isLoading.value = true;
     error.value = null;
 
     try {
-      logger.info(`Starting pod object discovery for cluster: ${clusterId}`);
+      logger.info(`Starting hybrid service/pod discovery for cluster: ${clusterId}`);
 
       // Validate cluster ID
       if (!clusterId) {
         throw new Error('No cluster ID provided for pod discovery');
       }
 
-      console.log(`🔍 [ServiceDiscovery] Starting pod object discovery for cluster: ${clusterId}`);
-      const pods = await querySUSEAIPods(store, clusterId);
+      console.log(`🔍 [ServiceDiscovery] Starting hybrid discovery for cluster: ${clusterId}`);
 
-      // Ensure pods is an array
-      if (!Array.isArray(pods)) {
-        console.error(`❌ [ServiceDiscovery] Expected pods to be an array, got:`, typeof pods, pods);
-        logger.error(`Expected pods to be an array, got:`, typeof pods, pods);
-        throw new Error('Invalid response format from Kubernetes API');
-      }
-
-      console.log(`✅ [ServiceDiscovery] Found ${pods.length} total pods in suse-ai-up namespace for cluster ${clusterId}`);
-      logger.info(`Found ${pods.length} total pods in suse-ai-up namespace for cluster ${clusterId}`)
-
-      const suseAIPods = pods.filter(pod => {
-        const hasCorrectPort = pod.spec?.containers?.some(container =>
-          container.ports?.some((port: any) => port.containerPort === 8911)
-        );
-        const podName = pod.metadata?.name || 'unknown';
-        const podNamespace = pod.metadata?.namespace || 'unknown';
-
-        console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: port=${hasCorrectPort}`);
-
-        return hasCorrectPort;
-      });
-
-      logger.info(`Found ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`)
-
-      const detectedPods: DetectedPod[] = [];
-
-      for (const pod of suseAIPods) {
-        try {
-          const podName = pod.metadata?.name || 'unknown';
-          const podNamespace = pod.metadata?.namespace || 'unknown';
-          console.log(`🔍 [ServiceDiscovery] Processing pod: ${podName} in ${podNamespace}`)
-
-          // Extract primary IP from annotations (field.cattle.io/publicEndpoints)
+      // First, try service discovery (like APIDiscoveryWizard)
+      let detectedPods: DetectedPod[] = [];
+      try {
+        const service = await querySUSEAIService(store, clusterId);
+        if (service) {
+          console.log(`✅ [ServiceDiscovery] Service discovery successful, creating pod object from service`);
+          
+          // Extract service information like APIDiscoveryWizard
+          const loadBalancerIP = service.status?.loadBalancer?.ingress?.[0]?.ip;
+          const clusterIP = service.spec?.clusterIP;
+          const externalIPs = service.spec?.externalIPs || [];
+          
+          // Extract public IP from Rancher annotations
           let primaryIP: string | undefined;
-          let clusterIP: string | undefined;
-          let externalIPs: string[] | undefined;
-
-          // Check annotations for public endpoints
-          const annotations = pod.metadata?.annotations || {};
-          const publicEndpointsAnnotation = annotations['field.cattle.io/publicEndpoints'];
-
+          const publicEndpointsAnnotation = service.metadata?.annotations?.['field.cattle.io/publicEndpoints'];
           if (publicEndpointsAnnotation) {
             try {
               const endpoints = JSON.parse(publicEndpointsAnnotation);
               if (Array.isArray(endpoints) && endpoints.length > 0) {
-                // Use the first endpoint's address
-                primaryIP = endpoints[0].addresses?.[0] || endpoints[0].address;
-                console.log(`✅ [ServiceDiscovery] Extracted primary IP from annotations: ${primaryIP}`);
+                primaryIP = endpoints[0]?.addresses?.[0] || '';
+                console.log(`✅ [ServiceDiscovery] Extracted primary IP from service annotations: ${primaryIP}`);
               }
-            } catch (parseError) {
-              console.warn(`⚠️ [ServiceDiscovery] Failed to parse publicEndpoints annotation:`, parseError);
+            } catch (e) {
+              console.warn(`⚠️ [ServiceDiscovery] Failed to parse service public endpoints annotation:`, e);
             }
           }
-
-          // Fallback to pod IP if no annotation
-          if (!primaryIP) {
-            primaryIP = pod.status?.podIP;
-            console.log(`📍 [ServiceDiscovery] Using pod IP as primary IP: ${primaryIP}`);
+          
+          // Determine primary IP (prefer public IP from annotations, fallback to service IPs)
+          primaryIP = primaryIP || loadBalancerIP || clusterIP || externalIPs[0];
+          
+          // Perform health check if we have an IP
+          let isHealthy = false;
+          if (primaryIP) {
+            try {
+              const healthResponse = await fetch(`http://${primaryIP}:8911/health`, {
+                method: 'GET',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              isHealthy = healthResponse.ok;
+              console.log(`🏥 [ServiceDiscovery] Service health check for ${primaryIP}: ${isHealthy ? 'PASS' : 'FAIL'}`);
+            } catch (error) {
+              console.warn(`⚠️ [ServiceDiscovery] Service health check failed for ${primaryIP}:`, error);
+            }
           }
-
-          clusterIP = pod.status?.podIP;
-          if (pod.status?.hostIP) {
-            externalIPs = [pod.status.hostIP];
+          
+          if (isHealthy) {
+            // Create a synthetic pod object from service
+            const syntheticPod: DetectedPod = {
+              metadata: {
+                name: service.metadata?.name || 'suse-ai-up-service',
+                namespace: service.metadata?.namespace || 'suse-ai-up',
+                annotations: service.metadata?.annotations
+              },
+              spec: {
+                containers: [{
+                  ports: [{ containerPort: 8911, protocol: 'TCP' }]
+                }]
+              },
+              status: {
+                podIP: clusterIP,
+                phase: 'Running'
+              },
+              primaryIP,
+              clusterIP,
+              externalIPs: externalIPs.length > 0 ? externalIPs : (primaryIP ? [primaryIP] : undefined)
+            };
+            
+            detectedPods.push(syntheticPod);
+            console.log(`✅ [ServiceDiscovery] Successfully created pod object from service`);
           }
+        }
+      } catch (serviceError: any) {
+        console.warn(`⚠️ [ServiceDiscovery] Service discovery failed, falling back to pod discovery:`, serviceError?.message);
+      }
 
-          const detectedPod: DetectedPod = {
-            ...pod,
-            primaryIP,
-            clusterIP,
-            externalIPs
-          };
+      // If service discovery didn't find anything, try pod discovery
+      if (detectedPods.length === 0) {
+        console.log(`🔄 [ServiceDiscovery] Service discovery found nothing, trying pod discovery`);
+        const pods = await querySUSEAIPods(store, clusterId);
 
-          detectedPods.push(detectedPod);
-          console.log(`✅ [ServiceDiscovery] Added pod ${podName} with primaryIP: ${primaryIP}`);
+        // Ensure pods is an array
+        if (!Array.isArray(pods)) {
+          console.error(`❌ [ServiceDiscovery] Expected pods to be an array, got:`, typeof pods, pods);
+          logger.error(`Expected pods to be an array, got:`, typeof pods, pods);
+          throw new Error('Invalid response format from Kubernetes API');
+        }
 
-        } catch (podError) {
-          console.error(`❌ [ServiceDiscovery] Error processing pod ${pod.metadata?.name}:`, podError);
-          // Continue with other pods even if one fails
+         // Pods are already filtered by querySUSEAIPods to only include SUSE AI UP pods
+         const suseAIPods = pods;
+         logger.info(`Processing ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`)
+
+        for (const pod of suseAIPods) {
+          try {
+            const podName = pod.metadata?.name || 'unknown';
+            const podNamespace = pod.metadata?.namespace || 'unknown';
+            console.log(`🔍 [ServiceDiscovery] Processing pod: ${podName} in ${podNamespace}`)
+
+            // Extract primary IP from annotations (field.cattle.io/publicEndpoints)
+            let primaryIP: string | undefined;
+            let clusterIP: string | undefined;
+            let externalIPs: string[] | undefined;
+
+            // Check annotations for public endpoints
+            const annotations = pod.metadata?.annotations || {};
+            const publicEndpointsAnnotation = annotations['field.cattle.io/publicEndpoints'];
+
+            if (publicEndpointsAnnotation) {
+              try {
+                const endpoints = JSON.parse(publicEndpointsAnnotation);
+                if (Array.isArray(endpoints) && endpoints.length > 0) {
+                  // Use first endpoint's address
+                  primaryIP = endpoints[0].addresses?.[0] || endpoints[0].address;
+                  console.log(`✅ [ServiceDiscovery] Extracted primary IP from annotations: ${primaryIP}`);
+                }
+              } catch (parseError) {
+                console.warn(`⚠️ [ServiceDiscovery] Failed to parse publicEndpoints annotation:`, parseError);
+              }
+            }
+
+            // Fallback to pod IP if no annotation
+            if (!primaryIP) {
+              primaryIP = pod.status?.podIP;
+              console.log(`📍 [ServiceDiscovery] Using pod IP as primary IP: ${primaryIP}`);
+            }
+
+            clusterIP = pod.status?.podIP;
+            if (pod.status?.hostIP) {
+              externalIPs = [pod.status.hostIP];
+            }
+
+            const detectedPod: DetectedPod = {
+              ...pod,
+              primaryIP,
+              clusterIP,
+              externalIPs
+            };
+
+            detectedPods.push(detectedPod);
+            console.log(`✅ [ServiceDiscovery] Added pod ${podName} with primaryIP: ${primaryIP}`);
+
+          } catch (podError) {
+            console.error(`❌ [ServiceDiscovery] Error processing pod ${pod.metadata?.name}:`, podError);
+            // Continue with other pods even if one fails
+          }
         }
       }
 
@@ -404,28 +576,28 @@ export function useServiceDiscovery() {
   /**
      * Check service health by trying to connect to /health endpoint
      */
-  const checkServiceHealth = async (url: string): Promise<boolean> => {
-    try {
-      const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`;
-      console.log(`🔍 [ServiceDiscovery] Checking health at: ${healthUrl}`);
+   const checkServiceHealth = async (url: string): Promise<boolean> => {
+     try {
+       const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`;
+       console.log(`🔍 [ServiceDiscovery] Checking health at: ${healthUrl}`);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+       const controller = new AbortController();
+       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch(healthUrl, {
-        method: 'GET',
-        mode: 'no-cors', // Allow cross-origin requests
-        signal: controller.signal
-      });
+       const response = await fetch(healthUrl, {
+         method: 'GET',
+         mode: 'no-cors', // Allow cross-origin requests
+         signal: controller.signal
+       });
 
-      clearTimeout(timeoutId);
-      console.log(`✅ [ServiceDiscovery] Health check response:`, response);
-      return true; // If we get any response, consider it healthy
-    } catch (error) {
-      console.warn(`⚠️ [ServiceDiscovery] Health check failed for ${url}:`, error);
-      return false;
-    }
-  };
+       clearTimeout(timeoutId);
+       console.log(`✅ [ServiceDiscovery] Health check response:`, response);
+       return true; // If we get any response, consider it healthy
+     } catch (error) {
+       console.warn(`⚠️ [ServiceDiscovery] Health check failed for ${url}:`, error);
+       return false;
+     }
+   };
 
   /**
      * Check if any services were detected
