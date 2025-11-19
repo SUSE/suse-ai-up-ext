@@ -10,7 +10,18 @@ export const getApiBaseUrls = (serviceUrl?: string) => ({
   RANCHER: window.location.origin
 });
 
-export const API_BASE_URLS = getApiBaseUrls();
+// Initialize with default localhost
+let currentApiBaseUrls = getApiBaseUrls();
+
+export const API_BASE_URLS = currentApiBaseUrls;
+
+// Function to update API base URLs dynamically
+export const updateApiBaseUrls = (serviceUrl?: string) => {
+  currentApiBaseUrls = getApiBaseUrls(serviceUrl);
+  // Update the exported object by updating its properties
+  Object.assign(API_BASE_URLS, currentApiBaseUrls);
+  return currentApiBaseUrls;
+};
 
 // API Endpoints for MCP Gateway
 export const MCP_ENDPOINTS = {

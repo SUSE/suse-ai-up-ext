@@ -39,6 +39,9 @@ export const apiClient = axios.create({
 export const updateApiBaseUrl = (newBaseUrl: string) => {
   const cleanUrl = newBaseUrl.replace(/\/$/, ''); // Remove trailing slash
   apiClient.defaults.baseURL = `${cleanUrl}/api/v1`;
+  // Also update global API_BASE_URLS
+  const { updateApiBaseUrls } = require('../config/api-config');
+  updateApiBaseUrls(cleanUrl);
 };
 
 export interface AdapterData {

@@ -23,6 +23,9 @@
         <p>Please return to the main page to install the proxy first.</p>
       </div>
     </div>
+
+    <!-- Schedule Scan Modal -->
+    <ScheduleScanModal ref="scanModal" @scanStarted="onScanStarted" />
   </div>
 </template>
 

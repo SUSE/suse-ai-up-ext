@@ -1,7 +1,7 @@
 import { computed, ref, getCurrentInstance, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useStore } from 'vuex';
 import { logger } from '../utils/logger';
-import { MCPService, type DiscoveredServer, apiClient } from '../services/mcp-service';
+import { MCPService, type DiscoveredServer, apiClient, updateApiBaseUrl } from '../services/mcp-service';
 import type { SecurityFinding } from '../services/security-engine';
 import { tokenService } from '../services/token-service';
 import type {
@@ -765,13 +765,22 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
     }
   });
 
-  // Watch for service selection changes to trigger data loading
-  watch(hasSelectedServices, (newValue) => {
-    if (newValue) {
-      logger.info('Services selected, loading MCP data');
-      loadData();
-    }
-  });
+   // Watch for service selection changes to trigger data loading
+   watch(hasSelectedServices, (newValue) => {
+     if (newValue) {
+       logger.info('Services selected, loading MCP data');
+       loadData();
+     }
+   });
+
+   // Watch for service URL changes to update API base URL
+   watch(() => store.state.suseai.settings.serviceUrls, (newServiceUrls) => {
+     if (newServiceUrls && newServiceUrls.length > 0) {
+       const proxyUrl = newServiceUrls[0]; // Use the first service URL as the proxy URL
+       logger.info('Updating API base URL to discovered proxy:', proxyUrl);
+       updateApiBaseUrl(proxyUrl);
+     }
+   }, { deep: true });
 
   onUnmounted(() => {
     if (pollInterval) {

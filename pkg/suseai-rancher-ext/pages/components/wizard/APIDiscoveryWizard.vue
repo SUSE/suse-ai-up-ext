@@ -1082,6 +1082,15 @@ const retryScan = async () => {
   const handleFinish = () => {
     const currentStepName = wizardSteps.value[currentStep.value]?.name;
 
+    // Store discovered proxy service URLs
+    if (discoveredServices.value.length > 0) {
+      const proxyUrls = discoveredServices.value
+        .map(service => service.primaryIP ? `http://${service.primaryIP}:8911` : null)
+        .filter(url => url !== null) as string[];
+      store.dispatch('suseai/setServiceUrls', proxyUrls);
+      console.log('Stored proxy service URLs:', proxyUrls);
+    }
+
     if (currentStepName === 'service-selection' && selectedServices.value.length > 0) {
       // Complete configuration with discovered services and selected services
       emit('complete', {
