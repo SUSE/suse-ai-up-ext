@@ -86,40 +86,49 @@
 
                <!-- Server Cards Grid -->
                <div v-if="!isLoading && filteredServers.length" class="tiles-grid">
-                 <div
-                   v-for="server in filteredServers"
-                   :key="server.id"
-                   class="clickable-tile"
-                   @click="onTileClick(server)"
-                   role="button"
-                   tabindex="0"
-                   :aria-label="`View details for ${server.name}`"
-                   @keydown.enter="onTileClick(server)"
-                   @keydown.space.prevent="onTileClick(server)"
-                 >
-                   <div class="tile-header">
-                     <div class="tile-logo-container">
-                         <img
-                           v-if="getServerLogo(server.name, server.iconClass, server.iconurl, server)"
-                           :src="getServerLogo(server.name, server.iconClass, server.iconurl, server)"
-                           :alt="`${server.name} logo`"
-                           class="tile-logo"
-                           @error="handleImageError"
-                         />
-                       <div v-else class="tile-icon">
-                         <i :class="server.iconClass" aria-hidden="true" />
-                       </div>
-                     </div>
-                     <div class="tile-info">
-                        <div class="tile-meta">
-                          <span v-if="server.isCertified" class="badge-certified badge">Certified</span>
-                          <span :class="['badge-state badge', getBadgeClass(server.status)]">{{ formatStatus(server.status) }}</span>
-                          <span class="tile-author">{{ server.author }}</span>
+                  <div
+                    v-for="server in filteredServers"
+                    :key="server.id"
+                    class="clickable-tile"
+                    @click="onTileClick(server)"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="`View details for ${server.name}`"
+                    @keydown.enter="onTileClick(server)"
+                    @keydown.space.prevent="onTileClick(server)"
+                  >
+                    <div class="tile-header">
+                      <div class="tile-logo-container">
+                          <img
+                            v-if="getServerLogo(server.name, server.iconClass, server.iconurl, server)"
+                            :src="getServerLogo(server.name, server.iconClass, server.iconurl, server)"
+                            :alt="`${server.name} logo`"
+                            class="tile-logo"
+                            @error="handleImageError"
+                          />
+                        <div v-else class="tile-icon">
+                          <i :class="server.iconClass" aria-hidden="true" />
                         </div>
-                       <h3 class="tile-title">{{ server.name }}</h3>
-                       <p class="tile-description">{{ server.description }}</p>
-                     </div>
-                   </div>
+                      </div>
+                      <div class="tile-info">
+                         <div class="tile-meta">
+                           <span v-if="server.isCertified" class="badge-certified badge">Certified</span>
+                           <span :class="['badge-state badge', getBadgeClass(server.status)]">{{ formatStatus(server.status) }}</span>
+                           <span class="tile-author">{{ server.author }}</span>
+                         </div>
+                        <h3 class="tile-title">{{ server.name }}</h3>
+                        <p class="tile-description">{{ server.description }}</p>
+                      </div>
+                      <!-- Delete button -->
+                      <button
+                        class="delete-btn"
+                        @click.stop="handleDeleteServer(server.id)"
+                        :aria-label="`Delete ${server.name}`"
+                        title="Delete server"
+                      >
+                        <i class="icon icon-trash" aria-hidden="true" />
+                      </button>
+                    </div>
                     <div class="tile-footer">
                       <div class="tile-actions">
                         <button
@@ -207,7 +216,7 @@
     </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, getCurrentInstance } from 'vue';
+import { defineComponent, ref, computed, onMounted, onUnmounted, getCurrentInstance } from 'vue';
 import { useStore } from 'vuex';
 import { MCPService } from '../services/mcp-service';
 import { persistLoad, persistSave, persistClear } from '../services/ui-persist';
@@ -262,6 +271,8 @@ export default defineComponent({
     const selectedServer = ref<RegistryServer | null>(null);
     const hasPerformedInitialSync = ref(false);
 
+
+
     // Registry management - predefined registries
     const predefinedRegistries = ref<Registry[]>([
       {
@@ -287,6 +298,15 @@ export default defineComponent({
         name: 'Community MCP Registry',
         url: 'https://community-mcp.example.com',
         source: 'community',
+        enabled: true,
+        lastSync: null,
+        serverCount: 0
+      },
+      {
+        id: 'virtual-mcp',
+        name: 'Virtual MCP Registry',
+        url: 'http://localhost:8912/api/v1',
+        source: 'virtual-mcp',
         enabled: true,
         lastSync: null,
         serverCount: 0
@@ -507,15 +527,20 @@ export default defineComponent({
       if (Array.isArray(serverData)) {
         return serverData.map((server: RegistryServer, index: number) => {
           const isAlwaysInstalled = server.name?.toLowerCase().includes('suse') ||
-                                   server.name?.toLowerCase().includes('trento') ||
-                                   server.name?.toLowerCase().includes('uyuni') ||
-                                   server.name?.toLowerCase().includes('rancher');
+                                    server.name?.toLowerCase().includes('trento') ||
+                                    server.name?.toLowerCase().includes('uyuni') ||
+                                    server.name?.toLowerCase().includes('rancher');
+
+          // Check if this is a Virtual MCP server
+          const isVirtualMCP = server.repository?.source === 'virtual-mcp' ||
+                              server.name?.toLowerCase().includes('virtual') ||
+                              server.url?.includes('8912');
 
           return {
             id: server.id,
             name: server.name,
             description: server.description,
-            author: server.repository?.source || 'Unknown',
+            author: isVirtualMCP ? 'SUSE Virtual MCP' : (server.repository?.source || 'Unknown'),
             stars: Math.floor(Math.random() * 10000) + 1000, // Could be removed or fetched from API
             iconClass: server.name?.toLowerCase().includes('suse') ? 'suse-logo' : (server.repository?.source === 'docker' ? 'docker-logo' : 'icon icon-server'),
             iconurl: server.iconurl, // Add iconurl from server data
@@ -531,7 +556,8 @@ export default defineComponent({
             availabilityStatus: 'unknown', // New: online, offline, unknown
             securityScanStatus: 'not-scanned', // New: not-scanned, running, completed, failed
             lastSecurityScanId: null, // New: scan ID for tracking
-            rawData: server // Keep original data for view modal
+            rawData: server, // Keep original data for view modal
+            isCertified: isVirtualMCP // Virtual MCP servers are always certified
           };
         });
       }
@@ -567,14 +593,14 @@ export default defineComponent({
       const certifiedServer = certifiedScenarios.value.find(s => s.id === serverId);
 
       if (certifiedServer) {
-        // Create adapter for other certified scenarios
+        // Create adapter for certified scenarios using their configuration
         try {
           const adapterData = {
             name: `${certifiedServer.id.replace('certified-', '')}-mcp`,
             imageName: `mcp-${certifiedServer.id.replace('certified-', '')}-adapter`,
             imageVersion: '1.0.0',
             description: certifiedServer.description,
-            connectionType: 'LocalStdio' as const,
+            connectionType: certifiedServer.adapterConfig.connectionType,
             protocol: 'MCP' as const,
             replicaCount: 1,
             useWorkloadIdentity: false,
@@ -598,13 +624,46 @@ export default defineComponent({
         return;
       }
 
-      // Handle regular registry servers
+      // Handle registry servers using their configuration
       const server = registryServers.value.find(s => s.id === serverId);
       if (server) {
-        server.status = 'installing';
-        setTimeout(() => {
+        try {
+          server.status = 'installing';
+
+          // Use the server's configuration to create the adapter
+          const adapterData = {
+            name: `${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-mcp`,
+            imageName: server.packages?.[0]?.identifier || `mcp-${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            imageVersion: server.version || 'latest',
+            description: server.description,
+            connectionType: server.protocol === 'stdio' ? 'LocalStdio' : 'Http' as const,
+            protocol: 'MCP' as const,
+            replicaCount: 1,
+            useWorkloadIdentity: false,
+            environmentVariables: {},
+            mcpClientConfig: server.protocol === 'stdio' ? {
+              mcpServers: {
+                [server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')]: {
+                  command: 'npx',
+                  args: ['-y', server.packages?.[0]?.identifier || server.name],
+                  env: {}
+                }
+              }
+            } : {
+              mcpServers: {
+                [server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')]: {
+                  url: server.url
+                }
+              }
+            }
+          };
+
+          await MCPService.createAdapter(adapterData);
           server.status = 'installed';
-        }, 1000); // Simulate installation delay
+        } catch (error) {
+          console.error('Failed to create adapter for registry server:', error);
+          server.status = 'not-installed';
+        }
       }
     };
 
@@ -616,6 +675,53 @@ export default defineComponent({
         } else {
           registryServers.value = registryServers.value.filter(s => s.id !== serverId);
         }
+      }
+    };
+
+    const handleDeleteServer = async (serverId: string | number) => {
+      try {
+        // Check if this is a Virtual MCP server
+        const registryServer = registryServers.value.find(s => s.id === serverId);
+        const certifiedServer = certifiedScenarios.value.find(s => s.id === serverId);
+
+        const server = registryServer || certifiedServer;
+        const isVirtualMCP = server && (
+          server.repository?.source === 'virtual-mcp' ||
+          server.name?.toLowerCase().includes('virtual') ||
+          server.url?.includes('8912')
+        );
+
+        // If it's a Virtual MCP server, delete it from the backend first
+        if (isVirtualMCP && server?.id) {
+          try {
+            await fetch(`http://localhost:8912/api/v1/mcps/${server.id}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+            console.log(`Successfully deleted Virtual MCP server ${server.id} from backend`);
+          } catch (error) {
+            console.error(`Failed to delete Virtual MCP server ${server.id} from backend:`, error);
+            // Continue with local deletion even if backend deletion fails
+          }
+        }
+
+        // Remove from registry servers
+        registryServers.value = registryServers.value.filter(s => s.id !== serverId);
+
+        // Also remove from certified scenarios if it's one of them
+        const certifiedIndex = certifiedScenarios.value.findIndex(s => s.id === serverId);
+        if (certifiedIndex !== -1) {
+          certifiedScenarios.value.splice(certifiedIndex, 1);
+        }
+
+        // Persist the changes
+        persistRegistryData();
+
+        console.log(`Successfully deleted server ${serverId} from registry`);
+      } catch (error) {
+        console.error(`Failed to delete server ${serverId}:`, error);
       }
     };
 
@@ -661,8 +767,43 @@ export default defineComponent({
       try {
         console.log(`Syncing from ${registry.name}...`);
 
-        // Call real API with source filtering using MCPService
-        const servers = await MCPService.getPublicRegistryServersBySource(registry.source);
+        let servers: any[] = [];
+
+        // Handle Virtual MCP registry specially
+        if (registry.source === 'virtual-mcp') {
+          // Fetch Virtual MCP servers directly from the API
+          const response = await fetch('http://localhost:8912/api/v1/mcps');
+          if (response.ok) {
+            const data = await response.json();
+            const virtualMcps = data.mcps || [];
+
+            // Transform Virtual MCP data to RegistryServer format
+            servers = virtualMcps.map((vmcp: any) => ({
+              id: vmcp.id,
+              name: vmcp.name,
+              description: vmcp.description,
+              version: vmcp.version,
+              protocol: 'stdio', // Virtual MCP uses stdio
+              url: '',
+              validation_status: 'certified',
+              discovered_at: vmcp.created_at,
+              packages: [],
+              tools: vmcp.tools || [],
+              repository: {
+                source: 'virtual-mcp',
+                url: ''
+              },
+              rawData: vmcp
+            }));
+
+            console.log(`Fetched and transformed ${servers.length} Virtual MCP servers`);
+          } else {
+            throw new Error(`Failed to fetch Virtual MCP servers: ${response.status}`);
+          }
+        } else {
+          // Call real API with source filtering using MCPService
+          servers = await MCPService.getPublicRegistryServersBySource(registry.source);
+        }
 
         // Process and add new servers to registry
         const processedServers = processServerData(servers);
@@ -678,8 +819,10 @@ export default defineComponent({
         // Persist the updated data
         persistRegistryData();
 
-        // Automatically refresh from browse API after sync
-        await refreshFromBrowse();
+        // Automatically refresh from browse API after sync (only for non-Virtual MCP)
+        if (registry.source !== 'virtual-mcp') {
+          await refreshFromBrowse();
+        }
 
         console.log(`Successfully synced ${servers.length} servers from ${registry.name}`);
       } catch (error) {
@@ -711,6 +854,8 @@ export default defineComponent({
       };
       persistSave('mcp-registry-data', data);
     };
+
+
 
     // Advanced modal functions
     const clearAllEntries = () => {
@@ -1036,6 +1181,8 @@ export default defineComponent({
       isLoading.value = false;
     });
 
+    // No polling - manual sync only
+
     // Service enablement check
     const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled);
     const selectedServices = computed(() => store.state.suseai.settings.selectedServices);
@@ -1056,9 +1203,10 @@ export default defineComponent({
       filteredServers,
       publicRegistries,
       syncingRegistry,
-      handleInstallServer,
-      handleRemoveServer,
-      handleViewServer,
+       handleInstallServer,
+       handleRemoveServer,
+       handleDeleteServer,
+       handleViewServer,
        toggleRegistry,
        syncRegistry,
        syncAllRegistries,
@@ -1275,6 +1423,32 @@ export default defineComponent({
   gap: 16px;
   padding: 20px 20px 16px;
   border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--border-radius);
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.delete-btn:hover {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  opacity: 1;
+}
+
+.delete-btn:focus {
+  outline: 2px solid #dc3545;
+  outline-offset: 2px;
 }
 
 .tile-logo-container {

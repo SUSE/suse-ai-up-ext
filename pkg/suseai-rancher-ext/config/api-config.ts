@@ -3,24 +3,25 @@
  * Centralizes all API endpoints and base URLs
  */
 
+import { reactive } from 'vue';
+
 // Base URLs for different services
 export const getApiBaseUrls = (serviceUrl?: string) => ({
   MCP_GATEWAY: serviceUrl ? `${serviceUrl}/api/v1` : 'http://localhost:8911/api/v1',
+  VIRTUAL_MCP: serviceUrl ? `${serviceUrl}/api/v1` : 'http://localhost:8912/api/v1',
   SMART_AGENTS: 'http://localhost:8910',
   RANCHER: window.location.origin
 });
 
-// Initialize with default localhost
-let currentApiBaseUrls = getApiBaseUrls();
-
-export const API_BASE_URLS = currentApiBaseUrls;
+// Initialize with default localhost as reactive object
+export const API_BASE_URLS = reactive(getApiBaseUrls());
 
 // Function to update API base URLs dynamically
 export const updateApiBaseUrls = (serviceUrl?: string) => {
-  currentApiBaseUrls = getApiBaseUrls(serviceUrl);
-  // Update the exported object by updating its properties
-  Object.assign(API_BASE_URLS, currentApiBaseUrls);
-  return currentApiBaseUrls;
+  const newApiBaseUrls = getApiBaseUrls(serviceUrl);
+  // Update the reactive object properties
+  Object.assign(API_BASE_URLS, newApiBaseUrls);
+  return newApiBaseUrls;
 };
 
 // API Endpoints for MCP Gateway

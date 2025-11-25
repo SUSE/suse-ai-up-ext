@@ -78,12 +78,22 @@ export default defineComponent({
     loading: {
       type: Boolean,
       default: false
+    },
+    registeredServerIds: {
+      type: Object as () => Set<string>,
+      default: () => new Set<string>()
     }
   },
   emits: ['view-server-details', 'register-server'],
   setup(props, { emit }) {
-    // Risk Status based on vulnerability_score from API
+    // Risk Status based on vulnerability_score from API, but show "protected" for registered servers
     const getRiskBadgeClass = (server: DiscoveredServer) => {
+      // Check if server is registered (protected)
+      if (props.registeredServerIds.has(server.id)) {
+        return 'badge badge-success'; // Green for protected
+      }
+
+      // Original vulnerability-based logic
       const score = server.vulnerability_score;
       switch (score) {
         case 'high':
@@ -98,6 +108,12 @@ export default defineComponent({
     };
 
     const getRiskLabel = (server: DiscoveredServer) => {
+      // Check if server is registered (protected)
+      if (props.registeredServerIds.has(server.id)) {
+        return 'Protected';
+      }
+
+      // Original vulnerability-based logic
       const score = server.vulnerability_score;
       switch (score) {
         case 'high':

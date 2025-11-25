@@ -397,7 +397,7 @@ export default defineComponent({
     const onPodSave = () => {
       podSaved.value = true
       // Initialize selected services from store or empty array
-      selectedServices.value = [...storedSelectedServices.value]
+      selectedServices.value = [...(storedSelectedServices.value || [])]
       console.log('Pod saved, showing service selection')
     }
 

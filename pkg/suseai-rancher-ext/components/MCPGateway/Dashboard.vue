@@ -39,6 +39,7 @@
             :adapters="adapters"
             :loading="loading"
             :error="error || undefined"
+            :ping-results="adapterPingResults"
             @view-logs="handleViewAdapterLogs"
             @edit-adapter="handleEditAdapter"
             @delete-adapter="handleDeleteAdapter"
@@ -47,6 +48,7 @@
           <DiscoveredServersTable
             :discovered-servers="discoveredServers"
             :loading="loading"
+            :registered-server-ids="registeredServerIds"
             @view-server-details="handleViewServerDetails"
             @register-server="handleRegisterServer"
           />
@@ -148,6 +150,8 @@ export default defineComponent({
       registeredCount,
       availableCount,
       errorRate,
+      adapterPingResults,
+      registeredServerIds,
 
       // Enhanced data from useMCPGateway
       sessions,
@@ -236,6 +240,8 @@ export default defineComponent({
       registeredCount,
       availableCount,
       errorRate,
+      adapterPingResults,
+      registeredServerIds,
 
       // Enhanced data
       sessions,

@@ -4,11 +4,11 @@
     <table class="endpoints-table">
        <thead>
          <tr>
-           <th>Name</th>
-           <th>Status</th>
-           <th>Protocol</th>
-           <th>Endpoint</th>
-           <th>Errors</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Protocol</th>
+            <th>Original Endpoint</th>
+            <th>Errors</th>
            <th>Last Active</th>
            <th>Actions</th>
          </tr>
@@ -25,13 +25,13 @@
          </tr>
          <tr v-else v-for="adapter in adapters" :key="adapter.id">
            <td>{{ adapter.name }}</td>
-            <td>
-              <span class="status-active">
-                Available
-              </span>
-            </td>
+             <td>
+               <span :class="getStatusClass(adapter)">
+                 {{ getStatusText(adapter) }}
+               </span>
+             </td>
            <td>{{ adapter.protocol || 'MCP' }}</td>
-            <td>{{ adapter.endpoint || '-' }}</td>
+            <td>{{ adapter.originalServer?.address || '-' }}</td>
            <td>{{ adapter.errorCount || 0 }}</td>
            <td>{{ adapter.lastActive ? new Date(adapter.lastActive).toLocaleString() : 'Never' }}</td>
            <td>
@@ -86,6 +86,10 @@ export default defineComponent({
     error: {
       type: String,
       default: null
+    },
+    pingResults: {
+      type: Object as () => Record<string, boolean>,
+      default: () => ({})
     }
   },
   emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter'],
@@ -119,20 +123,32 @@ export default defineComponent({
         emit('delete-adapter', adapter);
       };
 
-      const closeAdapterDetailsModal = () => {
-        showAdapterDetailsModal.value = false;
-        selectedAdapter.value = null;
-      };
+       const closeAdapterDetailsModal = () => {
+         showAdapterDetailsModal.value = false;
+         selectedAdapter.value = null;
+       };
 
-     return {
-       showAdapterDetailsModal,
-       selectedAdapter,
-       handleViewDetails,
-       handleViewLogs,
-       handleEditAdapter,
-       handleDeleteAdapter,
-       closeAdapterDetailsModal
-     };
+       const getStatusClass = (adapter: AdapterResource) => {
+         const isAvailable = props.pingResults[adapter.name];
+         return isAvailable ? 'status-active badge badge-success' : 'status-inactive badge badge-secondary';
+       };
+
+       const getStatusText = (adapter: AdapterResource) => {
+         const isAvailable = props.pingResults[adapter.name];
+         return isAvailable ? 'Available' : 'Checking...';
+       };
+
+      return {
+        showAdapterDetailsModal,
+        selectedAdapter,
+        handleViewDetails,
+        handleViewLogs,
+        handleEditAdapter,
+        handleDeleteAdapter,
+        closeAdapterDetailsModal,
+        getStatusClass,
+        getStatusText
+      };
    }
  });
 </script>
@@ -182,6 +198,26 @@ export default defineComponent({
 .status-inactive {
   color: var(--muted, #6b7280);
   font-weight: 500;
+}
+
+/* Badge styles for status */
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.badge-success {
+  background: #28a745;
+  color: white;
+}
+
+.badge-secondary {
+  background: #6c757d;
+  color: white;
 }
 
 .endpoints-table .loading-row,

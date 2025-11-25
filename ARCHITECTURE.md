@@ -9,11 +9,12 @@ This document outlines the architectural patterns, conventions, and best practic
 3. [Store Management](#store-management)
 4. [Component Architecture](#component-architecture)
 5. [Service Layer](#service-layer)
-6. [TypeScript Conventions](#typescript-conventions)
-7. [Feature Flag System](#feature-flag-system)
-8. [Error Handling](#error-handling)
-9. [Testing Patterns](#testing-patterns)
-10. [Development Workflow](#development-workflow)
+6. [Virtual MCP Implementation](#virtual-mcp-implementation)
+7. [TypeScript Conventions](#typescript-conventions)
+8. [Feature Flag System](#feature-flag-system)
+9. [Error Handling](#error-handling)
+10. [Testing Patterns](#testing-patterns)
+11. [Development Workflow](#development-workflow)
 
 ## Architectural Principles
 
@@ -284,6 +285,152 @@ export class AppLifecycleService {
 3. **Progress Tracking**: Update store with operation progress
 4. **Single Responsibility**: Each service handles one domain
 5. **Interface Contracts**: Well-defined service interfaces
+
+## Virtual MCP Implementation
+
+### Overview
+
+The Virtual MCP (Model Context Protocol) feature enables transformation of various data sources into MCP servers that can be consumed by AI assistants. This implementation follows the established architectural patterns while introducing new patterns for transformation workflows.
+
+### Architecture Components
+
+#### Service Layer (`services/virtual-mcp-service.ts`)
+
+The VirtualMCPService handles all API interactions with the Virtual MCP backend:
+
+```typescript
+export class VirtualMCPService {
+  // Server Management: CRUD operations for MCP servers
+  static async getMCPServers(limit, offset, token)
+  static async createMCPServer(server, token)
+  static async updateMCPServer(id, updates, token)
+  static async deleteMCPServer(id, token)
+
+  // Transformation Methods: Convert sources to MCP specs
+  static async transformOpenAPI(request, token)
+  static async transformGraphQL(request, token)
+  static async transformDatabase(request, token)
+  static async combineServers(request, token)
+
+  // Health Check: Service availability monitoring
+  static async ping()
+}
+```
+
+#### State Management (`composables/useVirtualMCP.ts`)
+
+The useVirtualMCP composable provides reactive state management with polling:
+
+```typescript
+export const useVirtualMCP = () => {
+  // Reactive State
+  const servers = ref<MCPServer[]>([])
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+  const metrics = ref<ServerMetrics>({ ... })
+
+  // CRUD Operations
+  const createServer = async (form) => { ... }
+  const updateServer = async (id, updates) => { ... }
+  const deleteServer = async (id) => { ... }
+
+  // Real-time Updates
+  const startPolling = () => { ... } // 5-second intervals
+  const stopPolling = () => { ... }
+
+  return { servers, loading, error, createServer, ... }
+}
+```
+
+#### Component Hierarchy
+
+```
+components/VirtualMCP/
+├── MetricsGrid.vue          # Server statistics dashboard
+├── MCPServersTable.vue      # Server listing with actions
+└── CreateServerWizard.vue   # 5-step creation workflow
+```
+
+### Transformation Workflow
+
+The Virtual MCP implementation supports four transformation types:
+
+1. **OpenAPI/Swagger**: REST API specifications → MCP servers
+2. **GraphQL Schema**: GraphQL schemas → MCP servers
+3. **Database Schema**: Database connections → MCP servers
+4. **Combine Servers**: Multiple MCP servers → Unified server
+
+### Key Patterns
+
+#### Wizard-Based Creation
+
+Multi-step wizard pattern for complex server creation:
+
+```vue
+<CreateServerWizard
+  :show="showWizard"
+  :available-servers="servers"
+  @transform="handleTransform"
+  @create="handleCreateServer"
+  @close="closeWizard"
+/>
+```
+
+#### Real-time Monitoring
+
+Automatic polling with lifecycle management:
+
+```typescript
+onMounted(() => startPolling())
+onUnmounted(() => stopPolling())
+```
+
+#### Proxy Configuration
+
+CORS-free API access via Vue CLI proxy:
+
+```javascript
+// vue.config.js
+devServer: {
+  proxy: {
+    '/api/virtual-mcp': {
+      target: 'http://localhost:8912',
+      changeOrigin: true,
+      pathRewrite: { '^/api/virtual-mcp': '/api/v1' }
+    }
+  }
+}
+```
+
+### Error Handling Patterns
+
+- **Network Errors**: User-friendly messages for API failures
+- **Validation Errors**: Form validation prevents invalid submissions
+- **Transformation Errors**: Clear feedback during spec generation
+- **File Upload Errors**: Graceful handling of file reading failures
+
+### Type Safety
+
+Comprehensive TypeScript interfaces ensure type safety:
+
+```typescript
+interface MCPServer {
+  id?: string
+  name: string
+  description?: string
+  status?: 'active' | 'inactive'
+  tools?: MCPTool[]
+  // ... additional properties
+}
+
+interface TransformRequest {
+  name: string
+  source: string
+  source_type?: 'url' | 'file'
+  auth?: AuthConfig
+  overrides?: Record<string, any>
+}
+```
 
 ## TypeScript Conventions
 

@@ -197,17 +197,18 @@ const showToken = ref(false);
 const copying = ref(false);
 const copiedField = ref<string | null>(null);
 
-// Watch for prop changes to update local state
+// Watch for adapter data changes
 watch(() => props.adapterData, (newAdapter) => {
-  if (newAdapter) {
-    adapter.value = newAdapter;
-  }
-});
+  console.log('AdapterDetailsModal adapterData changed:', newAdapter);
+  adapter.value = newAdapter;
+}, { immediate: true });
 
-// Generate MCP URL
+// Generate MCP URL from reactive API_BASE_URLS
 const mcpUrl = computed(() => {
   if (!adapter.value?.name) return '';
-  return `${API_BASE_URLS.MCP_GATEWAY}/adapters/${adapter.value.name}/mcp`;
+  const url = `${API_BASE_URLS.MCP_GATEWAY}/adapters/${adapter.value.name}/mcp`;
+  console.log('AdapterDetailsModal mcpUrl:', url, 'API_BASE_URLS:', API_BASE_URLS.MCP_GATEWAY);
+  return url;
 });
 
 // Extract token from authentication object in API response

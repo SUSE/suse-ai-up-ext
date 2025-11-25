@@ -95,6 +95,13 @@ export function useMCPGateway() {
   const loadingMetrics = ref(false);
   const metricsPollInterval = ref<number | null>(null);
 
+  // MCP Server Ping Status
+  const adapterPingResults = ref<Record<string, boolean>>({});
+  const loadingPing = ref(false);
+
+  // Registered Server Tracking (for risk badge correlation)
+  const registeredServerIds = ref<Set<string>>(new Set());
+
   // Real-time updates
   const realTimeUpdates = ref(false);
   const eventSource = ref<EventSource | null>(null);
@@ -381,6 +388,41 @@ export function useMCPGateway() {
     }
   };
 
+  const pingAllAdapters = async () => {
+    if (adapters.value.length === 0) return;
+
+    loadingPing.value = true;
+    try {
+      const pingPromises = adapters.value.map(async (adapter) => {
+        const serverUrl = adapter.originalServer?.address;
+        if (!serverUrl) {
+          adapterPingResults.value[adapter.name] = false;
+          return;
+        }
+
+        // Get authentication token if available
+        let authToken: string | undefined;
+        try {
+          const tokenData = await tokenService.getAdapterToken(adapter.name);
+          authToken = tokenData?.token;
+        } catch (err) {
+          // Token might not be available, try without authentication
+          logger.info(`No token available for adapter ${adapter.name}, pinging without auth`);
+        }
+
+        const isAvailable = await MCPService.pingMCPServer(serverUrl, authToken);
+        adapterPingResults.value[adapter.name] = isAvailable;
+      });
+
+      await Promise.all(pingPromises);
+      logger.info('Completed pinging all adapters');
+    } catch (err) {
+      logger.error('Failed to ping adapters', err);
+    } finally {
+      loadingPing.value = false;
+    }
+  };
+
   const loadData = async () => {
     logger.info('Loading MCP data...');
     loading.value = true;
@@ -390,6 +432,8 @@ export function useMCPGateway() {
         fetchDiscoveredServers(),
         fetchAdapters()
       ]);
+      // Ping all adapters to check availability
+      await pingAllAdapters();
       logger.info('MCP data loaded successfully');
     } catch (err) {
       logger.error('Failed to load MCP data', err);
@@ -445,6 +489,10 @@ export function useMCPGateway() {
       if (createdAdapter) {
         // Fetch the token using the name from the adapters list
         await fetchAdapterToken(createdAdapter.name);
+        // Ping the newly registered server to check availability
+        await pingAllAdapters();
+        // Mark server as registered for risk badge correlation
+        registeredServerIds.value.add(server.id);
       } else {
         logger.error('Created adapter not found in refreshed list', {
           expectedName: adapterName,
@@ -455,6 +503,10 @@ export function useMCPGateway() {
         if (result && result.name) {
           logger.info('Attempting to fetch token using create result name', { name: result.name });
           await fetchAdapterToken(result.name);
+          // Ping the newly registered server to check availability
+          await pingAllAdapters();
+          // Mark server as registered for risk badge correlation
+          registeredServerIds.value.add(server.id);
         }
       }
 
@@ -499,6 +551,10 @@ export function useMCPGateway() {
     if (confirm(`Are you sure you want to delete adapter "${adapter.name}"?`)) {
       try {
         await MCPService.deleteAdapter(adapter.name);
+        // Remove server from registered tracking if it exists
+        if (adapter.originalServer?.id) {
+          registeredServerIds.value.delete(adapter.originalServer.id);
+        }
         await fetchAdapters();
         logger.info('Adapter deleted successfully', { data: { adapterName: adapter.name } });
       } catch (err) {
@@ -739,7 +795,7 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
   const discoveredCount = computed(() => discoveredServers.value.length);
   const registeredCount = computed(() => adapters.value.length);
   const availableCount = computed(() => {
-    return adapters.value.filter(adapter => adapter.status === 'active' || adapter.status === 'healthy').length;
+    return adapters.value.filter(adapter => adapterPingResults.value[adapter.name] === true).length;
   });
   const errorRate = computed(() => {
     const totalErrors = adapters.value.reduce((sum, adapter) => sum + (adapter.errorCount || 0), 0);
@@ -756,10 +812,14 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
       await loadData();
 
       // Start polling for real-time updates every 5 seconds
-      pollInterval = window.setInterval(() => {
+      pollInterval = window.setInterval(async () => {
         if (!loading.value && proxyInstalled.value) {
-          fetchDiscoveredServers();
-          fetchAdapters();
+          await Promise.all([
+            fetchDiscoveredServers(),
+            fetchAdapters()
+          ]);
+          // Ping all adapters to update availability status
+          await pingAllAdapters();
         }
       }, 5000);
     }
@@ -1062,12 +1122,20 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
     availableCount,
     errorRate,
 
+    // MCP Ping Status
+    adapterPingResults,
+    loadingPing,
+
+    // Registered Server Tracking
+    registeredServerIds,
+
     // MCP Gateway methods
     loadData,
     registerServer,
     viewAdapterLogs,
     editAdapter,
     deleteAdapter,
+    pingAllAdapters,
     getRiskBadgeClass,
     getRiskLabel,
     getAddressWithoutPort,

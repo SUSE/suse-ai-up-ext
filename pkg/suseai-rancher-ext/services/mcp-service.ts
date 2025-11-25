@@ -753,6 +753,40 @@ export class MCPService {
     }
   }
 
+  static async pingMCPServer(serverUrl: string, authToken?: string): Promise<boolean> {
+    try {
+      // MCP ping endpoint uses JSON-RPC 2.0 protocol
+      const pingRequest = {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'ping'
+      };
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
+      // Add authentication header if token is provided
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
+      const response = await axios.post(serverUrl, pingRequest, {
+        headers,
+        timeout: 5000 // 5 second timeout for ping
+      });
+
+      // Check if we got a valid JSON-RPC response
+      return response.data &&
+             response.data.jsonrpc === '2.0' &&
+             response.data.id === 1 &&
+             'result' in response.data;
+    } catch (error) {
+      console.error('Failed to ping MCP server:', error);
+      return false;
+    }
+  }
+
   static async getApiDocs(): Promise<any> {
     try {
       const response = await apiClient.get(MCP_ENDPOINTS.DOCS);
