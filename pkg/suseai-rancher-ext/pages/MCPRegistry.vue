@@ -189,16 +189,16 @@
         @sync-registry="syncRegistry"
         @sync-all="syncAllRegistries"
         @add-registry="showAddRegistryModal = true"
-        @advanced="showAdvancedModal = true"
+        @showAdvanced="showAdvancedModal = true"
         @remove-registry="removeCustomRegistry"
       />
 
       <AdvancedRegistryModal
         :show="showAdvancedModal"
         @close="showAdvancedModal = false"
-        @clear-all="clearAllEntries"
-        @check-availability="checkAvailability"
-        @check-security="checkSecurity"
+        @clearAll="clearAllEntries"
+        @checkAvailability="checkAvailability"
+        @checkSecurity="checkSecurity"
       />
 
       <AddRegistryModal
@@ -630,33 +630,75 @@ export default defineComponent({
         try {
           server.status = 'installing';
 
-          // Use the server's configuration to create the adapter
-          const adapterData = {
-            name: `${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-mcp`,
-            imageName: server.packages?.[0]?.identifier || `mcp-${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-            imageVersion: server.version || 'latest',
-            description: server.description,
-            connectionType: server.protocol === 'stdio' ? 'LocalStdio' : 'Http' as const,
-            protocol: 'MCP' as const,
-            replicaCount: 1,
-            useWorkloadIdentity: false,
-            environmentVariables: {},
-            mcpClientConfig: server.protocol === 'stdio' ? {
-              mcpServers: {
-                [server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')]: {
-                  command: 'npx',
-                  args: ['-y', server.packages?.[0]?.identifier || server.name],
-                  env: {}
-                }
-              }
-            } : {
-              mcpServers: {
-                [server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')]: {
-                  url: server.url
-                }
-              }
+          // Check if this is a Virtual MCP server that needs streamable-HTTP
+          const isVirtualMCP = server.repository?.source === 'virtual-mcp' ||
+                              server.protocol === 'streamable-http';
+
+          let adapterData;
+
+          if (isVirtualMCP) {
+            // Virtual MCP servers spawn streamable-HTTP servers
+            const serverConfig = {
+              tools: server.tools,
+              serverId: server.id,
+              name: server.name,
+              description: server.description,
+              version: server.version
+            };
+
+            adapterData = {
+              name: `${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-mcp`,
+              imageName: '@suse/virtual-mcp-streamable-server',
+              imageVersion: 'latest',
+              description: server.description,
+              connectionType: 'LocalStdio' as const, // Spawns local HTTP server via stdio
+              protocol: 'MCP' as const,
+              replicaCount: 1,
+              useWorkloadIdentity: false,
+              environmentVariables: {
+                VIRTUAL_MCP_CONFIG: JSON.stringify(serverConfig),
+                VIRTUAL_MCP_SERVER_ID: server.id,
+                NODE_ENV: 'production'
+              },
+              command: 'npx',
+              args: [
+                '@suse/virtual-mcp-streamable-server',
+                '--config', JSON.stringify(serverConfig),
+                '--port', '0',  // Auto-assign port
+                '--localhost-only'  // Security: only accept localhost connections
+              ]
+            };
+          } else {
+            // Regular registry servers
+            if (server.protocol === 'stdio') {
+              adapterData = {
+                name: `${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-mcp`,
+                imageName: server.packages?.[0]?.identifier || `mcp-${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                imageVersion: server.version || 'latest',
+                description: server.description,
+                connectionType: 'LocalStdio' as const,
+                protocol: 'MCP' as const,
+                replicaCount: 1,
+                useWorkloadIdentity: false,
+                environmentVariables: {},
+                command: 'npx',
+                args: ['-y', server.packages?.[0]?.identifier || server.name]
+              };
+            } else {
+              adapterData = {
+                name: `${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-mcp`,
+                imageName: server.packages?.[0]?.identifier || `mcp-${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                imageVersion: server.version || 'latest',
+                description: server.description,
+                connectionType: 'Http' as const,
+                protocol: 'MCP' as const,
+                replicaCount: 1,
+                useWorkloadIdentity: false,
+                environmentVariables: {},
+                remoteUrl: server.url
+              };
             }
-          };
+          }
 
           await MCPService.createAdapter(adapterData);
           server.status = 'installed';
@@ -783,11 +825,17 @@ export default defineComponent({
               name: vmcp.name,
               description: vmcp.description,
               version: vmcp.version,
-              protocol: 'stdio', // Virtual MCP uses stdio
+              protocol: 'streamable-http', // Virtual MCP uses streamable-HTTP servers
               url: '',
               validation_status: 'certified',
               discovered_at: vmcp.created_at,
-              packages: [],
+              packages: [{
+                identifier: '@suse/virtual-mcp-streamable-server',
+                registryType: 'npm',
+                transport: {
+                  type: 'http'
+                }
+              }],
               tools: vmcp.tools || [],
               repository: {
                 source: 'virtual-mcp',
