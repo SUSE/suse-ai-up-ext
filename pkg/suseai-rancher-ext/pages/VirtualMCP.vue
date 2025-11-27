@@ -150,8 +150,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated } from 'vue';
+import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import { useStore } from 'vuex';
+import { useRoute } from 'vue-router';
 import { useVirtualMCP } from '../composables/useVirtualMCP';
 import MetricsGrid from '../components/VirtualMCP/MetricsGrid.vue';
 import MCPServersTable from '../components/VirtualMCP/MCPServersTable.vue';
@@ -167,6 +168,9 @@ const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled
 const selectedServices = computed(() => store.state.suseai.settings.selectedServices);
 const isEnabled = computed(() => proxyInstalled.value && selectedServices.value.includes('virtual-mcp'));
 
+// Route access
+const route = useRoute();
+
 // Virtual MCP composable
 const {
   servers,
@@ -180,12 +184,27 @@ const {
   updateServer,
   deleteServer,
   resetCreateForm,
-  fetchData
+  fetchData,
+  loadFromStorage
 } = useVirtualMCP();
+
+// Load persisted data on mount
+onMounted(() => {
+  loadFromStorage();
+});
 
 // Data loading is handled manually when the page is activated
 onActivated(() => {
   fetchData();
+});
+
+// Watch for route changes to refetch data when navigating to Virtual MCP
+watch(route, (newRoute) => {
+  console.log('Route changed to:', newRoute.name);
+  if (newRoute.name === 'c-cluster-suseai-virtual-mcp') {
+    console.log('Fetching data for Virtual MCP');
+    fetchData();
+  }
 });
 
 // Local state

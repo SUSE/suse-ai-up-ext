@@ -1,4 +1,5 @@
 import { PRODUCT, PAGE_TYPES } from './config/suseai';
+import type { RouteLocationNormalized, NavigationGuardNext } from 'vue-router';
 
 export default [
 
@@ -32,13 +33,18 @@ export default [
     meta:      { product: PRODUCT, category: 'mcp-registry' }
   },
 
-  // Virtual MCP page
-  {
-    name:      `c-cluster-${PRODUCT}-virtual-mcp`,
-    path:      `/c/:cluster/${PRODUCT}/virtual-mcp`,
-    component: () => import('./pages/VirtualMCP.vue'),
-    meta:      { product: PRODUCT, category: 'virtual-mcp' }
-  },
+   // Virtual MCP page
+   {
+     name:      `c-cluster-${PRODUCT}-virtual-mcp`,
+     path:      `/c/:cluster/${PRODUCT}/virtual-mcp`,
+     component: () => import('./pages/VirtualMCP.vue'),
+     meta:      { product: PRODUCT, category: 'virtual-mcp' },
+     beforeEnter: (to: any, from: any, next: any) => {
+       // Add a timestamp query param to force route change detection
+       to.query.t = Date.now().toString();
+       next();
+     }
+   },
 
   // SmartAgents page
   {

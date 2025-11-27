@@ -1,7 +1,7 @@
 // Virtual MCP Composable
 // Provides state management and API integration for Virtual MCP functionality
 
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { VirtualMCPService } from '../services/virtual-mcp-service';
 import { logger } from '../utils/logger';
 import type {
@@ -13,6 +13,8 @@ import type {
   ServerMetrics,
   TransformationType
 } from '../types/virtual-mcp-types';
+
+const STORAGE_KEY = 'virtual-mcp-servers';
 
 export const useVirtualMCP = () => {
   const servers = ref<MCPServer[]>([]);
@@ -37,19 +39,36 @@ export const useVirtualMCP = () => {
     overrides: {}
   });
 
-  // Metrics
-  const metrics = ref<ServerMetrics>({
-    totalServers: 0,
-    activeServers: 0,
-    inactiveServers: 0,
-    totalTools: 0,
-    totalResources: 0
-  });
+   // Metrics
+   const metrics = ref<ServerMetrics>({
+     totalServers: 0,
+     activeServers: 0,
+     inactiveServers: 0,
+     totalTools: 0,
+     totalResources: 0
+   });
 
-  // Polling
-  let pollInterval: NodeJS.Timeout | null = null;
+   // Polling
+   let pollInterval: NodeJS.Timeout | null = null;
+
+  const loadFromStorage = () => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        servers.value = JSON.parse(stored);
+        console.log('Loaded servers from storage:', servers.value.length);
+      } catch (e) {
+        console.error('Failed to parse stored servers', e);
+      }
+    }
+  };
+
+  const saveToStorage = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(servers.value));
+  };
 
   const fetchServers = async () => {
+    console.log('Fetching Virtual MCP servers from API...');
     loading.value = true;
     error.value = null;
 
@@ -58,9 +77,18 @@ export const useVirtualMCP = () => {
         pagination.value.limit,
         pagination.value.offset
       );
+      console.log('Fetched servers:', response.mcps);
 
       servers.value = response.mcps;
       pagination.value.total = response.total;
+
+      // If API returns empty, clear cached data
+      if (response.mcps.length === 0) {
+        localStorage.removeItem(STORAGE_KEY);
+      } else {
+        // Save to storage
+        saveToStorage();
+      }
 
       // Calculate metrics
       metrics.value = {
@@ -73,6 +101,7 @@ export const useVirtualMCP = () => {
 
       logger.info('Fetched Virtual MCP servers', { count: response.mcps.length });
     } catch (err) {
+      console.error('Failed to fetch servers:', err);
       error.value = `Failed to fetch Virtual MCP servers: ${err instanceof Error ? err.message : 'Unknown error'}`;
       logger.error('Failed to fetch Virtual MCP servers', err);
     } finally {
@@ -208,34 +237,32 @@ export const useVirtualMCP = () => {
     };
   };
 
-  const fetchData = () => {
-    startPolling();
-  };
+   const startPolling = () => {
+     if (pollInterval) return;
 
-  const startPolling = () => {
-    if (pollInterval) return;
+     console.log('Starting polling every 20 seconds');
+     pollInterval = setInterval(() => {
+       console.log('Polling: fetching servers');
+       fetchServers();
+     }, 20000); // Poll every 20 seconds
+   };
 
-    pollInterval = setInterval(() => {
-      fetchServers();
-    }, 5000); // Poll every 5 seconds
-  };
+   const stopPolling = () => {
+     if (pollInterval) {
+       clearInterval(pollInterval);
+       pollInterval = null;
+     }
+   };
 
-  const stopPolling = () => {
-    if (pollInterval) {
-      clearInterval(pollInterval);
-      pollInterval = null;
-    }
-  };
+   const fetchData = () => {
+     fetchServers();
+     startPolling();
+   };
 
-  // Manual initialization - polling only starts when explicitly called
-  // onMounted(() => {
-  //   startPolling();
-  // });
-
-  // Cleanup
-  onUnmounted(() => {
-    stopPolling();
-  });
+   // Cleanup
+   onUnmounted(() => {
+     stopPolling();
+   });
 
   return {
     // State
@@ -258,6 +285,7 @@ export const useVirtualMCP = () => {
     deleteServer,
     resetCreateForm,
     fetchData,
+    loadFromStorage,
     startPolling,
     stopPolling
   };
