@@ -2,8 +2,8 @@
   <div class="adapter-details">
     <div class="header">
       <h2>{{ adapter.name }}</h2>
-      <div class="status-badge" :class="getStatusClass(adapter.status)">
-        {{ getStatusLabel(adapter.status) }}
+       <div class="status-badge" :class="getStatusClass(adapter.status || 'unknown')">
+         {{ getStatusLabel(adapter.status || 'unknown') }}
       </div>
     </div>
 
@@ -15,14 +15,14 @@
           <span class="label">Name:</span>
           <span class="value">{{ adapter.name }}</span>
         </div>
-        <div class="detail-row">
-          <span class="label">Status:</span>
-          <span class="value">{{ getStatusLabel(adapter.status) }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Protocol:</span>
-          <span class="value">{{ adapter.protocol }}</span>
-        </div>
+         <div class="detail-row">
+           <span class="label">Status:</span>
+           <span class="value">{{ getStatusLabel(adapter.status || 'unknown') }}</span>
+         </div>
+         <div class="detail-row">
+           <span class="label">Protocol:</span>
+           <span class="value">{{ adapter.protocol || 'Unknown' }}</span>
+         </div>
         <div class="detail-row">
           <span class="label">Connection Type:</span>
           <span class="value">{{ adapter.connectionType }}</span>
@@ -73,10 +73,10 @@
           <span class="label">Type:</span>
           <span class="value">{{ adapter.authentication.type }}</span>
         </div>
-         <div v-if="adapter.authentication?.token" class="detail-row">
-           <span class="label">Token:</span>
-           <span class="value">Present</span>
-         </div>
+          <div v-if="adapter.authentication?.bearerToken?.token" class="detail-row">
+            <span class="label">Token:</span>
+            <span class="value">Present</span>
+          </div>
       </div>
 
       <!-- Environment Variables -->

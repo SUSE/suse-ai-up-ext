@@ -467,14 +467,17 @@ export function useMCPGateway() {
         imageVersion: '1.0.0',
         description: `Adapter for ${server.name || server.address}`,
         connectionType: 'RemoteHttp', // Always use RemoteHttp for remote HTTP-based MCP servers
-        protocol: server.protocol || 'MCP',
+        protocol: 'MCP',
         replicaCount: 1,
         useWorkloadIdentity: false,
         originalServer: server,
         remoteUrl: server.address,
         authentication: {
           required: true,
-          type: 'bearer'
+          type: 'bearer',
+          bearerToken: {
+            dynamic: true // Use dynamic token management
+          }
         }
       };
 

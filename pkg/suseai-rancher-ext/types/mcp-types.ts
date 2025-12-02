@@ -445,6 +445,102 @@ export interface SessionFilter {
   search?: string
 }
 
+// Adapter API Types (matching API spec)
+export interface AdapterAuthConfig {
+  apiKey?: APIKeyConfig
+  basic?: BasicAuthConfig
+  bearerToken?: BearerTokenConfig
+  oauth?: OAuthConfig
+  required: boolean
+  type: 'bearer' | 'oauth' | 'basic' | 'apikey' | 'none'
+}
+
+export interface APIKeyConfig {
+  key: string
+  location: 'header' | 'query' | 'cookie'
+  name: string
+}
+
+export interface BasicAuthConfig {
+  password: string
+  username: string
+}
+
+export interface BearerTokenConfig {
+  dynamic: boolean
+  expiresAt?: string
+  token?: string
+}
+
+export interface OAuthConfig {
+  authUrl: string
+  clientId: string
+  clientSecret: string
+  redirectUri: string
+  scopes: string[]
+  tokenUrl: string
+}
+
+export interface ConnectionType {
+  type: 'SSE' | 'StreamableHttp' | 'RemoteHttp' | 'LocalStdio'
+}
+
+export interface ServerProtocol {
+  type: 'MCP'
+}
+
+export interface MCPClientConfig {
+  mcpServers: Record<string, MCPServerConfig>
+}
+
+export interface MCPServerConfig {
+  args?: string[]
+  command?: string
+  env?: Record<string, string>
+}
+
+export interface MCPFunctionality {
+  lastRefreshed?: string
+  prompts?: MCPPrompt[]
+  resources?: MCPResource[]
+  serverInfo?: MCPServerInfo
+  tools?: MCPTool[]
+}
+
+export interface MCPPrompt {
+  arguments?: MCPArgument[]
+  description?: string
+  name: string
+}
+
+export interface MCPArgument {
+  description?: string
+  name: string
+  required?: boolean
+}
+
+export interface MCPResource {
+  description?: string
+  mimeType?: string
+  name: string
+  uri: string
+}
+
+export interface MCPServerInfo {
+  capabilities?: Record<string, any>
+  name: string
+  protocol: string
+  version: string
+}
+
+export interface MCPTool {
+  config?: Record<string, any>
+  description?: string
+  input_schema?: Record<string, any>
+  name: string
+  source_type?: string
+}
+
 // Configuration Templates
 export interface ConfigTemplate {
   id: string

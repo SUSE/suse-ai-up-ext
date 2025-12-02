@@ -285,24 +285,6 @@ export default defineComponent({
         serverCount: 0
       },
       {
-        id: 'docker-mcp',
-        name: 'Docker MCP Registry',
-        url: 'https://hub.docker.com/r/mcp',
-        source: 'docker',
-        enabled: true,
-        lastSync: null,
-        serverCount: 0
-      },
-      {
-        id: 'community-mcp',
-        name: 'Community MCP Registry',
-        url: 'https://community-mcp.example.com',
-        source: 'community',
-        enabled: true,
-        lastSync: null,
-        serverCount: 0
-      },
-      {
         id: 'virtual-mcp',
         name: 'Virtual MCP Registry',
         url: 'http://localhost:8912/api/v1',
@@ -597,13 +579,9 @@ export default defineComponent({
         try {
           const adapterData = {
             name: `${certifiedServer.id.replace('certified-', '')}-mcp`,
-            imageName: `mcp-${certifiedServer.id.replace('certified-', '')}-adapter`,
-            imageVersion: '1.0.0',
             description: certifiedServer.description,
             connectionType: certifiedServer.adapterConfig.connectionType,
-            protocol: 'MCP' as const,
-            replicaCount: 1,
-            useWorkloadIdentity: false,
+            protocol: 'MCP',
             environmentVariables: certifiedServer.adapterConfig.env || {},
             mcpClientConfig: {
               mcpServers: {
@@ -613,11 +591,15 @@ export default defineComponent({
                   env: certifiedServer.adapterConfig.env
                 }
               }
+            },
+            authentication: {
+              required: false,
+              type: 'none' as const
             }
           };
 
-          await MCPService.createAdapter(adapterData);
-          certifiedServer.status = 'installed';
+           await MCPService.createAdapter(adapterData);
+           certifiedServer.status = 'installed';
         } catch (error) {
           console.error('Failed to create adapter for certified scenario:', error);
         }
@@ -648,13 +630,9 @@ export default defineComponent({
 
             adapterData = {
               name: `${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-mcp`,
-              imageName: '@suse/virtual-mcp-streamable-server',
-              imageVersion: 'latest',
               description: server.description,
-              connectionType: 'LocalStdio' as const, // Spawns local HTTP server via stdio
-              protocol: 'MCP' as const,
-              replicaCount: 1,
-              useWorkloadIdentity: false,
+              connectionType: 'LocalStdio', // Spawns local HTTP server via stdio
+              protocol: 'MCP',
               environmentVariables: {
                 VIRTUAL_MCP_CONFIG: JSON.stringify(serverConfig),
                 VIRTUAL_MCP_SERVER_ID: server.id,
@@ -666,42 +644,44 @@ export default defineComponent({
                 '--config', JSON.stringify(serverConfig),
                 '--port', '0',  // Auto-assign port
                 '--localhost-only'  // Security: only accept localhost connections
-              ]
+              ],
+              authentication: {
+                required: false,
+                type: 'none' as const
+              }
             };
           } else {
             // Regular registry servers
             if (server.protocol === 'stdio') {
               adapterData = {
                 name: `${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-mcp`,
-                imageName: server.packages?.[0]?.identifier || `mcp-${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-                imageVersion: server.version || 'latest',
                 description: server.description,
-                connectionType: 'LocalStdio' as const,
-                protocol: 'MCP' as const,
-                replicaCount: 1,
-                useWorkloadIdentity: false,
-                environmentVariables: {},
+                connectionType: 'LocalStdio',
+                protocol: 'MCP',
                 command: 'npx',
-                args: ['-y', server.packages?.[0]?.identifier || server.name]
+                args: ['-y', server.packages?.[0]?.identifier || server.name],
+                authentication: {
+                  required: false,
+                  type: 'none' as const
+                }
               };
             } else {
               adapterData = {
                 name: `${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-mcp`,
-                imageName: server.packages?.[0]?.identifier || `mcp-${server.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-                imageVersion: server.version || 'latest',
                 description: server.description,
-                connectionType: 'Http' as const,
-                protocol: 'MCP' as const,
-                replicaCount: 1,
-                useWorkloadIdentity: false,
-                environmentVariables: {},
-                remoteUrl: server.url
+                connectionType: 'RemoteHttp',
+                protocol: 'MCP',
+                remoteUrl: server.url,
+                authentication: {
+                  required: false,
+                  type: 'none' as const
+                }
               };
             }
-          }
+            }
 
-          await MCPService.createAdapter(adapterData);
-          server.status = 'installed';
+           await MCPService.createAdapter(adapterData);
+           server.status = 'installed';
         } catch (error) {
           console.error('Failed to create adapter for registry server:', error);
           server.status = 'not-installed';

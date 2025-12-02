@@ -830,7 +830,7 @@ const onLocalProviderChange = () => {
     try {
       isLoadingAdapters.value = true;
       const adapters = await MCPService.getAdapters();
-      availableAdapters.value = adapters.filter(adapter => adapter.connectionType && adapter.connectionType !== '');
+      availableAdapters.value = adapters.filter(adapter => adapter.connectionType);
     } catch (error) {
       console.error('Failed to fetch adapters:', error);
       availableAdapters.value = [];

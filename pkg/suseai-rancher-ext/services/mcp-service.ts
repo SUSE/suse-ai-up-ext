@@ -11,6 +11,11 @@ import type {
   AdapterToken,
   TokenValidationResult,
   ClientTokenRequest,
+  AdapterAuthConfig,
+  MCPClientConfig,
+  MCPFunctionality,
+  ConnectionType,
+  ServerProtocol,
 
   DiscoveryScan,
   DiscoveryScanConfig,
@@ -46,22 +51,23 @@ export const updateApiBaseUrl = (newBaseUrl: string) => {
 
 export interface AdapterData {
   name: string;
-  imageName: string;
-  imageVersion: string;
-  description: string;
-  connectionType: string;
+  description?: string;
   protocol: string;
-  replicaCount: number;
-  useWorkloadIdentity: boolean;
-  environmentVariables?: Record<string, string>;
+  connectionType: string;
   command?: string;
   args?: string[];
-   originalServer?: DiscoveredServer;
-   remoteUrl?: string;
-   authentication?: {
-     required: boolean;
-     type: string;
-   };
+  remoteUrl?: string;
+  imageName?: string;
+  imageVersion?: string;
+  apiBaseUrl?: string;
+  authentication: AdapterAuthConfig;
+  environmentVariables?: Record<string, string>;
+  replicaCount?: number;
+  mcpClientConfig?: MCPClientConfig;
+  mcpFunctionality?: MCPFunctionality;
+  tools?: any[];
+  useWorkloadIdentity?: boolean;
+  originalServer?: DiscoveredServer;
 }
 
 export interface ScanConfig {
@@ -91,33 +97,33 @@ export interface ScanResult {
 
 export interface AdapterResource {
   name: string;
-  status: string;
   description?: string;
   protocol: string;
   connectionType: string;
   command?: string;
   args?: string[];
+  remoteUrl?: string;
+  imageName?: string;
+  imageVersion?: string;
+  apiBaseUrl?: string;
+  authentication: AdapterAuthConfig;
   environmentVariables?: Record<string, string>;
-  replicaCount: number;
-  useWorkloadIdentity: boolean;
-  createdAt: string;
+  replicaCount?: number;
+  mcpClientConfig?: MCPClientConfig;
+  mcpFunctionality?: MCPFunctionality;
+  tools?: any[];
+  useWorkloadIdentity?: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  lastUpdatedAt?: string;
+  id?: string;
+  // Legacy fields for backward compatibility
+  status?: string;
   lastActivity?: string;
   phase?: string;
   message?: string;
   lastCheck?: string;
-  imageName?: string;
-  imageVersion?: string;
-   originalServer?: DiscoveredServer;
-   remoteUrl?: string;
-   authentication?: {
-     required: boolean;
-     type: string;
-     token?: string;
-   };
-   createdBy?: string;
-  lastUpdatedAt?: string;
-  // Legacy fields for backward compatibility
-  id?: string;
+  originalServer?: DiscoveredServer;
   endpoint?: string;
   errorCount?: number;
   requestCount?: number;
@@ -277,12 +283,62 @@ export interface MCPSessionRequest {
 }
 
 export class MCPService {
-  static async createAdapter(data: AdapterData) {
+  static async createAdapter(data: AdapterData): Promise<AdapterResource> {
     try {
-      const response = await apiClient.post(MCP_ENDPOINTS.ADAPTERS, data);
+      // Clean up the data before sending to API
+      const cleanedData = { ...data };
+
+      // Remove empty or undefined fields that might cause issues
+      if (!cleanedData.description) delete cleanedData.description;
+      if (!cleanedData.command) delete cleanedData.command;
+      if (!cleanedData.args || cleanedData.args.length === 0) delete cleanedData.args;
+      if (!cleanedData.remoteUrl) delete cleanedData.remoteUrl;
+      if (!cleanedData.imageName) delete cleanedData.imageName;
+      if (!cleanedData.imageVersion) delete cleanedData.imageVersion;
+      if (!cleanedData.apiBaseUrl) delete cleanedData.apiBaseUrl;
+      if (!cleanedData.replicaCount) delete cleanedData.replicaCount;
+      if (!cleanedData.mcpClientConfig) delete cleanedData.mcpClientConfig;
+      if (!cleanedData.mcpFunctionality) delete cleanedData.mcpFunctionality;
+      if (!cleanedData.tools || cleanedData.tools.length === 0) delete cleanedData.tools;
+      if (cleanedData.useWorkloadIdentity === false) delete cleanedData.useWorkloadIdentity;
+
+      // Clean up environment variables
+      if (!cleanedData.environmentVariables || Object.keys(cleanedData.environmentVariables).length === 0) {
+        delete cleanedData.environmentVariables;
+      }
+
+      // Clean up authentication - only send relevant fields
+      if (cleanedData.authentication) {
+        const auth = { ...cleanedData.authentication };
+
+        // Remove auth method fields that aren't relevant for the selected type
+        if (auth.type !== 'bearer' && auth.bearerToken) delete auth.bearerToken;
+        if (auth.type !== 'basic' && auth.basic) delete auth.basic;
+        if (auth.type !== 'apikey' && auth.apiKey) delete auth.apiKey;
+        if (auth.type !== 'oauth' && auth.oauth) delete auth.oauth;
+
+        // If auth is not required, simplify it
+        if (!auth.required) {
+          cleanedData.authentication = { required: false, type: 'none' };
+        } else {
+          cleanedData.authentication = auth;
+        }
+      }
+
+      console.log('API Base URL:', apiClient.defaults.baseURL);
+      console.log('Sending adapter data to API:', cleanedData);
+      const response = await apiClient.post(MCP_ENDPOINTS.ADAPTERS, cleanedData);
+      console.log('Adapter creation response:', response.data);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create adapter:', error);
+      if (error.response) {
+        console.error('API Error Response:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        });
+      }
       throw error;
     }
   }
@@ -330,10 +386,19 @@ export class MCPService {
 
   static async getAdapters(): Promise<AdapterResource[]> {
     try {
+      console.log('Fetching adapters from:', apiClient.defaults.baseURL + MCP_ENDPOINTS.ADAPTERS);
       const response = await apiClient.get(MCP_ENDPOINTS.ADAPTERS);
+      console.log('Adapters response:', response.data);
       return response.data || [];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch adapters:', error);
+      if (error.response) {
+        console.error('API Error Response:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        });
+      }
       return [];
     }
   }

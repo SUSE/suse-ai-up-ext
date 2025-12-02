@@ -97,6 +97,7 @@ const createAdapter = async () => {
     const adapterData = {
       name: 'github-api',
       connectionType: 'LocalStdio',
+      protocol: 'MCP',
       mcpClientConfig: {
         mcpServers: {
           'github-api': {
@@ -114,7 +115,10 @@ const createAdapter = async () => {
       authentication: {
         required: true,
         type: 'bearer',
-        token: 'github-token-202'
+        bearerToken: {
+          token: githubToken.value.trim(),
+          dynamic: false
+        }
       },
       description: 'Authenticated GitHub API MCP server'
     };

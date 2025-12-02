@@ -58,6 +58,8 @@
           <select id="connectionType" v-model="adapterData.connectionType" class="form-control">
             <option value="StreamableHttp">Streamable HTTP</option>
             <option value="SSE">Server-Sent Events</option>
+            <option value="RemoteHttp">Remote HTTP</option>
+            <option value="LocalStdio">Local Stdio</option>
           </select>
         </div>
 
@@ -66,6 +68,110 @@
           <select id="protocol" v-model="adapterData.protocol" class="form-control">
             <option value="MCP">MCP</option>
           </select>
+        </div>
+
+        <!-- Authentication Configuration -->
+        <div class="form-group">
+          <label>Authentication:</label>
+          <div class="auth-config">
+            <div class="form-group">
+              <label for="authRequired">Authentication Required:</label>
+              <input
+                type="checkbox"
+                id="authRequired"
+                v-model="adapterData.authentication.required"
+              />
+            </div>
+
+            <div class="form-group" v-if="adapterData.authentication?.required">
+              <label for="authType">Authentication Type:</label>
+              <select id="authType" v-model="adapterData.authentication!.type" class="form-control">
+                <option value="none">None</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="basic">Basic Auth</option>
+                <option value="apikey">API Key</option>
+                <option value="oauth">OAuth</option>
+              </select>
+            </div>
+
+            <!-- Bearer Token Config -->
+            <div v-if="adapterData.authentication?.required && adapterData.authentication?.type === 'bearer'" class="auth-details">
+              <div class="form-group">
+                <label for="bearerToken">Bearer Token:</label>
+                <input
+                  type="password"
+                  id="bearerToken"
+                  v-model="adapterData.authentication!.bearerToken!.token"
+                  class="form-control"
+                  placeholder="Enter bearer token"
+                />
+              </div>
+              <div class="form-group">
+                <label for="bearerDynamic">Use Dynamic Token:</label>
+                <input
+                  type="checkbox"
+                  id="bearerDynamic"
+                  v-model="adapterData.authentication!.bearerToken!.dynamic"
+                />
+              </div>
+            </div>
+
+            <!-- Basic Auth Config -->
+            <div v-if="adapterData.authentication?.required && adapterData.authentication?.type === 'basic'" class="auth-details">
+              <div class="form-group">
+                <label for="basicUsername">Username:</label>
+                <input
+                  type="text"
+                  id="basicUsername"
+                  v-model="adapterData.authentication!.basic!.username"
+                  class="form-control"
+                  placeholder="Enter username"
+                />
+              </div>
+              <div class="form-group">
+                <label for="basicPassword">Password:</label>
+                <input
+                  type="password"
+                  id="basicPassword"
+                  v-model="adapterData.authentication!.basic!.password"
+                  class="form-control"
+                  placeholder="Enter password"
+                />
+              </div>
+            </div>
+
+            <!-- API Key Config -->
+            <div v-if="adapterData.authentication?.required && adapterData.authentication?.type === 'apikey'" class="auth-details">
+              <div class="form-group">
+                <label for="apiKey">API Key:</label>
+                <input
+                  type="password"
+                  id="apiKey"
+                  v-model="adapterData.authentication!.apiKey!.key"
+                  class="form-control"
+                  placeholder="Enter API key"
+                />
+              </div>
+              <div class="form-group">
+                <label for="apiKeyLocation">Location:</label>
+                <select id="apiKeyLocation" v-model="adapterData.authentication!.apiKey!.location" class="form-control">
+                  <option value="header">Header</option>
+                  <option value="query">Query Parameter</option>
+                  <option value="cookie">Cookie</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="apiKeyName">Name:</label>
+                <input
+                  type="text"
+                  id="apiKeyName"
+                  v-model="adapterData.authentication!.apiKey!.name"
+                  class="form-control"
+                  placeholder="Header name, query param, or cookie name"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="form-group">
@@ -81,13 +187,13 @@
         </div>
 
         <div class="form-group">
-          <label class="checkbox-label">
-            <input
-              type="checkbox"
-              v-model="adapterData.useWorkloadIdentity"
-            />
-            <span>Use Workload Identity</span>
-          </label>
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                v-model="adapterData.authentication!.required"
+              />
+              <span>Authentication Required</span>
+            </label>
         </div>
 
         <div class="form-group">
@@ -159,7 +265,14 @@ const adapterData = ref<AdapterData>({
   protocol: 'MCP',
   replicaCount: 1,
   useWorkloadIdentity: false,
-  environmentVariables: {}
+  environmentVariables: {},
+  authentication: {
+    required: false,
+    type: 'none',
+    bearerToken: { dynamic: false },
+    basic: { username: '', password: '' },
+    apiKey: { key: '', location: 'header', name: '' }
+  }
 });
 
 // Environment variables management
@@ -180,8 +293,7 @@ watch([envVarKeys, envVarValues], () => {
 // Computed properties
 const isValid = computed(() => {
   return adapterData.value.name.trim() &&
-         adapterData.value.imageName.trim() &&
-         adapterData.value.imageVersion.trim();
+         (adapterData.value.imageName?.trim() || adapterData.value.remoteUrl?.trim());
 });
 
 // Methods
@@ -207,7 +319,14 @@ const reset = () => {
     protocol: 'MCP',
     replicaCount: 1,
     useWorkloadIdentity: false,
-    environmentVariables: {}
+    environmentVariables: {},
+    authentication: {
+      required: false,
+      type: 'none',
+      bearerToken: { dynamic: false },
+      basic: { username: '', password: '' },
+      apiKey: { key: '', location: 'header', name: '' }
+    }
   };
   envVarKeys.value = [];
   envVarValues.value = [];
