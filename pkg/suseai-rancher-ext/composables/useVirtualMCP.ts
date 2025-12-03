@@ -29,15 +29,15 @@ export const useVirtualMCP = () => {
   // Create/Edit state
   const showCreateModal = ref(false);
   const creating = ref(false);
-  const createForm = ref<CreateServerForm>({
-    name: '',
-    description: '',
-    type: 'openapi',
-    source: '',
-    sourceType: 'url',
-    auth: undefined,
-    overrides: {}
-  });
+   const createForm = ref<CreateServerForm>({
+     name: '',
+     description: '',
+     type: 'openapi',
+     source: '',
+     sourceType: 'url',
+     auth: { type: 'transparent' },
+     overrides: {}
+   });
 
    // Metrics
    const metrics = ref<ServerMetrics>({
@@ -232,7 +232,7 @@ export const useVirtualMCP = () => {
       type: 'openapi',
       source: '',
       sourceType: 'url',
-      auth: undefined,
+    auth: { type: 'transparent' },
       overrides: {}
     };
   };

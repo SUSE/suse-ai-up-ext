@@ -113,7 +113,7 @@
                       <div class="tile-info">
                          <div class="tile-meta">
                            <span v-if="server.isCertified" class="badge-certified badge">Certified</span>
-                           <span :class="['badge-state badge', getBadgeClass(server.status)]">{{ formatStatus(server.status) }}</span>
+                            <span :class="['badge-state badge', getBadgeClass(server?.status || 'not-installed')]">{{ formatStatus(server?.status || 'not-installed') }}</span>
                            <span class="tile-author">{{ server.author }}</span>
                          </div>
                         <h3 class="tile-title">{{ server.name }}</h3>
@@ -154,15 +154,23 @@
                         >
                           Remove
                         </button>
-                        <button
-                          v-else-if="server.status === 'installing'"
-                          class="btn btn-sm btn-secondary"
-                          disabled
-                          aria-label="Installing"
-                        >
-                          <i class="icon icon-spinner icon-spin" aria-hidden="true" />
-                          Installing...
-                        </button>
+                         <button
+                           v-else-if="server.status === 'installing'"
+                           class="btn btn-sm btn-secondary"
+                           disabled
+                           aria-label="Installing"
+                         >
+                           <i class="icon icon-spinner icon-spin" aria-hidden="true" />
+                           Installing...
+                         </button>
+                         <button
+                           v-if="server"
+                           class="btn btn-sm btn-secondary"
+                           @click.stop.prevent="handleCreateAdapter(server)"
+                           :aria-label="`Create adapter for ${server?.name || 'server'}`"
+                         >
+                           Create Adapter
+                         </button>
                       </div>
                     </div>
                  </div>
@@ -207,16 +215,23 @@
         @submit="addCustomRegistry"
       />
 
-      <GitHubEnvModal
-        :show="showGitHubModal"
-        @adapterCreated="onAdapterCreated"
-        @close="showGitHubModal = false"
-      />
+       <GitHubEnvModal
+         :show="showGitHubModal"
+         @adapterCreated="onAdapterCreated"
+         @close="showGitHubModal = false"
+       />
+
+        <RegistryAdapterConfigModal
+          :show="showRegistryAdapterModal"
+          :registry-server="selectedRegistryServer"
+          @adapterCreated="onRegistryAdapterCreated"
+          @close="showRegistryAdapterModal = false"
+        />
       </div>
     </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, onUnmounted, getCurrentInstance } from 'vue';
+import { defineComponent, ref, computed, onMounted, onUnmounted, getCurrentInstance, nextTick } from 'vue';
 import { useStore } from 'vuex';
 import { MCPService } from '../services/mcp-service';
 import { persistLoad, persistSave, persistClear } from '../services/ui-persist';
@@ -228,6 +243,7 @@ import {
   AddRegistryModal
 } from '../components/MCPGateway';
 import GitHubEnvModal from '../components/shared/GitHubEnvModal.vue';
+import RegistryAdapterConfigModal from '../components/shared/RegistryAdapterConfigModal.vue';
 
 interface Registry {
   id: string;
@@ -246,7 +262,8 @@ export default defineComponent({
     RegistryManagementModal,
     AdvancedRegistryModal,
     AddRegistryModal,
-    GitHubEnvModal
+    GitHubEnvModal,
+    RegistryAdapterConfigModal
   },
 
   metaInfo() {
@@ -266,10 +283,13 @@ export default defineComponent({
     const showAdvancedModal = ref(false);
     const showAddRegistryModal = ref(false);
     const showGitHubModal = ref(false);
+
     const isLoading = ref(true);
     const registryServers = ref<any[]>([]);
     const selectedServer = ref<RegistryServer | null>(null);
+    const selectedRegistryServer = ref<any>(null);
     const hasPerformedInitialSync = ref(false);
+    const showRegistryAdapterModal = ref(false);
 
 
 
@@ -700,6 +720,16 @@ export default defineComponent({
       }
     };
 
+    const handleCreateAdapter = async (server: any) => {
+      console.log('handleCreateAdapter called with server:', server);
+      if (!server) {
+        console.error('Server is undefined in handleCreateAdapter');
+        return;
+      }
+      selectedRegistryServer.value = server;
+      showRegistryAdapterModal.value = true;
+    };
+
     const handleDeleteServer = async (serverId: string | number) => {
       try {
         // Check if this is a Virtual MCP server
@@ -754,6 +784,14 @@ export default defineComponent({
         githubServer.status = 'installed';
       }
     };
+
+    const onRegistryAdapterCreated = (response: any) => {
+      // Handle successful registry adapter creation
+      console.log('Registry adapter created:', response);
+      // Could show a success message or update UI state here
+    };
+
+
 
     const handleViewServer = async (server: any) => {
       try {
@@ -1029,6 +1067,7 @@ export default defineComponent({
     };
 
     const getBadgeClass = (status: string) => {
+      if (!status) return 'bg-secondary';
       switch (status) {
         case 'installed': return 'bg-success';
         case 'installing': return 'bg-warning';
@@ -1038,6 +1077,7 @@ export default defineComponent({
     };
 
     const formatStatus = (status: string) => {
+      if (!status) return 'Unknown';
       switch (status) {
         case 'installed': return 'Installed';
         case 'installing': return 'Installing';
@@ -1250,6 +1290,10 @@ export default defineComponent({
         certifiedCount,
         registryCount,
         onAdapterCreated,
+         onRegistryAdapterCreated,
+         selectedRegistryServer,
+         handleCreateAdapter,
+         showRegistryAdapterModal,
       isLoading,
       newMcpServer,
       handleAddMcpServer,
@@ -1475,7 +1519,7 @@ export default defineComponent({
 }
 
 .delete-btn:focus {
-  outline: 2px solid #dc3545;
+  outline: 2px solid var(--outline);
   outline-offset: 2px;
 }
 

@@ -347,8 +347,8 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, watch } from 'vue';
-import type { AdapterResource, SessionInfo } from '../../services/mcp-service';
-import type { SessionMetrics } from '../../types/mcp-types';
+import type { AdapterResource, SessionMetrics } from '../../types/mcp-types';
+import type { SessionInfo } from '../../services/mcp-service';
 
 export default defineComponent({
   name: 'SessionManager',

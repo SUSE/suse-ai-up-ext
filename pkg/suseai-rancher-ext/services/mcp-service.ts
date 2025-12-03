@@ -29,8 +29,15 @@ import type {
   AdapterMetrics,
   SystemMetrics,
   PluginService as EnhancedPluginService,
-  UploadRequest
+  UploadRequest,
+  CreateAdapterFromRegistryRequest,
+  CreateAdapterFromRegistryResponse,
+  AdapterData,
+  AdapterResource
 } from '../types/mcp-types';
+
+// Re-export AdapterResource for use in components
+export type { AdapterResource };
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URLS.MCP_GATEWAY,
@@ -49,26 +56,28 @@ export const updateApiBaseUrl = (newBaseUrl: string) => {
   updateApiBaseUrls(cleanUrl);
 };
 
-export interface AdapterData {
-  name: string;
-  description?: string;
+
+
+export interface ServiceDiscoveredServer {
+  id: string;
+  address: string;
   protocol: string;
-  connectionType: string;
-  command?: string;
-  args?: string[];
-  remoteUrl?: string;
-  imageName?: string;
-  imageVersion?: string;
-  apiBaseUrl?: string;
-  authentication: AdapterAuthConfig;
-  environmentVariables?: Record<string, string>;
-  replicaCount?: number;
-  mcpClientConfig?: MCPClientConfig;
-  mcpFunctionality?: MCPFunctionality;
-  tools?: any[];
-  useWorkloadIdentity?: boolean;
-  originalServer?: DiscoveredServer;
+  connection: string;
+  status: string;
+  lastSeen: string;
+  port?: number;
+  discoveredAt?: string;
+  vulnerability_score?: 'high' | 'medium' | 'low';
+  scan_results?: any;
+  name?: string;
+  metadata?: {
+    auth_type?: string;
+    detectionMethod?: string;
+  };
+  security_findings?: any[];
 }
+
+export type DiscoveredServer = ServiceDiscoveredServer;
 
 export interface ScanConfig {
   maxConcurrent?: number;
@@ -87,67 +96,17 @@ export interface ScanResult {
   config?: ScanConfig;
   progress?: number;
   message?: string;
-  results?: DiscoveredServer[];
+  results?: ServiceDiscoveredServer[];
   error?: string;
   // Legacy fields for backward compatibility
   scanId?: string;
   scan_id?: string;
-  discovered_servers?: DiscoveredServer[];
+  discovered_servers?: ServiceDiscoveredServer[];
 }
 
-export interface AdapterResource {
-  name: string;
-  description?: string;
-  protocol: string;
-  connectionType: string;
-  command?: string;
-  args?: string[];
-  remoteUrl?: string;
-  imageName?: string;
-  imageVersion?: string;
-  apiBaseUrl?: string;
-  authentication: AdapterAuthConfig;
-  environmentVariables?: Record<string, string>;
-  replicaCount?: number;
-  mcpClientConfig?: MCPClientConfig;
-  mcpFunctionality?: MCPFunctionality;
-  tools?: any[];
-  useWorkloadIdentity?: boolean;
-  createdAt?: string;
-  createdBy?: string;
-  lastUpdatedAt?: string;
-  id?: string;
-  // Legacy fields for backward compatibility
-  status?: string;
-  lastActivity?: string;
-  phase?: string;
-  message?: string;
-  lastCheck?: string;
-  originalServer?: DiscoveredServer;
-  endpoint?: string;
-  errorCount?: number;
-  requestCount?: number;
-  lastActive?: string;
-}
 
-export interface DiscoveredServer {
-  id: string;
-  address: string;
-  protocol: string;
-  connection: string;
-  status: string;
-  lastSeen: string;
-  port?: number;
-  discoveredAt?: string;
-  vulnerability_score?: 'high' | 'medium' | 'low';
-  scan_results?: any;
-  name?: string;
-  metadata?: {
-    auth_type?: string;
-    detectionMethod?: string;
-  };
-  security_findings?: any[];
-}
+
+
 
 export interface RegistryServer {
   _meta?: Record<string, any>;
@@ -503,6 +462,16 @@ export class MCPService {
     }
   }
 
+  static async getAdapterToken(name: string): Promise<any> {
+    try {
+      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTER_TOKEN(name));
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get adapter token:', error);
+      throw error;
+    }
+  }
+
   static async updateAdapter(name: string, updates: Partial<AdapterData>): Promise<AdapterResource> {
     try {
       const response = await apiClient.put(MCP_ENDPOINTS.ADAPTER_UPDATE(name), updates);
@@ -647,7 +616,7 @@ export class MCPService {
     }
   }
 
-  static async getDiscoveryServers(): Promise<DiscoveredServer[]> {
+  static async getDiscoveryServers(): Promise<ServiceDiscoveredServer[]> {
     try {
       console.log('Calling getDiscoveryServers with URL:', apiClient.defaults.baseURL + MCP_ENDPOINTS.DISCOVERY_SERVERS);
       const response = await apiClient.get(MCP_ENDPOINTS.DISCOVERY_SERVERS);
@@ -671,7 +640,7 @@ export class MCPService {
     }
   }
 
-  static async getDiscoveryServerDetails(id: string): Promise<DiscoveredServer | null> {
+  static async getDiscoveryServerDetails(id: string): Promise<ServiceDiscoveredServer | null> {
     try {
       const response = await apiClient.get(MCP_ENDPOINTS.DISCOVERY_SERVER_DETAILS(id));
       return response.data;
@@ -869,6 +838,79 @@ export class MCPService {
     } catch (error) {
       console.error('Failed to get Swagger spec:', error);
       throw error;
+    }
+  }
+
+  static async createAdapterFromRegistry(id: string, config: CreateAdapterFromRegistryRequest): Promise<CreateAdapterFromRegistryResponse> {
+    try {
+      const response = await apiClient.post(MCP_ENDPOINTS.REGISTRY_CREATE_ADAPTER(id), config);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to create adapter from registry:', error);
+      throw error;
+    }
+  }
+
+  static async testAdapterConnection(data: AdapterData): Promise<{ success: boolean; message: string; details?: any }> {
+    try {
+      // Create a temporary adapter for testing (this would be a dry-run endpoint if available)
+      // For now, we'll validate the configuration client-side and attempt a basic connectivity test
+      const testData = { ...data, name: `${data.name}-test-${Date.now()}` };
+
+      // Basic validation
+      if (!testData.name || testData.name.trim() === '') {
+        return { success: false, message: 'Adapter name is required' };
+      }
+
+      if (testData.connectionType === 'LocalStdio' && (!testData.command || testData.command.trim() === '')) {
+        return { success: false, message: 'Command is required for Local Stdio connections' };
+      }
+
+      if ((testData.connectionType === 'RemoteHttp' || testData.connectionType === 'StreamableHttp') && (!testData.remoteUrl || testData.remoteUrl.trim() === '')) {
+        return { success: false, message: 'Remote URL is required for HTTP connections' };
+      }
+
+      if (testData.connectionType === 'VirtualMCP' && (!testData.apiBaseUrl || testData.apiBaseUrl.trim() === '')) {
+        return { success: false, message: 'API Base URL is required for VirtualMCP connections' };
+      }
+
+      // For HTTP-based connections, try a basic connectivity test
+      if (testData.connectionType === 'RemoteHttp' || testData.connectionType === 'StreamableHttp') {
+        try {
+          const testResponse = await axios.get(testData.remoteUrl!, { timeout: 5000 });
+          if (testResponse.status >= 200 && testResponse.status < 300) {
+            return { success: true, message: 'Connection test successful' };
+          } else {
+            return { success: false, message: `HTTP ${testResponse.status}: ${testResponse.statusText}` };
+          }
+        } catch (error: any) {
+          return { success: false, message: `Connection failed: ${error.message}` };
+        }
+      }
+
+      // For VirtualMCP, test the API endpoint
+      if (testData.connectionType === 'VirtualMCP') {
+        try {
+          const testResponse = await axios.get(testData.apiBaseUrl!, { timeout: 5000 });
+          if (testResponse.status >= 200 && testResponse.status < 300) {
+            return { success: true, message: 'VirtualMCP API connection test successful' };
+          } else {
+            return { success: false, message: `API ${testResponse.status}: ${testResponse.statusText}` };
+          }
+        } catch (error: any) {
+          return { success: false, message: `VirtualMCP API connection failed: ${error.message}` };
+        }
+      }
+
+      // For LocalStdio, we can't test connectivity easily, so just validate config
+      if (testData.connectionType === 'LocalStdio') {
+        return { success: true, message: 'Local Stdio configuration validated' };
+      }
+
+      return { success: true, message: 'Configuration validated successfully' };
+    } catch (error: any) {
+      console.error('Failed to test adapter connection:', error);
+      return { success: false, message: `Test failed: ${error.message}` };
     }
   }
 }

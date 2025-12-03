@@ -3,7 +3,7 @@
 
 export interface AuthConfig {
   type: 'transparent' | 'oauth_github';
-  config?: Record<string, any>;
+  config?: string;
 }
 
 export interface MCPPromptArgument {
@@ -91,9 +91,9 @@ export interface CreateServerForm {
   description?: string;
   source?: string;
   sourceType?: 'url' | 'file';
-  sources?: string[]; // For combine operation
-  auth?: AuthConfig;
-  overrides?: Record<string, any>;
+   sources?: string[]; // For combine operation
+   auth: AuthConfig;
+   overrides?: Record<string, any>;
 }
 
 export interface ServerMetrics {

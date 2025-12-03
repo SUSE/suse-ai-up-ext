@@ -152,6 +152,23 @@ export interface RegisterServerRequest {
 }
 
 // Registry Types
+export interface RegistryPackage {
+  identifier: string
+  registryType: string
+  transport: {
+    type: string
+  }
+  environmentVariables?: RegistryEnvironmentVariable[]
+}
+
+export interface RegistryEnvironmentVariable {
+  name: string
+  description: string
+  default: string
+  format: string
+  isSecret: boolean
+}
+
 export interface RegistryServer {
   id: string
   name: string
@@ -165,6 +182,7 @@ export interface RegistryServer {
     branch?: string
     commit?: string
   }
+  packages?: RegistryPackage[]
   metadata?: Record<string, any>
   createdAt: string
   updatedAt: string
@@ -557,4 +575,80 @@ export interface ConfigTemplate {
     options?: string[]
   }>
   metadata?: Record<string, any>
+}
+
+// Registry Adapter Creation Types
+export interface CreateAdapterFromRegistryRequest {
+  environmentVariables?: Record<string, string>
+  replicaCount?: number
+}
+
+export interface CreateAdapterFromRegistryResponse {
+  adapter: AdapterResource
+  mcp_endpoint: string
+  message: string
+  note?: string
+  token_info: AuthTokenInfo
+}
+
+export interface AuthTokenInfo {
+  expiresAt: string
+  token: string
+  tokenType: string
+}
+
+// Enhanced Adapter Data (matching API spec)
+export interface AdapterData {
+  name: string
+  description?: string
+  protocol: string
+  connectionType: string
+  command?: string
+  args?: string[]
+  remoteUrl?: string
+  imageName?: string
+  imageVersion?: string
+  apiBaseUrl?: string
+  authentication: AdapterAuthConfig
+  environmentVariables?: Record<string, string>
+  replicaCount?: number
+  mcpClientConfig?: MCPClientConfig
+  mcpFunctionality?: MCPFunctionality
+  tools?: any[]
+  useWorkloadIdentity?: boolean
+  originalServer?: DiscoveredServer
+}
+
+export interface AdapterResource {
+  name: string
+  description?: string
+  protocol: string
+  connectionType: string
+  command?: string
+  args?: string[]
+  remoteUrl?: string
+  imageName?: string
+  imageVersion?: string
+  apiBaseUrl?: string
+  authentication: AdapterAuthConfig
+  environmentVariables?: Record<string, string>
+  replicaCount?: number
+  mcpClientConfig?: MCPClientConfig
+  mcpFunctionality?: MCPFunctionality
+  tools?: any[]
+  useWorkloadIdentity?: boolean
+  createdAt?: string
+  createdBy?: string
+  lastUpdatedAt?: string
+  id?: string
+  status?: string
+  lastActivity?: string
+  phase?: string
+  message?: string
+  lastCheck?: string
+  originalServer?: DiscoveredServer
+  endpoint?: string
+  errorCount?: number
+  requestCount?: number
+  lastActive?: string
 }

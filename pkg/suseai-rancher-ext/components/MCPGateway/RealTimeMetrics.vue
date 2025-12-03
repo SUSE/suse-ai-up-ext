@@ -283,8 +283,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import type { AdapterResource } from '../../services/mcp-service';
-import type { AdapterMetrics, SystemMetrics } from '../../types/mcp-types';
+import type { AdapterResource, AdapterMetrics, SystemMetrics } from '../../types/mcp-types';
 
 interface Alert {
   id: string;

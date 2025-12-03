@@ -73,8 +73,9 @@ export const MCP_ENDPOINTS = {
   REGISTRY_SYNC_OFFICIAL: '/registry/sync/official',
   REGISTRY_UPLOAD: '/registry/upload',
   REGISTRY_UPLOAD_BULK: '/registry/upload/bulk',
-  REGISTRY_UPLOAD_LOCAL_MCP: '/registry/upload/local-mcp',
-  REGISTRY_DETAILS: (id: string) => `/registry/${id}`,
+   REGISTRY_UPLOAD_LOCAL_MCP: '/registry/upload/local-mcp',
+   REGISTRY_DETAILS: (id: string) => `/registry/${id}`,
+   REGISTRY_CREATE_ADAPTER: (id: string) => `/registry/${id}/create-adapter`,
   
   // Deployment Management
   DEPLOYMENT_CONFIG: (serverId: string) => `/deployment/config/${serverId}`,

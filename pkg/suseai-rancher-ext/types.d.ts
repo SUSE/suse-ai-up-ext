@@ -1,15 +1,9 @@
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue'
-  const component: DefineComponent<{}, {}, any>
-  export default component
-}
-
 declare module '@shell/*' {
-  const component: any
-  export default component
+  const shellComponent: any
+  export default shellComponent
 }
 
 declare module '@components/*' {
-  const component: any
-  export default component
+  const componentsComponent: any
+  export default componentsComponent
 }

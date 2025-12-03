@@ -867,7 +867,7 @@ const onLocalProviderChange = () => {
     if (selectedAdapters.length === 0) return [];
 
     return selectedAdapters.map(adapterName => {
-      const adapter = availableAdapters.value.find(a => a.name === adapterName);
+       const adapter = availableAdapters.value.find((a: AdapterResource) => a.name === adapterName);
       return {
         type: "function",
         function: {

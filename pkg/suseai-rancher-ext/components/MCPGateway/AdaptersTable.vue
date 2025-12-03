@@ -31,7 +31,7 @@
                </span>
              </td>
            <td>{{ adapter.protocol || 'MCP' }}</td>
-            <td>{{ adapter.originalServer?.address || '-' }}</td>
+             <td>{{ adapter.originalServer?.host || '-' }}</td>
            <td>{{ adapter.errorCount || 0 }}</td>
            <td>{{ adapter.lastActive ? new Date(adapter.lastActive).toLocaleString() : 'Never' }}</td>
            <td>
@@ -65,8 +65,8 @@
 
  <script lang="ts">
   import { defineComponent, ref } from 'vue';
-  import type { AdapterResource } from '../../services/mcp-service';
   import { MCPService } from '../../services/mcp-service';
+  import type { AdapterResource } from '../../types/mcp-types';
   import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
 
 export default defineComponent({

@@ -1,12 +1,14 @@
 import { computed, ref, getCurrentInstance, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useStore } from 'vuex';
 import { logger } from '../utils/logger';
-import { MCPService, type DiscoveredServer, apiClient, updateApiBaseUrl } from '../services/mcp-service';
+import { MCPService, apiClient, updateApiBaseUrl, type ServiceDiscoveredServer, type DiscoveredServer } from '../services/mcp-service';
 import type { SecurityFinding } from '../services/security-engine';
 import { tokenService } from '../services/token-service';
 import type {
   AdapterResource,
-  AdapterData,
+  AdapterData
+} from '../types/mcp-types';
+import type {
   SessionInfo,
   SessionListResponse
 } from '../services/mcp-service';
@@ -394,7 +396,7 @@ export function useMCPGateway() {
     loadingPing.value = true;
     try {
       const pingPromises = adapters.value.map(async (adapter) => {
-        const serverUrl = adapter.originalServer?.address;
+        const serverUrl = adapter.originalServer?.host;
         if (!serverUrl) {
           adapterPingResults.value[adapter.name] = false;
           return;
@@ -470,7 +472,7 @@ export function useMCPGateway() {
         protocol: 'MCP',
         replicaCount: 1,
         useWorkloadIdentity: false,
-        originalServer: server,
+        originalServer: server as any,
         remoteUrl: server.address,
         authentication: {
           required: true,
