@@ -196,9 +196,20 @@ export interface RegistryServer {
   checksum?: string
   license?: string
   homepage?: string
-  documentation?: string
-  changelog?: string
-}
+   documentation?: string
+   changelog?: string
+   config_template?: {
+     command: string
+     args?: string[]
+     env?: Record<string, string>
+     transport: string
+     image: string
+     resource_limits?: {
+       cpu?: string
+       memory?: string
+     }
+   }
+ }
 
 export interface RegistryBrowseOptions {
   category?: string

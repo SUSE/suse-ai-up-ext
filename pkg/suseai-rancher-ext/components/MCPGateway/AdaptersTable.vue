@@ -1,6 +1,6 @@
 <template>
   <div class="endpoints-section">
-    <h2>Registered MCP Adapters</h2>
+     <h2>Registered MCP Adapters</h2>
     <table class="endpoints-table">
        <thead>
          <tr>
@@ -54,20 +54,20 @@
        </tbody>
      </table>
     
-    <!-- Adapter Details Modal -->
-    <AdapterDetailsModal
-      :show="showAdapterDetailsModal"
-      :adapter-data="selectedAdapter"
-      @close="closeAdapterDetailsModal"
-    />
-  </div>
+     <!-- Adapter Details Modal -->
+     <AdapterDetailsModal
+       :show="showAdapterDetailsModal"
+       :adapter-data="selectedAdapter"
+       @close="closeAdapterDetailsModal"
+     />
+   </div>
 </template>
 
  <script lang="ts">
-  import { defineComponent, ref } from 'vue';
-  import { MCPService } from '../../services/mcp-service';
-  import type { AdapterResource } from '../../types/mcp-types';
-  import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
+import { defineComponent, ref } from 'vue';
+import { MCPService } from '../../services/mcp-service';
+import type { AdapterResource } from '../../types/mcp-types';
+import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
 
 export default defineComponent({
   name: 'AdaptersTable',
@@ -92,10 +92,10 @@ export default defineComponent({
       default: () => ({})
     }
   },
-  emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter'],
-   setup(props, { emit }) {
-      const showAdapterDetailsModal = ref(false);
-      const selectedAdapter = ref<AdapterResource | null>(null);
+  emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter', 'refresh-adapters'],
+  setup(props, { emit }) {
+       const showAdapterDetailsModal = ref(false);
+       const selectedAdapter = ref<AdapterResource | null>(null);
 
       const handleViewDetails = async (adapter: AdapterResource) => {
         try {
@@ -123,10 +123,10 @@ export default defineComponent({
         emit('delete-adapter', adapter);
       };
 
-       const closeAdapterDetailsModal = () => {
-         showAdapterDetailsModal.value = false;
-         selectedAdapter.value = null;
-       };
+        const closeAdapterDetailsModal = () => {
+          showAdapterDetailsModal.value = false;
+          selectedAdapter.value = null;
+        };
 
        const getStatusClass = (adapter: AdapterResource) => {
          const isAvailable = props.pingResults[adapter.name];
@@ -138,17 +138,17 @@ export default defineComponent({
          return isAvailable ? 'Available' : 'Checking...';
        };
 
-      return {
-        showAdapterDetailsModal,
-        selectedAdapter,
-        handleViewDetails,
-        handleViewLogs,
-        handleEditAdapter,
-        handleDeleteAdapter,
-        closeAdapterDetailsModal,
-        getStatusClass,
-        getStatusText
-      };
+       return {
+         showAdapterDetailsModal,
+         selectedAdapter,
+         handleViewDetails,
+         handleViewLogs,
+         handleEditAdapter,
+         handleDeleteAdapter,
+         closeAdapterDetailsModal,
+         getStatusClass,
+         getStatusText
+       };
    }
  });
 </script>

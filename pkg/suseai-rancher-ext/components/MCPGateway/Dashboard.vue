@@ -35,14 +35,15 @@
       <div class="tab-content">
         <!-- Overview Tab -->
         <div v-if="activeTab === 'overview'" class="tab-pane">
-          <AdaptersTable
-            :adapters="adapters"
-            :loading="loading"
-            :error="error || undefined"
-            :ping-results="adapterPingResults"
-            @view-logs="handleViewAdapterLogs"
-            @edit-adapter="handleEditAdapter"
-            @delete-adapter="handleDeleteAdapter"
+           <AdaptersTable
+             :adapters="adapters"
+             :loading="loading"
+             :error="error || undefined"
+             :ping-results="adapterPingResults"
+             @view-logs="handleViewAdapterLogs"
+             @edit-adapter="handleEditAdapter"
+             @delete-adapter="handleDeleteAdapter"
+             @refresh-adapters="handleRefreshAdapters"
           />
 
           <DiscoveredServersTable
@@ -160,6 +161,7 @@ export default defineComponent({
       loadingMetrics,
 
       // Methods
+      loadData,
       onScanStarted,
       openRuleManagement,
       viewAdapterLogs,
@@ -197,6 +199,10 @@ export default defineComponent({
     const handleViewServerDetails = (server: any) => {
       viewServerDetails(server);
       emit('security-modal-open');
+    };
+
+    const handleRefreshAdapters = () => {
+      loadData();
     };
 
     const handleRegisterServer = (server: any) => {
@@ -260,6 +266,7 @@ export default defineComponent({
       handleCreateSession,
       handleTerminateSession,
       handleViewSessionDetails,
+      handleRefreshAdapters,
       handleRefreshMetrics
     };
   }

@@ -7,7 +7,7 @@ import { reactive } from 'vue';
 
 // Base URLs for different services
 export const getApiBaseUrls = (serviceUrl?: string) => ({
-  MCP_GATEWAY: serviceUrl ? `${serviceUrl}/api/v1` : 'http://localhost:8911/api/v1',
+  MCP_GATEWAY: serviceUrl ? `${serviceUrl}/api/v1` : 'http://192.168.64.17:8911/api/v1',
   VIRTUAL_MCP: serviceUrl ? `${serviceUrl}/api/v1` : 'http://localhost:8912/api/v1',
   SMART_AGENTS: 'http://localhost:8910',
   RANCHER: window.location.origin

@@ -431,9 +431,23 @@ export class MCPService {
     }
   }
 
-  static async browseRegistryServers(): Promise<RegistryServer[]> {
+  static async browseRegistryServers(filters?: {
+    q?: string;
+    transport?: string;
+    registryType?: string;
+    validationStatus?: string;
+  }): Promise<RegistryServer[]> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.REGISTRY_BROWSE);
+      const params = new URLSearchParams();
+      if (filters?.q) params.append('q', filters.q);
+      if (filters?.transport) params.append('transport', filters.transport);
+      if (filters?.registryType) params.append('registryType', filters.registryType);
+      if (filters?.validationStatus) params.append('validationStatus', filters.validationStatus);
+
+      const queryString = params.toString();
+      const url = queryString ? `${MCP_ENDPOINTS.REGISTRY_BROWSE}?${queryString}` : MCP_ENDPOINTS.REGISTRY_BROWSE;
+
+      const response = await apiClient.get(url);
       return response.data || [];
     } catch (error) {
       console.error('Failed to browse registry servers:', error);
@@ -681,9 +695,9 @@ export class MCPService {
     }
   }
 
-  static async bulkUploadToRegistry(requests: UploadRequest[]): Promise<EnhancedRegistryServer[]> {
+  static async bulkUploadToRegistry(requests: RegistryServer[]): Promise<EnhancedRegistryServer[]> {
     try {
-      const response = await apiClient.post(MCP_ENDPOINTS.REGISTRY_UPLOAD_BULK, { servers: requests });
+      const response = await apiClient.post(MCP_ENDPOINTS.REGISTRY_UPLOAD_BULK, requests);
       return response.data;
     } catch (error) {
       console.error('Failed to bulk upload to registry:', error);

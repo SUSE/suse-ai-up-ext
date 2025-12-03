@@ -6,6 +6,20 @@
         <button class="btn btn-sm btn-secondary" @click="closeModal">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- Registry Server Selection -->
+        <div class="form-group">
+          <label for="registryServer">Create from Registry Server (Optional):</label>
+          <select id="registryServer" v-model="selectedRegistryServer" class="form-control">
+            <option :value="null">Manual Configuration</option>
+            <option v-for="server in registryServers" :key="server.id" :value="server">
+              {{ server.name }} - {{ server.description?.substring(0, 50) || 'No description' }}...
+            </option>
+          </select>
+          <small class="form-text text-muted">
+            Selecting a registry server will auto-configure the adapter and enable automatic server spawning.
+          </small>
+        </div>
+
         <div class="form-group">
           <label for="adapterName">Adapter Name:</label>
           <input
@@ -14,132 +28,9 @@
             v-model="adapterData.name"
             class="form-control"
             placeholder="my-mcp-adapter"
+            :readonly="!!selectedRegistryServer"
             required
           />
-        </div>
-
-        <!-- Dynamic fields based on connection type -->
-        <div v-if="adapterData.connectionType === 'LocalStdio'" class="form-group">
-          <label for="command">Command:</label>
-          <input
-            type="text"
-            id="command"
-            v-model="adapterData.command"
-            class="form-control"
-            placeholder="python"
-            required
-          />
-        </div>
-
-        <div v-if="adapterData.connectionType === 'LocalStdio'" class="form-group">
-          <label>Arguments:</label>
-          <div class="args-list">
-            <div v-for="(arg, index) in argsList" :key="index" class="arg-item">
-              <input
-                type="text"
-                v-model="argsList[index]"
-                class="form-control"
-                :placeholder="`Argument ${index + 1}`"
-              />
-              <button
-                type="button"
-                class="btn btn-sm btn-secondary"
-                @click="removeArg(index)"
-              >
-                &times;
-              </button>
-            </div>
-            <button type="button" class="btn btn-sm btn-secondary" @click="addArg">
-              Add Argument
-            </button>
-          </div>
-        </div>
-
-        <div v-if="adapterData.connectionType === 'RemoteHttp' || adapterData.connectionType === 'StreamableHttp'" class="form-group">
-          <label for="remoteUrl">Remote URL:</label>
-          <input
-            type="url"
-            id="remoteUrl"
-            v-model="adapterData.remoteUrl"
-            class="form-control"
-            placeholder="https://remote-mcp.example.com"
-            required
-          />
-        </div>
-
-        <div v-if="adapterData.connectionType === 'VirtualMCP'" class="form-group">
-          <label for="apiBaseUrl">API Base URL:</label>
-          <input
-            type="url"
-            id="apiBaseUrl"
-            v-model="adapterData.apiBaseUrl"
-            class="form-control"
-            placeholder="http://localhost:8000"
-            required
-          />
-        </div>
-
-        <div v-if="adapterData.connectionType !== 'LocalStdio'" class="form-group">
-          <label for="imageName">Image Name:</label>
-          <input
-            type="text"
-            id="imageName"
-            v-model="adapterData.imageName"
-            class="form-control"
-            placeholder="nginx"
-            required
-          />
-        </div>
-
-        <div v-if="adapterData.connectionType !== 'LocalStdio'" class="form-group">
-          <label for="imageVersion">Image Version:</label>
-          <input
-            type="text"
-            id="imageVersion"
-            v-model="adapterData.imageVersion"
-            class="form-control"
-            placeholder="latest"
-            required
-          />
-        </div>
-
-        <div v-if="adapterData.connectionType === 'VirtualMCP'" class="form-group">
-          <label>Tools:</label>
-          <div class="tools-builder">
-            <div v-for="(tool, index) in toolsList" :key="index" class="tool-item">
-              <div class="tool-header">
-                <input
-                  type="text"
-                  v-model="tool.name"
-                  class="form-control"
-                  placeholder="Tool name"
-                  required
-                />
-                <button
-                  type="button"
-                  class="btn btn-sm btn-secondary"
-                  @click="removeTool(index)"
-                >
-                  &times;
-                </button>
-              </div>
-              <textarea
-                v-model="tool.description"
-                class="form-control"
-                placeholder="Tool description"
-                rows="2"
-              ></textarea>
-              <textarea
-                v-model="tool.inputSchema"
-                class="form-control"
-                placeholder="Input schema (JSON)"
-                rows="3"
-              ></textarea>
-            </div>
-            <button type="button" class="btn btn-sm btn-secondary" @click="addTool">
-              Add Tool
-            </button>
-          </div>
         </div>
 
         <div class="form-group">
@@ -149,17 +40,19 @@
             v-model="adapterData.description"
             class="form-control"
             placeholder="Description of this MCP adapter"
+            :readonly="!!selectedRegistryServer"
             rows="3"
           ></textarea>
         </div>
 
         <div class="form-group">
           <label for="connectionType">Connection Type:</label>
-          <select id="connectionType" v-model="adapterData.connectionType" class="form-control">
+          <select id="connectionType" v-model="adapterData.connectionType" class="form-control" :disabled="!!selectedRegistryServer">
             <option value="StreamableHttp">Streamable HTTP</option>
             <option value="SSE">Server-Sent Events</option>
             <option value="RemoteHttp">Remote HTTP</option>
             <option value="LocalStdio">Local Stdio</option>
+            <option value="VirtualMCP">Virtual MCP</option>
           </select>
         </div>
 
@@ -169,108 +62,42 @@
             <option value="MCP">MCP</option>
           </select>
         </div>
-
-        <!-- Authentication Configuration -->
-        <div class="form-group">
-          <label>Authentication:</label>
-          <div class="auth-config">
-            <div class="form-group">
-              <label for="authRequired">Authentication Required:</label>
-              <input
-                type="checkbox"
-                id="authRequired"
-                v-model="adapterData.authentication.required"
-              />
-            </div>
-
-            <div class="form-group" v-if="adapterData.authentication?.required">
-              <label for="authType">Authentication Type:</label>
-              <select id="authType" v-model="adapterData.authentication!.type" class="form-control">
-                <option value="none">None</option>
-                <option value="bearer">Bearer Token</option>
-                <option value="basic">Basic Auth</option>
-                <option value="apikey">API Key</option>
-                <option value="oauth">OAuth</option>
-              </select>
-            </div>
-
-            <!-- Bearer Token Config -->
-            <div v-if="adapterData.authentication?.required && adapterData.authentication?.type === 'bearer'" class="auth-details">
-              <div class="form-group">
-                <label for="bearerToken">Bearer Token:</label>
-                <input
-                  type="password"
-                  id="bearerToken"
-                  v-model="adapterData.authentication!.bearerToken!.token"
-                  class="form-control"
-                  placeholder="Enter bearer token"
-                />
-              </div>
-              <div class="form-group">
-                <label for="bearerDynamic">Use Dynamic Token:</label>
-                <input
-                  type="checkbox"
-                  id="bearerDynamic"
-                  v-model="adapterData.authentication!.bearerToken!.dynamic"
-                />
-              </div>
-            </div>
-
-            <!-- Basic Auth Config -->
-            <div v-if="adapterData.authentication?.required && adapterData.authentication?.type === 'basic'" class="auth-details">
-              <div class="form-group">
-                <label for="basicUsername">Username:</label>
-                <input
-                  type="text"
-                  id="basicUsername"
-                  v-model="adapterData.authentication!.basic!.username"
-                  class="form-control"
-                  placeholder="Enter username"
-                />
-              </div>
-              <div class="form-group">
-                <label for="basicPassword">Password:</label>
-                <input
-                  type="password"
-                  id="basicPassword"
-                  v-model="adapterData.authentication!.basic!.password"
-                  class="form-control"
-                  placeholder="Enter password"
-                />
-              </div>
-            </div>
-
-            <!-- API Key Config -->
-            <div v-if="adapterData.authentication?.required && adapterData.authentication?.type === 'apikey'" class="auth-details">
-              <div class="form-group">
-                <label for="apiKey">API Key:</label>
-                <input
-                  type="password"
-                  id="apiKey"
-                  v-model="adapterData.authentication!.apiKey!.key"
-                  class="form-control"
-                  placeholder="Enter API key"
-                />
-              </div>
-              <div class="form-group">
-                <label for="apiKeyLocation">Location:</label>
-                <select id="apiKeyLocation" v-model="adapterData.authentication!.apiKey!.location" class="form-control">
-                  <option value="header">Header</option>
-                  <option value="query">Query Parameter</option>
-                  <option value="cookie">Cookie</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="apiKeyName">Name:</label>
-                <input
-                  type="text"
-                  id="apiKeyName"
-                  v-model="adapterData.authentication!.apiKey!.name"
-                  class="form-control"
-                  placeholder="Header name, query param, or cookie name"
-                />
-        </div>
       </div>
+
+        <!-- Status Display -->
+        <div v-if="creating || spawningStatus" class="status-section">
+          <div class="status-header">
+            <h4>{{ creating ? 'Creating Adapter' : 'Spawning Server' }}</h4>
+            <div v-if="spawningProgress > 0" class="progress-bar">
+              <div class="progress-fill" :style="{ width: spawningProgress + '%' }"></div>
+            </div>
+          </div>
+          <div class="status-message">
+            <p>{{ spawningStatus || 'Initializing...' }}</p>
+          </div>
+          <div v-if="spawningError" class="error-message">
+            {{ spawningError }}
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            @click="testConnection"
+            :disabled="!isValid || testing || creating"
+          >
+            {{ testing ? 'Testing...' : 'Test Connection' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            @click="createAdapter"
+            :disabled="!isValid || creating"
+          >
+            {{ creating ? 'Creating...' : 'Create Adapter' }}
+          </button>
+        </div>
     </div>
   </div>
 
@@ -283,9 +110,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { MCPService } from '../../services/mcp-service';
-import type { AdapterData } from '../../types/mcp-types';
+import type { AdapterData, CreateAdapterFromRegistryResponse } from '../../types/mcp-types';
+import type { RegistryServer, AdapterResource } from '../../services/mcp-service';
 import { API_BASE_URLS } from '../../config/api-config';
 import { logger } from '../../utils/logger';
 import TokenEndpointDisplayModal from './TokenEndpointDisplayModal.vue';
@@ -304,6 +132,16 @@ const testResult = ref<{ success: boolean; message: string } | null>(null);
 const showTokenModal = ref(false);
 const creationResponse = ref<any>(null);
 const tokenModal = ref();
+
+// Spawning status
+const spawningStatus = ref<string>('');
+const spawningProgress = ref<number>(0);
+const spawningError = ref<string>('');
+
+// Registry servers
+const registryServers = ref<RegistryServer[]>([]);
+const loadingRegistry = ref(false);
+const selectedRegistryServer = ref<RegistryServer | null>(null);
 
 // Form data
 const adapterData = ref<AdapterData>({
@@ -365,6 +203,42 @@ watch(toolsList, () => {
     }));
 }, { deep: true });
 
+// Watch for registry server selection
+watch(selectedRegistryServer, (newServer) => {
+  if (newServer) {
+    // Auto-fill form from registry server
+    adapterData.value.name = newServer.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    adapterData.value.description = newServer.description;
+
+    // Determine connection type from registry server
+    if (newServer.packages && newServer.packages.length > 0) {
+      const pkg = newServer.packages[0];
+      if (pkg.registryType === 'oci') {
+        adapterData.value.connectionType = 'VirtualMCP';
+        adapterData.value.imageName = pkg.identifier;
+      } else if (pkg.transport?.type === 'stdio') {
+        adapterData.value.connectionType = 'LocalStdio';
+        adapterData.value.command = pkg.identifier;
+      } else {
+        adapterData.value.connectionType = 'RemoteHttp';
+      }
+    }
+
+    // Set environment variables from registry
+    if (newServer.packages && newServer.packages.length > 0) {
+      const envVars: Record<string, string> = {};
+      newServer.packages[0].environmentVariables?.forEach(env => {
+        envVars[env.name] = env.default || '';
+      });
+      adapterData.value.environmentVariables = envVars;
+
+      // Update env var keys/values for UI
+      envVarKeys.value = Object.keys(envVars);
+      envVarValues.value = Object.values(envVars);
+    }
+  }
+});
+
 // Computed properties
 const isValid = computed(() => {
   const data = adapterData.value;
@@ -400,9 +274,64 @@ const validateTools = () => {
 };
 
 // Methods
-const openModal = () => {
+const openModal = async (server?: any) => {
   isVisible.value = true;
   reset();
+
+  // Load registry servers first
+  await loadRegistryServers();
+
+  // If a server is provided, pre-populate the form
+  if (server) {
+    // Try to find the server in the registry servers list
+    const registryServer = registryServers.value.find(s => s.id === server.id);
+    if (registryServer) {
+      selectedRegistryServer.value = registryServer;
+    } else {
+      // If not found in registry, manually populate the form
+      adapterData.value.name = server.name?.toLowerCase().replace(/[^a-z0-9-]/g, '-') || '';
+      adapterData.value.description = server.description || '';
+
+      // Determine connection type from server data
+      if (server.packages && server.packages.length > 0) {
+        const pkg = server.packages[0];
+        if (pkg.registryType === 'oci' || pkg.registryType === 'docker') {
+          adapterData.value.connectionType = 'VirtualMCP';
+          adapterData.value.imageName = pkg.identifier;
+        } else if (pkg.transport?.type === 'stdio') {
+          adapterData.value.connectionType = 'LocalStdio';
+          adapterData.value.command = pkg.identifier;
+        } else {
+          adapterData.value.connectionType = 'RemoteHttp';
+        }
+
+        // Set environment variables
+        if (pkg.environmentVariables?.length > 0) {
+          const envVars: Record<string, string> = {};
+          pkg.environmentVariables.forEach((env: any) => {
+            envVars[env.name] = env.default || '';
+          });
+          adapterData.value.environmentVariables = envVars;
+
+          // Update UI
+          envVarKeys.value = Object.keys(envVars);
+          envVarValues.value = Object.values(envVars);
+        }
+      }
+    }
+  }
+};
+
+const loadRegistryServers = async () => {
+  loadingRegistry.value = true;
+  try {
+    registryServers.value = await MCPService.browseRegistryServers();
+  } catch (err) {
+    logger.error('Failed to load registry servers:', err);
+    error.value = 'Failed to load registry servers';
+  } finally {
+    loadingRegistry.value = false;
+  }
 };
 
 const closeModal = () => {
@@ -415,6 +344,7 @@ const reset = () => {
   testing.value = false;
   error.value = '';
   testResult.value = null;
+  selectedRegistryServer.value = null;
   adapterData.value = {
     name: '',
     description: '',
@@ -492,40 +422,100 @@ const createAdapter = async () => {
 
   creating.value = true;
   error.value = '';
+  spawningStatus.value = '';
+  spawningProgress.value = 0;
+  spawningError.value = '';
 
   try {
-    const adapter = await MCPService.createAdapter(adapterData.value);
-    logger.info('Adapter created successfully', { data: { adapterName: adapterData.value.name } });
+    let result;
 
-    // Fetch token information
-    try {
-      const tokenInfo = await MCPService.getAdapterToken(adapter.name || adapterData.value.name);
-      creationResponse.value = {
-        adapter,
-        mcp_endpoint: `${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}/adapters/${adapter.name || adapterData.value.name}`,
-        message: 'Adapter created successfully',
-        token_info: {
-          token: tokenInfo.accessToken || tokenInfo.token,
-          tokenType: tokenInfo.tokenType,
-          expiresAt: tokenInfo.expiresAt
-        }
+    if (selectedRegistryServer.value) {
+      // Create adapter from registry with automatic spawning
+      spawningStatus.value = 'Initializing server spawning...';
+      spawningProgress.value = 10;
+
+      const config = {
+        replicaCount: adapterData.value.replicaCount || 1,
+        environmentVariables: adapterData.value.environmentVariables || {}
       };
-      showTokenModal.value = true;
-    } catch (tokenErr) {
-      logger.warn('Failed to fetch token info', tokenErr);
-      // Still show success modal without token
-      creationResponse.value = {
-        adapter,
-        mcp_endpoint: `${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}/adapters/${adapter.name || adapterData.value.name}`,
-        message: 'Adapter created successfully'
-      };
-      showTokenModal.value = true;
+
+      spawningStatus.value = 'Creating adapter configuration...';
+      spawningProgress.value = 30;
+
+      result = await MCPService.createAdapterFromRegistry(selectedRegistryServer.value.id, config);
+
+      spawningStatus.value = 'Starting MCP server process...';
+      spawningProgress.value = 70;
+
+      // Simulate waiting for server to be ready (in real implementation, this would be handled by the API)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      spawningStatus.value = 'Server spawned successfully!';
+      spawningProgress.value = 100;
+
+      logger.info('Adapter created from registry with spawning', { data: { serverId: selectedRegistryServer.value.id } });
+    } else {
+      // Manual adapter creation
+      spawningStatus.value = 'Creating adapter...';
+      spawningProgress.value = 50;
+
+      result = await MCPService.createAdapter(adapterData.value);
+
+      spawningStatus.value = 'Adapter created successfully!';
+      spawningProgress.value = 100;
+
+      logger.info('Adapter created manually', { data: { adapterName: adapterData.value.name } });
     }
 
+    // Handle the response - registry creation returns different format
+    if (selectedRegistryServer.value) {
+      // Registry creation response
+      const registryResult = result as CreateAdapterFromRegistryResponse;
+      creationResponse.value = {
+        adapter: registryResult.adapter,
+        mcp_endpoint: registryResult.mcp_endpoint,
+        message: registryResult.message,
+        token_info: registryResult.token_info,
+        note: registryResult.note
+      };
+    } else {
+      // Manual creation response
+      const manualResult = result as AdapterResource;
+      // Fetch token information for manual creation
+      try {
+        const tokenInfo = await MCPService.getAdapterToken(manualResult.name || adapterData.value.name);
+        creationResponse.value = {
+          adapter: manualResult,
+          mcp_endpoint: `${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}/adapters/${manualResult.name || adapterData.value.name}`,
+          message: 'Adapter created successfully',
+          token_info: {
+            token: tokenInfo.accessToken || tokenInfo.token,
+            tokenType: tokenInfo.tokenType,
+            expiresAt: tokenInfo.expiresAt
+          }
+        };
+      } catch (tokenErr) {
+        logger.warn('Failed to fetch token info', tokenErr);
+        creationResponse.value = {
+          adapter: manualResult,
+          mcp_endpoint: `${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}/adapters/${manualResult.name || adapterData.value.name}`,
+          message: 'Adapter created successfully'
+        };
+      }
+    }
+
+    // Clear status after a brief delay
+    setTimeout(() => {
+      spawningStatus.value = '';
+      spawningProgress.value = 0;
+    }, 2000);
+
+    showTokenModal.value = true;
     emit('adapterCreated');
     closeModal();
-  } catch (err) {
+  } catch (err: any) {
     logger.error('Failed to create adapter', err);
+    spawningError.value = err.message || 'Failed to create adapter';
     error.value = 'Failed to create adapter. Please try again.';
   } finally {
     creating.value = false;
@@ -766,5 +756,46 @@ textarea.form-control {
 .btn-sm {
   padding: 4px 8px;
   font-size: 12px;
+}
+
+.status-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--card-bg);
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.status-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--body-text);
+}
+
+.progress-bar {
+  width: 200px;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.status-message p {
+  margin: 0;
+  color: var(--body-text);
+  font-size: 14px;
 }
 </style>

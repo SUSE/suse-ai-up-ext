@@ -18,20 +18,45 @@
                 <h1 class="m-0" id="page-title">MCP Registry</h1>
               </div>
 
-              <!-- Toolbar with filters and actions -->
-              <div class="actions-container" role="toolbar" aria-label="MCP server filters and actions">
-                <div class="search-box">
-                  <label for="search-input" class="sr-only">Search MCP servers</label>
-                  <input
-                    id="search-input"
-                    v-model="searchQuery"
-                    type="search"
-                    placeholder="Search MCP servers"
-                    class="input-sm"
-                    aria-label="Search MCP servers"
-                    :aria-describedby="searchQuery ? 'search-results-count' : undefined"
-                  />
-                </div>
+               <!-- Toolbar with filters and actions -->
+               <div class="actions-container" role="toolbar" aria-label="MCP server filters and actions">
+                 <div class="search-box">
+                   <label for="search-input" class="sr-only">Search MCP servers</label>
+                   <input
+                     id="search-input"
+                     v-model="searchQuery"
+                     type="search"
+                     placeholder="Search MCP servers"
+                     class="input-sm"
+                     aria-label="Search MCP servers"
+                     :aria-describedby="searchQuery ? 'search-results-count' : undefined"
+                   />
+                 </div>
+
+                 <!-- Filter Controls -->
+                 <div class="filter-controls">
+                   <select v-model="transportFilter" class="filter-select">
+                     <option value="">All Transports</option>
+                     <option value="stdio">Stdio</option>
+                     <option value="sse">SSE</option>
+                     <option value="websocket">WebSocket</option>
+                     <option value="http">HTTP</option>
+                   </select>
+
+                   <select v-model="registryTypeFilter" class="filter-select">
+                     <option value="">All Registry Types</option>
+                     <option value="npm">NPM</option>
+                     <option value="mcpb">MCP Binary</option>
+                     <!-- Hide Docker/OCI for now as requested -->
+                   </select>
+
+                   <select v-model="validationStatusFilter" class="filter-select">
+                     <option value="">All Status</option>
+                     <option value="new">New</option>
+                     <option value="approved">Approved</option>
+                     <option value="certified">Certified</option>
+                   </select>
+                 </div>
 
                 <button
                   class="btn role-primary"
@@ -44,27 +69,39 @@
                   Add MCP
                 </button>
 
-                <button
-                  class="btn role-secondary"
-                  @click="showImportModal = true"
-                  :title="'Import MCP Server'"
-                  :aria-label="'Import MCP Server'"
-                  type="button"
-                >
-                  <i class="icon icon-upload" aria-hidden="true" />
-                  Import
-                </button>
+                 <button
+                   class="btn role-secondary"
+                   @click="showImportModal = true"
+                   :title="'Import MCP Server'"
+                   :aria-label="'Import MCP Server'"
+                   type="button"
+                 >
+                   <i class="icon icon-upload" aria-hidden="true" />
+                   Import
+                 </button>
 
-                <button
-                  class="btn role-secondary"
-                  @click="showRegistryModal = true"
-                  :title="'Manage Public Registries'"
-                  :aria-label="'Manage Public Registries'"
-                  type="button"
-                >
-                  <i class="icon icon-sync" aria-hidden="true" />
-                  Registries
-                </button>
+                 <button
+                   class="btn role-secondary"
+                   @click="syncOfficialRegistry"
+                   :disabled="syncingRegistry !== null"
+                   :title="'Sync Official MCP Registry'"
+                   :aria-label="'Sync Official MCP Registry'"
+                   type="button"
+                 >
+                   <i class="icon icon-refresh" :class="{ 'icon-spin': syncingRegistry === 'official' }" aria-hidden="true" />
+                   {{ syncingRegistry === 'official' ? 'Syncing...' : 'Sync Official' }}
+                 </button>
+
+                 <button
+                   class="btn role-secondary"
+                   @click="showRegistryModal = true"
+                   :title="'Manage Public Registries'"
+                   :aria-label="'Manage Public Registries'"
+                   type="button"
+                 >
+                   <i class="icon icon-sync" aria-hidden="true" />
+                   Registries
+                 </button>
               </div>
             </header>
 
@@ -181,11 +218,12 @@
       </main>
 
       <!-- Modal Components -->
-      <ServerDetailsModal
-        :show="showViewModal"
-        :server="selectedServer"
-        @close="showViewModal = false"
-      />
+       <ServerDetailsModal
+         :show="showViewModal"
+         :server="selectedServer"
+         @close="showViewModal = false"
+         @serverSpawned="handleServerSpawned"
+       />
 
       <RegistryManagementModal
         :show="showRegistryModal"
@@ -209,13 +247,24 @@
         @checkSecurity="checkSecurity"
       />
 
-      <AddRegistryModal
-        :show="showAddRegistryModal"
-        @close="showAddRegistryModal = false"
-        @submit="addCustomRegistry"
-      />
+       <AddRegistryModal
+         :show="showAddRegistryModal"
+         @close="showAddRegistryModal = false"
+         @submit="addCustomRegistry"
+       />
 
-       <GitHubEnvModal
+        <BulkUploadModal
+          :show="showImportModal"
+          @close="showImportModal = false"
+          @uploaded="handleBulkUpload"
+        />
+
+        <CreateAdapterModal
+          ref="createAdapterModalRef"
+          @adapterCreated="handleAdapterCreated"
+        />
+
+        <GitHubEnvModal
          :show="showGitHubModal"
          @adapterCreated="onAdapterCreated"
          @close="showGitHubModal = false"
@@ -245,6 +294,9 @@ import {
 import GitHubEnvModal from '../components/shared/GitHubEnvModal.vue';
 import RegistryAdapterConfigModal from '../components/shared/RegistryAdapterConfigModal.vue';
 
+import BulkUploadModal from '../components/MCPGateway/BulkUploadModal.vue';
+import CreateAdapterModal from '../components/shared/CreateAdapterModal.vue';
+
 interface Registry {
   id: string;
   name: string;
@@ -262,6 +314,8 @@ export default defineComponent({
     RegistryManagementModal,
     AdvancedRegistryModal,
     AddRegistryModal,
+    BulkUploadModal,
+    CreateAdapterModal,
     GitHubEnvModal,
     RegistryAdapterConfigModal
   },
@@ -276,6 +330,9 @@ export default defineComponent({
     const store = useStore()
 
     const searchQuery = ref('');
+    const transportFilter = ref('');
+    const registryTypeFilter = ref('');
+    const validationStatusFilter = ref('');
     const showAddModal = ref(false);
     const showImportModal = ref(false);
     const showViewModal = ref(false);
@@ -283,6 +340,7 @@ export default defineComponent({
     const showAdvancedModal = ref(false);
     const showAddRegistryModal = ref(false);
     const showGitHubModal = ref(false);
+    const createAdapterModalRef = ref();
 
     const isLoading = ref(true);
     const registryServers = ref<any[]>([]);
@@ -480,6 +538,9 @@ export default defineComponent({
 
     const filteredServers = computed(() => {
       const query = searchQuery.value.toLowerCase();
+      const transport = transportFilter.value;
+      const registryType = registryTypeFilter.value;
+      const validationStatus = validationStatusFilter.value;
 
       // Always include certified scenarios (filtered by search)
       const filteredCertified = certifiedScenarios.value.filter((server: any) =>
@@ -491,12 +552,27 @@ export default defineComponent({
 
       // Filter registry servers if they exist
       const filteredRegistry = registryServers.value && registryServers.value.length > 0
-        ? registryServers.value.filter((server: any) =>
-            server.name != null &&
-            (server.name.toLowerCase().includes(query) ||
-             server.description.toLowerCase().includes(query) ||
-             server.author.toLowerCase().includes(query))
-          )
+        ? registryServers.value.filter((server: any) => {
+            // Search filter
+            const matchesSearch = server.name != null &&
+              (server.name.toLowerCase().includes(query) ||
+               server.description.toLowerCase().includes(query) ||
+               server.author.toLowerCase().includes(query));
+
+            // Transport filter
+            const matchesTransport = !transport ||
+              (server.packages && server.packages.some((pkg: any) => pkg.transport?.type === transport));
+
+            // Registry type filter
+            const matchesRegistryType = !registryType ||
+              (server.packages && server.packages.some((pkg: any) => pkg.registryType === registryType));
+
+            // Validation status filter
+            const matchesValidationStatus = !validationStatus ||
+              server.validation_status === validationStatus;
+
+            return matchesSearch && matchesTransport && matchesRegistryType && matchesValidationStatus;
+          })
         : [];
 
       // Return certified scenarios first, then registry servers
@@ -517,12 +593,31 @@ export default defineComponent({
     const registryCount = computed(() => {
       if (!registryServers.value || registryServers.value.length === 0) return 0;
       const query = searchQuery.value.toLowerCase();
-      return registryServers.value.filter((server: any) =>
-        server.name != null &&
-        (server.name.toLowerCase().includes(query) ||
-         server.description.toLowerCase().includes(query) ||
-         server.author.toLowerCase().includes(query))
-      ).length;
+      const transport = transportFilter.value;
+      const registryType = registryTypeFilter.value;
+      const validationStatus = validationStatusFilter.value;
+
+      return registryServers.value.filter((server: any) => {
+        // Search filter
+        const matchesSearch = server.name != null &&
+          (server.name.toLowerCase().includes(query) ||
+           server.description.toLowerCase().includes(query) ||
+           server.author.toLowerCase().includes(query));
+
+        // Transport filter
+        const matchesTransport = !transport ||
+          (server.packages && server.packages.some((pkg: any) => pkg.transport?.type === transport));
+
+        // Registry type filter
+        const matchesRegistryType = !registryType ||
+          (server.packages && server.packages.some((pkg: any) => pkg.registryType === registryType));
+
+        // Validation status filter
+        const matchesValidationStatus = !validationStatus ||
+          server.validation_status === validationStatus;
+
+        return matchesSearch && matchesTransport && matchesRegistryType && matchesValidationStatus;
+      }).length;
     });
 
     const processServerData = (serverData: RegistryServer[]) => {
@@ -721,13 +816,13 @@ export default defineComponent({
     };
 
     const handleCreateAdapter = async (server: any) => {
-      console.log('handleCreateAdapter called with server:', server);
       if (!server) {
         console.error('Server is undefined in handleCreateAdapter');
         return;
       }
-      selectedRegistryServer.value = server;
-      showRegistryAdapterModal.value = true;
+
+      // Simply call handleInstallServer with the server ID
+      await handleInstallServer(server.id);
     };
 
     const handleDeleteServer = async (serverId: string | number) => {
@@ -809,6 +904,13 @@ export default defineComponent({
         selectedServer.value = server.rawData || null;
         showViewModal.value = true;
       }
+    };
+
+    const handleServerSpawned = (spawnResult: any) => {
+      console.log('Server spawned successfully:', spawnResult);
+      // Refresh the adapters list in the parent component
+      // This will be handled by the parent component's refresh mechanism
+      alert(`Server spawned successfully! MCP Endpoint: ${spawnResult.mcp_endpoint}`);
     };
 
     // Registry management functions
@@ -921,7 +1023,37 @@ export default defineComponent({
       persistSave('mcp-registry-data', data);
     };
 
+    const syncOfficialRegistry = async () => {
+      syncingRegistry.value = 'official';
+      try {
+        console.log('Syncing official MCP registry...');
+        const result = await MCPService.syncOfficialRegistry();
+        console.log('Official registry sync completed:', result);
 
+        // Refresh the registry servers after sync
+        await refreshFromBrowse();
+
+        alert(`Official registry synced successfully! ${result.synced} servers synced, ${result.updated} updated.`);
+      } catch (error) {
+        console.error('Failed to sync official registry:', error);
+        alert('Failed to sync official registry. Please try again.');
+      } finally {
+        syncingRegistry.value = null;
+      }
+    };
+
+    const handleBulkUpload = (result: any) => {
+      console.log('Bulk upload completed:', result);
+      // Refresh the registry servers after upload
+      refreshFromBrowse();
+      alert(`Bulk upload completed! ${result.length} servers uploaded successfully.`);
+    };
+
+    const handleAdapterCreated = () => {
+      console.log('Adapter created successfully');
+      // Could refresh adapters list or show success message
+      alert('Adapter created successfully!');
+    };
 
     // Advanced modal functions
     const clearAllEntries = () => {
@@ -1259,6 +1391,9 @@ export default defineComponent({
     return {
       isEnabled,
       searchQuery,
+      transportFilter,
+      registryTypeFilter,
+      validationStatusFilter,
        showAddModal,
        showImportModal,
        showViewModal,
@@ -1274,10 +1409,15 @@ export default defineComponent({
        handleInstallServer,
        handleRemoveServer,
        handleDeleteServer,
-       handleViewServer,
-       toggleRegistry,
-       syncRegistry,
-       syncAllRegistries,
+        handleViewServer,
+        handleServerSpawned,
+        toggleRegistry,
+        syncRegistry,
+        syncAllRegistries,
+        syncOfficialRegistry,
+        handleBulkUpload,
+        handleAdapterCreated,
+        createAdapterModalRef,
        clearAllEntries,
        checkAvailability,
        checkSecurity,
@@ -1421,7 +1561,28 @@ export default defineComponent({
   top: 50%;
   transform: translateY(-50%);
   color: var(--muted);
-  font-size: 16px;
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  font-size: 13px;
+  background: var(--body-bg);
+  color: var(--body-text);
+  min-width: 120px;
+}
+
+.filter-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
 }
 
 /* Main content area */
