@@ -2,7 +2,7 @@
   <div v-if="show" class="modal-overlay" @click="$emit('close')">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h3>{{ server?.name }} Details</h3>
+        <h3>{{ server?.name || 'Server' }} Details</h3>
         <button @click="$emit('close')" class="btn btn-sm">×</button>
       </div>
       <div class="modal-body">
@@ -210,6 +210,8 @@ export default defineComponent({
   emits: ['close', 'serverSpawned'],
 
     setup(props, { emit }) {
+      console.log('ServerDetailsModal setup called with show:', props.show, 'server:', props.server?.name)
+
       const spawnEnvVars = reactive<Record<string, string>>({});
       const spawning = ref(false);
       const showDeploymentModal = ref(false);
@@ -238,23 +240,37 @@ export default defineComponent({
         return requiredEnvVars.every(env => spawnEnvVars[env.name]?.trim());
       });
 
-      // Watch for modal opening with a discovered server
+      // Watch for modal opening
       watch(() => props.show, async (newShow) => {
+        console.log('Modal show watcher triggered:', newShow, 'server:', props.server?.name)
         if (newShow && props.server) {
+          console.log('Server has packages?', 'packages' in props.server)
+          console.log('Server has vulnerability_score?', 'vulnerability_score' in props.server)
+
           // Check if this is a discovered server that needs full details
           if ('vulnerability_score' in props.server) {
-            // This is a discovered server, fetch full details from registry using MCP ID
-            // Transform name to slug format for API call
-            const mcpId = props.server.name?.toLowerCase().replace(/\s+/g, '-') || props.server.id;
-            await fetchServerDetails(mcpId);
+            // This is a discovered server, fetch full details from registry
+            loadingDetails.value = true;
+            try {
+              const mcpId = props.server.name?.toLowerCase().replace(/\s+/g, '-') || props.server.id;
+              console.log('Fetching details for discovered server with MCP ID:', mcpId)
+              await fetchServerDetails(mcpId);
+            } catch (error) {
+              console.error('Failed to fetch server details:', error)
+              detailsError.value = 'Failed to load server details. Please try again.';
+            } finally {
+              loadingDetails.value = false;
+            }
           } else {
             // This is a full MCPServer from registry - use directly
+            console.log('Using MCPServer directly - no API call needed')
             fullServerDetails.value = props.server as MCPServer;
           }
         } else {
           // Modal closing, reset state
           fullServerDetails.value = null;
           detailsError.value = '';
+          loadingDetails.value = false;
         }
       });
 

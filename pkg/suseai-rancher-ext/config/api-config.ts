@@ -109,9 +109,9 @@ export const MCP_ENDPOINTS = {
   REGISTRY_SYNC_OFFICIAL: '/api/v1/registry/reload',
   REGISTRY_UPLOAD: '/api/v1/registry/upload',
   REGISTRY_UPLOAD_BULK: '/api/v1/registry/upload',
-   REGISTRY_UPLOAD_LOCAL_MCP: '/api/v1/registry/upload',
-    REGISTRY_DETAILS: (id: string) => `/api/v1/registry/${id}`,
-    REGISTRY_CREATE_ADAPTER: (id: string) => `/api/v1/registry/${id}/create-adapter`,
+  REGISTRY_UPLOAD_LOCAL_MCP: '/api/v1/registry/upload',
+  REGISTRY_DETAILS: (id: string) => `/api/v1/registry/${id}`,
+  REGISTRY_CREATE_ADAPTER: (id: string) => `/api/v1/registry/${id}/create-adapter`,
 
   // Deployment Management
   DEPLOYMENT_CONFIG: (serverId: string) => `/api/v1/deployment/config/${serverId}`,
@@ -124,8 +124,8 @@ export const MCP_ENDPOINTS = {
   PLUGIN_UNREGISTER: (serviceId: string) => `/api/v1/plugins/${serviceId}`,
   PLUGIN_SERVICES_BY_TYPE: (serviceType: string) => `/api/v1/plugins/type/${serviceType}`,
 
-    // System
-    HEALTH: '/health',
+  // System
+  HEALTH: '/health',
   METRICS: '/metrics',
   DOCS: '/docs',
   SWAGGER_JSON: '/swagger.json'

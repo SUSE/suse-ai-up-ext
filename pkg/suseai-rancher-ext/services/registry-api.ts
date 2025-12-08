@@ -203,21 +203,66 @@ export class RegistryAPI extends BaseAPI {
   }
 
   /**
-   * Get server details by ID
-   */
-  async getServer(id: string): Promise<MCPServer> {
-    try {
-      logger.info('Getting server details', { id })
+    * Get server details by ID
+    */
+   async getServer(id: string): Promise<MCPServer> {
+     try {
+       logger.info('Getting server details', { id })
 
-       const server = await this.get<MCPServer>(`/api/v1/registry/${id}`)
-      logger.info('Server details retrieved', { id, name: server.name })
+       // Try API first
+       try {
+         const server = await this.get<MCPServer>(`/api/v1/registry/${id}`)
+         logger.info('Server details retrieved from API', { id, name: server.name })
+         return server
+       } catch (apiError) {
+         logger.warn('API call failed, falling back to server.json', { id, error: apiError })
+       }
 
-      return server
-    } catch (error) {
-      logger.error('Failed to get server details', { id, error })
-      throw error
-    }
-  }
+       // Fallback to server.json
+       try {
+         const response = await fetch('/server.json')
+         const servers = await response.json()
+
+         const server = servers.find((s: any) => {
+           // Try different ID matching strategies
+           const serverId = s.name?.toLowerCase().replace(/\s+/g, '-') ||
+                           s.title?.toLowerCase().replace(/\s+/g, '-') ||
+                           s.id
+           return serverId === id
+         })
+
+         if (server) {
+           // Transform to MCPServer format
+           const transformedServer: MCPServer = {
+             id: server.name?.toLowerCase().replace(/\s+/g, '-') || server.title?.toLowerCase().replace(/\s+/g, '-') || server.id,
+             name: server.title || server.name,
+             description: server.description,
+             icon: server.icon,
+             packages: server.packages || [],
+             _meta: {
+               source: 'registry',
+               userAuthRequired: false,
+               authType: 'none',
+               category: 'general',
+               tags: [],
+               badges: []
+             }
+           }
+
+           logger.info('Server details retrieved from server.json fallback', { id, name: transformedServer.name })
+           return transformedServer
+         } else {
+           throw new Error(`Server with id ${id} not found in server.json`)
+         }
+       } catch (fallbackError) {
+         logger.error('Fallback to server.json also failed', { id, error: fallbackError })
+         throw fallbackError
+       }
+     } catch (error) {
+       logger.error('Failed to get server details', { id, error })
+       throw error
+     }
+   }
 
   /**
    * Reload the MCP server registry

@@ -148,12 +148,12 @@
       </div>
     </main>
 
-    <!-- Server Details Modal -->
-    <ServerDetailsModal
-      :show="showViewModal"
-      :server="selectedServer"
-      @close="showViewModal = false"
-    />
+     <!-- Server Details Modal -->
+     <RegistryServerDetailsModal
+       :show="showViewModal"
+       :server="selectedServer"
+       @close="showViewModal = false"
+     />
   </div>
 </template>
 
@@ -180,7 +180,7 @@ const genericMCPIcon = `<svg width="180" height="180" viewBox="0 0 180 180" fill
 export default defineComponent({
   name: 'MCPRegistry',
   components: {
-    ServerDetailsModal: () => import('../components/MCPGateway/ServerDetailsModal.vue')
+    RegistryServerDetailsModal: () => import('../components/MCPRegistry/RegistryServerDetailsModal.vue')
   },
 
   metaInfo() {
@@ -282,7 +282,17 @@ export default defineComponent({
     }
 
     const handleViewServer = async (server: MCPServer) => {
-      selectedServer.value = await getServerDetails(server.id) as any
+      console.log('Opening details for registry server:', server.name, 'with ID:', server.id)
+      try {
+        // For registry servers, always fetch full details from registry API
+        const fullServerDetails = await getServerDetails(server.id)
+        console.log('Registry server details loaded:', fullServerDetails?.name)
+        selectedServer.value = fullServerDetails
+      } catch (error) {
+        console.error('Failed to load registry server details, using browse data:', error)
+        // Fallback to browse data if API fails
+        selectedServer.value = server
+      }
       showViewModal.value = true
     }
 
@@ -345,20 +355,20 @@ export default defineComponent({
   text-align: center;
   padding: 50px;
   font-size: 18px;
-  color: #666;
+  color: var(--muted, #666);
 }
 
 /* Experimental Banner */
 .experimental-banner {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  border-radius: 4px;
+  background: var(--warning-bg, #fff3cd);
+  border: 1px solid var(--warning-border, #ffeaa7);
+  border-radius: var(--border-radius, 4px);
   padding: 12px 16px;
   margin: 16px 24px 0;
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  color: #856404;
+  color: var(--warning-text, #856404);
 }
 
 .banner-icon {
@@ -368,16 +378,16 @@ export default defineComponent({
 
 .experimental-banner strong {
   font-weight: 600;
-  color: #856404;
+  color: var(--warning-text, #856404);
 }
 
 .experimental-banner a {
-  color: #d63384;
+  color: var(--link, #d63384);
   text-decoration: underline;
 }
 
 .experimental-banner a:hover {
-  color: #b02a5b;
+  color: var(--link-hover, #b02a5b);
 }
 
 /* Main layout */
@@ -394,8 +404,8 @@ export default defineComponent({
 
 /* Header */
 .fixed-header {
-  background: white;
-  border-bottom: 1px solid #e1e5e9;
+  background: var(--body-bg, white);
+  border-bottom: 1px solid var(--border, #e1e5e9);
   padding: 16px 24px;
   position: sticky;
   top: 0;
@@ -410,7 +420,7 @@ export default defineComponent({
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--body-text, #1a1a1a);
 }
 
 .actions-container {
@@ -428,9 +438,11 @@ export default defineComponent({
 .search-box input {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: var(--border-radius, 4px);
   font-size: 14px;
+  background: var(--body-bg, white);
+  color: var(--body-text);
 }
 
 .filter-controls {
@@ -440,10 +452,11 @@ export default defineComponent({
 
 .filter-select {
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: var(--border-radius, 4px);
   font-size: 14px;
-  background: white;
+  background: var(--body-bg, white);
+  color: var(--body-text);
 }
 
 /* Main content */
@@ -455,7 +468,7 @@ export default defineComponent({
 .results-summary {
   margin-bottom: 24px;
   font-size: 14px;
-  color: #666;
+  color: var(--muted, #666);
 }
 
 .inline-loading {
@@ -465,15 +478,15 @@ export default defineComponent({
 }
 
 .error-message {
-  color: #dc3545;
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
+  color: var(--error, #dc3545);
+  background: var(--error-bg, #f8d7da);
+  border: 1px solid var(--error-border, #f5c6cb);
+  border-radius: var(--border-radius, 4px);
   padding: 12px;
 }
 
 .results-text {
-  color: #666;
+  color: var(--muted, #666);
 }
 
 /* Server tiles */
@@ -484,9 +497,9 @@ export default defineComponent({
 }
 
 .clickable-tile {
-  background: white;
-  border: 1px solid #e1e5e9;
-  border-radius: 8px;
+  background: var(--card-bg, white);
+  border: 1px solid var(--border, #e1e5e9);
+  border-radius: var(--border-radius, 8px);
   padding: 16px;
   transition: all 0.2s ease;
   display: flex;
@@ -499,12 +512,12 @@ export default defineComponent({
 }
 
 .clickable-tile:hover {
-  border-color: #007bff;
+  border-color: var(--primary, #007bff);
   box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
 }
 
 .clickable-tile:focus {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--primary, #007bff);
   outline-offset: 2px;
 }
 
@@ -522,12 +535,12 @@ export default defineComponent({
 .tile-icon {
   width: 40px;
   height: 40px;
-  background: #f8f9fa;
-  border-radius: 6px;
+  background: var(--accent-bg, #f8f9fa);
+  border-radius: var(--border-radius, 6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6c757d;
+  color: var(--muted, #6c757d);
   font-size: 18px;
 }
 
@@ -547,7 +560,7 @@ export default defineComponent({
   margin: 0 0 4px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--body-text, #1a1a1a);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -556,7 +569,7 @@ export default defineComponent({
 .tile-description {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: #666;
+  color: var(--muted, #666);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -579,33 +592,33 @@ export default defineComponent({
 }
 
 .badge-warning {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--warning-bg, #fff3cd);
+  color: var(--warning-text, #856404);
 }
 
 .badge-info {
-  background: #d1ecf1;
-  color: #0c5460;
+  background: var(--info-bg, #d1ecf1);
+  color: var(--info-text, #0c5460);
 }
 
 .badge-secondary {
-  background: #e9ecef;
-  color: #495057;
+  background: var(--secondary-bg, #e9ecef);
+  color: var(--secondary-text, #495057);
 }
 
 .badge-light {
-  background: #f8f9fa;
-  color: #6c757d;
+  background: var(--light-bg, #f8f9fa);
+  color: var(--light-text, #6c757d);
 }
 
 .badge-success {
-  background: #d4edda;
-  color: #155724;
+  background: var(--success-bg, #d4edda);
+  color: var(--success-text, #155724);
 }
 
 .badge-primary {
-  background: #cce5ff;
-  color: #004085;
+  background: var(--primary-bg, #cce5ff);
+  color: var(--primary-text, #004085);
 }
 
 .tile-tags {
@@ -617,16 +630,16 @@ export default defineComponent({
 
 .tag {
   padding: 2px 6px;
-  background: #e3f2fd;
-  color: #1976d2;
+  background: var(--info-bg, #e3f2fd);
+  color: var(--info-text, #1976d2);
   border-radius: 12px;
   font-size: 11px;
   font-weight: 500;
 }
 
 .more-tags {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--light-bg, #f5f5f5);
+  color: var(--muted, #666);
 }
 
 .tile-packages {
@@ -639,7 +652,7 @@ export default defineComponent({
   margin: 0 0 8px 0;
   font-size: 14px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--body-text, #1a1a1a);
 }
 
 .packages-list {
@@ -650,15 +663,15 @@ export default defineComponent({
 
 .package-item {
   padding: 8px;
-  background: #f8f9fa;
-  border-radius: 4px;
-  border: 1px solid #e9ecef;
+  background: var(--accent-bg, #f8f9fa);
+  border-radius: var(--border-radius, 4px);
+  border: 1px solid var(--border-light, #e9ecef);
 }
 
 .package-name {
   font-weight: 600;
   font-size: 13px;
-  color: #1a1a1a;
+  color: var(--body-text, #1a1a1a);
   margin-bottom: 4px;
 }
 
@@ -666,12 +679,12 @@ export default defineComponent({
   display: flex;
   gap: 8px;
   font-size: 12px;
-  color: #666;
+  color: var(--muted, #666);
   margin-bottom: 4px;
 }
 
 .package-type {
-  background: #e9ecef;
+  background: var(--secondary-bg, #e9ecef);
   padding: 1px 4px;
   border-radius: 2px;
 }
@@ -696,17 +709,17 @@ export default defineComponent({
   gap: 6px;
   font-size: 11px;
   padding: 2px 4px;
-  background: #f8f9fa;
+  background: var(--accent-bg, #f8f9fa);
   border-radius: 3px;
 }
 
 .env-var-name {
   font-weight: 500;
-  color: #495057;
+  color: var(--body-text, #495057);
 }
 
 .env-var-required {
-  background: #dc3545;
+  background: var(--error, #dc3545);
   color: white;
   padding: 1px 3px;
   border-radius: 2px;
@@ -715,7 +728,7 @@ export default defineComponent({
 }
 
 .env-var-secret {
-  background: #6f42c1;
+  background: var(--warning, #6f42c1);
   color: white;
   padding: 1px 3px;
   border-radius: 2px;
@@ -725,7 +738,7 @@ export default defineComponent({
 
 .env-var-more {
   font-size: 10px;
-  color: #6c757d;
+  color: var(--muted, #6c757d);
   font-style: italic;
   text-align: center;
   padding: 2px;
@@ -734,9 +747,9 @@ export default defineComponent({
 .more-packages {
   text-align: center;
   font-style: italic;
-  color: #666;
+  color: var(--muted, #666);
   background: transparent;
-  border: 1px dashed #ddd;
+  border: 1px dashed var(--border, #ddd);
 }
 
 .tile-expand-btn {
@@ -747,7 +760,7 @@ export default defineComponent({
 .tile-actions {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid #f8f9fa;
+  border-top: 1px solid var(--border-light, #f8f9fa);
   display: flex;
   justify-content: flex-end;
 }
@@ -755,14 +768,14 @@ export default defineComponent({
 .tile-expanded {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--border-light, #e9ecef);
 }
 
 .meta-details h4 {
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--body-text, #1a1a1a);
 }
 
 .meta-grid {
@@ -780,18 +793,18 @@ export default defineComponent({
 .meta-label {
   font-size: 12px;
   font-weight: 500;
-  color: #666;
+  color: var(--muted, #666);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .meta-value {
   font-size: 14px;
-  color: #1a1a1a;
+  color: var(--body-text, #1a1a1a);
 }
 
 .meta-value a {
-  color: #007bff;
+  color: var(--primary, #007bff);
   text-decoration: none;
 }
 
@@ -802,7 +815,7 @@ export default defineComponent({
 .btn {
   padding: 6px 12px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--border-radius, 4px);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -814,24 +827,24 @@ export default defineComponent({
 }
 
 .btn-primary {
-  background: #007bff;
+  background: var(--primary, #007bff);
   color: white;
-  border-color: #007bff;
+  border-color: var(--primary, #007bff);
 }
 
 .btn-primary:hover {
-  background: #0056b3;
-  border-color: #0056b3;
+  background: var(--primary-hover, #0056b3);
+  border-color: var(--primary-hover, #0056b3);
 }
 
 .btn-outline {
   background: transparent;
-  border: 1px solid #007bff;
-  color: #007bff;
+  border: 1px solid var(--primary, #007bff);
+  color: var(--primary, #007bff);
 }
 
 .btn-outline:hover {
-  background: #007bff;
+  background: var(--primary, #007bff);
   color: white;
 }
 
