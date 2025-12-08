@@ -1,7 +1,7 @@
 // Discovery Composable
 // Provides state management and API integration for network scanning
 
-import { ref, readonly } from 'vue'
+import { ref, readonly, onMounted, onUnmounted } from 'vue'
 import { discoveryAPI, type ScanConfig, type ScanResult, type DiscoveredServer } from '../services/discovery-api'
 import { logger } from '../utils/logger'
 
@@ -53,12 +53,12 @@ export function useDiscovery() {
         scanProgress.value = Math.min(scanProgress.value + 10, 90)
         // Continue polling
         setTimeout(() => pollScanStatus(scanId), 2000)
-      } else if (status.status === 'completed') {
-        scanProgress.value = 100
-        scanning.value = false
-        // Load discovered servers
-        await loadDiscoveredServers()
-        logger.info('Network scan completed', { scanId, serversFound: status.results?.length || 0 })
+       } else if (status.status === 'completed') {
+         scanProgress.value = 100
+         scanning.value = false
+         // Always load from API to ensure proper data formatting
+         await loadDiscoveredServers()
+         logger.info('Network scan completed, loaded servers from API', { scanId, serversFound: discoveredServers.value.length })
       } else if (status.status === 'failed') {
         scanProgress.value = 0
         scanning.value = false
@@ -82,9 +82,17 @@ export function useDiscovery() {
       const servers = await discoveryAPI.getDiscoveredServers()
       discoveredServers.value = servers
       logger.info('Discovered servers loaded', { count: servers.length })
+
+      if (servers.length > 0) {
+        logger.info('Sample server data:', servers[0])
+        logger.info('All server data:', servers)
+      } else {
+        logger.warn('No servers loaded from API')
+      }
     } catch (err: any) {
       error.value = err.message || 'Failed to load discovered servers'
       logger.error('Failed to load discovered servers', err)
+      // Don't throw, just log the error
     } finally {
       loading.value = false
     }
@@ -168,6 +176,74 @@ export function useDiscovery() {
     error.value = null
   }
 
+  // Polling for discovered servers updates
+  let pollInterval: ReturnType<typeof setInterval> | null = null
+
+  // Check for server updates
+  const checkForUpdates = async () => {
+    try {
+      const latestServers = await discoveryAPI.getDiscoveredServers()
+
+      // Check if there are any changes
+      const currentIds = new Set(discoveredServers.value.map(s => s.id))
+      const latestIds = new Set(latestServers.map(s => s.id))
+
+      const hasNewServers = latestServers.some(s => !currentIds.has(s.id))
+      const hasUpdatedServers = latestServers.some(latest => {
+        const current = discoveredServers.value.find(c => c.id === latest.id)
+        return current && (
+          current.lastSeen !== latest.lastSeen ||
+          current.status !== latest.status ||
+          JSON.stringify(current.metadata) !== JSON.stringify(latest.metadata)
+        )
+      })
+
+      if (hasNewServers || hasUpdatedServers) {
+        logger.info('Discovered servers updated', {
+          newCount: latestServers.length,
+          previousCount: discoveredServers.value.length,
+          hasNew: hasNewServers,
+          hasUpdates: hasUpdatedServers
+        })
+
+        // Update with latest data
+        discoveredServers.value = latestServers
+      }
+    } catch (err: any) {
+      // Don't set error for polling failures, just log
+      logger.warn('Failed to poll discovered servers', { error: err.message })
+    }
+  }
+
+  // Start polling
+  const startPolling = () => {
+    if (pollInterval) {
+      clearInterval(pollInterval)
+    }
+    pollInterval = setInterval(checkForUpdates, 30000) // Poll every 30 seconds
+    logger.info('Started polling discovered servers')
+  }
+
+  // Stop polling
+  const stopPolling = () => {
+    if (pollInterval) {
+      clearInterval(pollInterval)
+      pollInterval = null
+      logger.info('Stopped polling discovered servers')
+    }
+  }
+
+  // Initialize polling on mount
+  onMounted(async () => {
+    await loadDiscoveredServers() // Initial load
+    startPolling()
+  })
+
+  // Cleanup on unmount
+  onUnmounted(() => {
+    stopPolling()
+  })
+
   return {
     // State
     discoveredServers: readonly(discoveredServers),
@@ -187,6 +263,9 @@ export function useDiscovery() {
     getVulnerabilityScore,
     filterBySecurity,
     getScanStats,
-    clearResults
+    clearResults,
+    checkForUpdates,
+    startPolling,
+    stopPolling
   }
 }

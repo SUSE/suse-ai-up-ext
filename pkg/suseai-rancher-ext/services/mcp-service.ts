@@ -16,10 +16,20 @@ export const apiClient = axios.create({
   },
 });
 
+// API client for Discovery service
+export const discoveryClient = axios.create({
+  baseURL: API_BASE_URLS.DISCOVERY,
+  timeout: getApiConfig().timeout,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 // Function to update API base URL
-export const updateApiBaseUrl = (serviceUrl?: string) => {
-  const newUrls = updateApiBaseUrls(serviceUrl);
+export const updateApiBaseUrl = (serviceUrl?: string, useHttps?: boolean) => {
+  const newUrls = updateApiBaseUrls(serviceUrl, useHttps);
   apiClient.defaults.baseURL = newUrls.MCP_GATEWAY;
+  discoveryClient.defaults.baseURL = newUrls.DISCOVERY;
 };
 
 // Types
@@ -112,7 +122,7 @@ export class MCPService {
   // Discovery
   static async getDiscoveryServers(): Promise<DiscoveredServer[]> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.DISCOVERY_SERVERS);
+      const response = await discoveryClient.get(MCP_ENDPOINTS.DISCOVERY_SERVERS);
       return response.data.servers || response.data;
     } catch (error) {
       console.error('Failed to get discovery servers:', error);
@@ -239,7 +249,7 @@ export class MCPService {
   // Scan Management
   static async getScanStatus(scanId: string): Promise<ScanStatus> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.SCAN_STATUS(scanId));
+      const response = await discoveryClient.get(MCP_ENDPOINTS.SCAN_STATUS(scanId));
       return response.data;
     } catch (error) {
       console.error('Failed to get scan status:', error);

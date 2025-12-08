@@ -21,18 +21,19 @@ export interface MCPServer {
   readonly lastSeen?: string
   readonly metadata?: any
   readonly validation_status?: string
-  readonly _meta: {
-    readonly source: string
-    readonly userAuthRequired: boolean
-    readonly authType: string
-    readonly category: string
-    readonly tags: readonly string[]
-    readonly documentation?: string
-    readonly hosted?: boolean
-    readonly requiresInstallation?: boolean
-    readonly transportType?: string
-    readonly validation_status?: string
-  }
+   readonly _meta: {
+     readonly source: string
+     readonly userAuthRequired: boolean
+     readonly authType: string
+     readonly category: string
+     readonly tags: readonly string[]
+     readonly documentation?: string
+     readonly hosted?: boolean
+     readonly requiresInstallation?: boolean
+     readonly transportType?: string
+     readonly validation_status?: string
+     readonly badges?: readonly string[]
+   }
 }
 
 export interface Package {
@@ -101,44 +102,59 @@ export class RegistryAPI extends BaseAPI {
         // Handle different response formats
         if (Array.isArray(result)) {
           // Raw array format (fallback for server.json)
-          servers = result.map((server: any) => ({
-            id: server.name,
-            name: server.title || server.name,
-            description: server.description,
-            icon: server.icon,
-            packages: server.packages || [],
-            _meta: {
-              source: 'registry',
-              userAuthRequired: false,
-              authType: 'none',
-              category: 'general',
-              tags: []
+          servers = result.map((server: any) => {
+            const serverName = server.title || server.name
+            return {
+              id: serverName.toLowerCase().replace(/\s+/g, '-'),
+              name: serverName,
+              description: server.description,
+              icon: server.icon,
+              packages: server.packages || [],
+              _meta: {
+                source: 'registry',
+                userAuthRequired: false,
+                authType: 'none',
+                category: 'general',
+                tags: []
+              }
             }
-          }))
+          })
           total = servers.length
           hasMore = false
           logger.info('Registry returned raw array format, transformed to expected structure')
         } else if (Array.isArray(result.servers)) {
-          // Expected structured format
-          servers = result.servers
+          // Expected structured format - transform IDs to slug format
+          servers = result.servers.map((server: MCPServer) => {
+            // Transform ID to slug format if it contains spaces or uppercase
+            if (server.id && (server.id.includes(' ') || server.id !== server.id.toLowerCase())) {
+              return {
+                ...server,
+                id: server.name.toLowerCase().replace(/\s+/g, '-')
+              }
+            }
+            return server
+          })
           total = result.total || servers.length
           hasMore = result.hasMore || false
-        } else if ((result as any).data && Array.isArray((result as any).data)) {
+         } else if ((result as any).data && Array.isArray((result as any).data)) {
           // Some APIs wrap the array in a data property
-          servers = (result as any).data.map((server: any) => ({
-            id: server.name,
-            name: server.title || server.name,
-            description: server.description,
-            icon: server.icon,
-            packages: server.packages || [],
-            _meta: {
-              source: 'registry',
-              userAuthRequired: false,
-              authType: 'none',
-              category: 'general',
-              tags: []
+          servers = (result as any).data.map((server: any) => {
+            const serverName = server.title || server.name
+            return {
+              id: serverName.toLowerCase().replace(/\s+/g, '-'),
+              name: serverName,
+              description: server.description,
+              icon: server.icon,
+              packages: server.packages || [],
+              _meta: {
+                source: 'registry',
+                userAuthRequired: false,
+                authType: 'none',
+                category: 'general',
+                tags: []
+              }
             }
-          }))
+          })
           total = servers.length
           hasMore = false
           logger.info('Registry returned data array format, transformed to expected structure')

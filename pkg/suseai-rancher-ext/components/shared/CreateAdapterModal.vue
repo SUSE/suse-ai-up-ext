@@ -449,9 +449,10 @@ const createAdapter = async () => {
       // result = await MCPService.createAdapterFromRegistry(selectedRegistryServer.value.id, config);
       result = await adapterAPI.create({
         mcpServerId: selectedRegistryServer.value.id,
-        name: config.name,
-        description: config.description,
-        authentication: config.authentication || { type: 'none', required: false }
+        name: adapterData.value.name,
+        description: adapterData.value.description,
+        environmentVariables: config.environmentVariables,
+        authentication: adapterData.value.authentication
       });
 
       spawningStatus.value = 'Starting MCP server process...';
@@ -469,7 +470,15 @@ const createAdapter = async () => {
       spawningStatus.value = 'Creating adapter...';
       spawningProgress.value = 50;
 
-      result = await adapterAPI.create(adapterData.value);
+      const createRequest = {
+        mcpServerId: '', // Empty for manual creation
+        name: adapterData.value.name,
+        description: adapterData.value.description,
+        environmentVariables: adapterData.value.environmentVariables,
+        authentication: adapterData.value.authentication
+      };
+
+      result = await adapterAPI.create(createRequest);
 
       spawningStatus.value = 'Adapter created successfully!';
       spawningProgress.value = 100;
@@ -479,18 +488,23 @@ const createAdapter = async () => {
 
     // Handle the response - registry creation returns different format
     if (selectedRegistryServer.value) {
-      // Registry creation response
-      const registryResult = result as CreateAdapterFromRegistryResponse;
+      // For now, registry creation returns the same Adapter format
+      // TODO: Implement proper registry creation API when available
+      const adapterResult = result as Adapter;
       creationResponse.value = {
-        adapter: registryResult.adapter,
-        mcp_endpoint: registryResult.mcp_endpoint,
-        message: registryResult.message,
-        token_info: registryResult.token_info,
-        note: registryResult.note
+        adapter: adapterResult,
+        mcp_endpoint: `http://localhost:8911/adapters/${adapterResult.name}`, // Placeholder endpoint
+        message: 'Adapter created successfully from registry server',
+        token_info: {
+          token: 'placeholder-token', // TODO: Get from API response
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+          tokenType: 'Bearer'
+        },
+        note: 'This is a placeholder response. Registry creation API needs to be implemented.'
       };
     } else {
       // Manual creation response
-      const manualResult = result as AdapterResource;
+      const manualResult = result as Adapter;
       // Fetch token information for manual creation
       try {
         // const tokenInfo = await MCPService.getAdapterToken(manualResult.name || adapterData.value.name);
@@ -500,8 +514,8 @@ const createAdapter = async () => {
           mcp_endpoint: `${API_BASE_URLS.MCP_GATEWAY.replace('/api/v1', '')}/adapters/${manualResult.name || adapterData.value.name}`,
           message: 'Adapter created successfully',
           token_info: {
-            token: tokenInfo.accessToken || tokenInfo.token,
-            tokenType: tokenInfo.tokenType,
+            token: tokenInfo.token,
+            tokenType: 'Bearer',
             expiresAt: tokenInfo.expiresAt
           }
         };

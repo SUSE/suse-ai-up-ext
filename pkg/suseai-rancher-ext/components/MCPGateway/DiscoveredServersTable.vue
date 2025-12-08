@@ -1,84 +1,88 @@
 <template>
   <div class="discovered-servers-section">
     <h2>Discovered MCP Servers</h2>
-     <table class="discovered-servers-table">
-         <thead>
-           <tr>
-             <th>Risk Status</th>
-             <th>Security Status</th>
-             <th>Name</th>
-             <th>Address</th>
-             <th>Port</th>
-             <th>Connection</th>
-             <th>Authentication Type</th>
-             <th>Validation Status</th>
-             <th>Discovered At</th>
-             <th>Actions</th>
-           </tr>
-         </thead>
-      <tbody>
-          <tr v-if="loading">
-            <td colspan="10" class="loading-row">Loading discovered servers...</td>
-          </tr>
-          <tr v-else-if="discoveredServers.length === 0">
-            <td colspan="10" class="empty-row">No servers discovered yet.</td>
-          </tr>
-          <tr v-else v-for="server in discoveredServers" :key="server.id">
-            <td>
-              <span :class="getRiskBadgeClass(server)">
-                {{ getRiskLabel(server) }}
-              </span>
-            </td>
-            <td>
-              <span :class="getSecurityStatusClass(server)">
-                {{ getSecurityStatusLabel(server) }}
-              </span>
-            </td>
-            <td>{{ server.name || '-' }}</td>
-            <td>{{ getAddressWithoutPort(server.address) }}</td>
-            <td>{{ getPortFromAddress(server.address) || server.port || '8911' }}</td>
-             <td>{{ server.connection || 'HTTP' }}</td>
-             <td>{{ getAuthTypeLabel(server.metadata?.auth_type) }}</td>
-             <td>
-               <span :class="getValidationStatusClass(server)">
-                 {{ getValidationStatusLabel(server) }}
-               </span>
-             </td>
-             <td>{{ server.discoveredAt ? new Date(server.discoveredAt).toLocaleString() : (server.lastSeen ? new Date(server.lastSeen).toLocaleString() : 'Unknown') }}</td>
-             <td>
-               <div class="action-buttons">
-                 <button
-                   class="btn btn-sm btn-icon"
-                   @click="handleViewServerDetails(server)"
-                   title="View Server Details"
-                   aria-label="View server details"
-                 >
-                   <i class="icon icon-info"></i>
-                 </button>
-                 <button
-                   class="btn btn-sm role-secondary"
-                   @click="handleViewServerDetails(server)"
-                   title="View Server Details"
-                 >
-                   View
-                 </button>
-                 <button
-                   class="btn btn-sm role-primary"
-                   @click="handleRegisterServer(server)"
-                   :disabled="server.status === 'error' || server.status === 'failed'"
-                 >
-                   Register
-                 </button>
-               </div>
-             </td>
-          </tr>
-      </tbody>
-     </table>
+
+    <div v-if="loading" class="loading-state">
+      <i class="icon icon-spinner icon-spin"></i>
+      Loading discovered servers...
+    </div>
+
+    <div v-else-if="discoveredServers.length === 0" class="empty-state">
+      <i class="icon icon-info"></i>
+      No servers discovered yet.
+    </div>
+
+    <div v-else class="servers-list">
+      <div
+        v-for="server in discoveredServers"
+        :key="server.id"
+        class="server-card"
+      >
+        <div class="server-header">
+          <h3>{{ server.name || 'Unknown Server' }}</h3>
+          <span :class="getStatusClass(server.status)" class="status-badge">
+            {{ getStatusLabel(server.status) }}
+          </span>
+        </div>
+
+        <div class="server-details">
+          <div class="detail-row">
+            <span class="label">Address:</span>
+            <span class="value">{{ server.address }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="label">Port:</span>
+            <span class="value">{{ server.port }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="label">Protocol:</span>
+            <span class="value">{{ server.protocol }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="label">Connection:</span>
+            <span class="value">{{ server.connection }}</span>
+          </div>
+
+          <div class="detail-row" v-if="server.lastSeen">
+            <span class="label">Last Seen:</span>
+            <span class="value">{{ formatDate(server.lastSeen) }}</span>
+          </div>
+
+          <div class="detail-row" v-if="server.vulnerability_score">
+            <span class="label">Risk:</span>
+            <span :class="getRiskClass(server.vulnerability_score)" class="value">
+              {{ server.vulnerability_score.toUpperCase() }}
+            </span>
+          </div>
+        </div>
+
+        <div class="server-actions">
+          <button
+            class="btn btn-sm btn-secondary"
+            @click="handleViewServerDetails(server)"
+          >
+            <i class="icon icon-info"></i>
+            Details
+          </button>
+
+          <button
+            class="btn btn-sm btn-primary"
+            @click="handleRegisterServer(server)"
+            :disabled="!canRegister(server)"
+          >
+            Register
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, watch } from 'vue';
 import type { DiscoveredServer } from '../../services/discovery-api';
 
 export default defineComponent({
@@ -99,147 +103,60 @@ export default defineComponent({
   },
   emits: ['view-server-details', 'register-server'],
   setup(props, { emit }) {
-    // Risk Status based on vulnerability_score from API, but show "protected" for registered servers
-    const getRiskBadgeClass = (server: DiscoveredServer) => {
-      // Check if server is registered (protected)
-      if (props.registeredServerIds.has(server.id)) {
-        return 'badge badge-success'; // Green for protected
-      }
 
-      // Original vulnerability-based logic
-      const score = server.vulnerability_score;
-      switch (score) {
-        case 'high':
-          return 'badge badge-danger';
-        case 'medium':
-          return 'badge badge-warning';
-        case 'low':
-          return 'badge badge-success';
+    const getStatusClass = (status?: string): string => {
+      switch (status) {
+        case 'discovered':
+        case 'ready':
+          return 'status-healthy';
+        case 'error':
+        case 'failed':
+          return 'status-unhealthy';
         default:
-          return 'badge badge-secondary';
+          return 'status-unknown';
       }
     };
 
-    const getRiskLabel = (server: DiscoveredServer) => {
-      // Check if server is registered (protected)
-      if (props.registeredServerIds.has(server.id)) {
-        return 'Protected';
-      }
-
-      // Original vulnerability-based logic
-      const score = server.vulnerability_score;
-      switch (score) {
-        case 'high':
-          return 'High';
-        case 'medium':
-          return 'Medium';
-        case 'low':
-          return 'Low';
+    const getStatusLabel = (status?: string): string => {
+      switch (status) {
+        case 'discovered':
+          return 'Discovered';
+        case 'ready':
+          return 'Ready';
+        case 'error':
+          return 'Error';
+        case 'failed':
+          return 'Failed';
         default:
           return 'Unknown';
       }
     };
 
-    // Security Status based on authentication and findings
-    const getSecurityStatus = (server: DiscoveredServer): 'critical' | 'medium' | 'low' => {
-      const hasAuth = server.metadata?.auth_type !== 'none';
-      const hasOtherIssues = server.security_findings &&
-        server.security_findings.some(f => f.category !== 'AUTHENTICATION');
-
-      if (!hasAuth) return 'critical';
-      if (hasAuth && hasOtherIssues) return 'medium';
-      return 'low';
-    };
-
-    const getSecurityStatusClass = (server: DiscoveredServer) => {
-      const status = getSecurityStatus(server);
-      switch (status) {
-        case 'critical':
-          return 'badge badge-danger';
+    const getRiskClass = (score?: string): string => {
+      switch (score) {
+        case 'high':
+          return 'risk-high';
         case 'medium':
-          return 'badge badge-warning';
+          return 'risk-medium';
         case 'low':
-          return 'badge badge-success';
+          return 'risk-low';
         default:
-          return 'badge badge-secondary';
+          return 'risk-unknown';
       }
     };
 
-    const getSecurityStatusLabel = (server: DiscoveredServer) => {
-      const status = getSecurityStatus(server);
-      switch (status) {
-        case 'critical':
-          return 'Critical';
-        case 'medium':
-          return 'Medium';
-        case 'low':
-          return 'Low';
-        default:
-          return 'Unknown';
+    const formatDate = (dateString?: string): string => {
+      if (!dateString) return 'Unknown';
+      try {
+        return new Date(dateString).toLocaleString();
+      } catch {
+        return 'Invalid Date';
       }
     };
 
-    const getAddressWithoutPort = (address: string) => {
-      if (!address) return '';
-      const colonIndex = address.lastIndexOf(':');
-      if (colonIndex > 0) {
-        return address.substring(0, colonIndex);
-      }
-      return address;
+    const canRegister = (server: DiscoveredServer): boolean => {
+      return server.status === 'discovered' || server.status === 'ready';
     };
-
-    const getPortFromAddress = (address: string) => {
-      if (!address) return null;
-      const colonIndex = address.lastIndexOf(':');
-      if (colonIndex > 0) {
-        const port = address.substring(colonIndex + 1);
-        return port;
-      }
-      return null;
-    };
-
-    const getAuthTypeLabel = (authType?: string) => {
-       if (!authType) return 'None';
-       return authType.charAt(0).toUpperCase() + authType.slice(1).toLowerCase();
-     };
-
-     // Validation Status based on server metadata
-     const getValidationStatus = (server: DiscoveredServer): 'approved' | 'pending' | 'rejected' | 'unknown' => {
-       // Check for validation_status in metadata or _meta
-       const validationStatus = server.metadata?.validation_status || (server as any)._meta?.validation_status;
-       if (validationStatus === 'approved') return 'approved';
-       if (validationStatus === 'rejected') return 'rejected';
-       if (validationStatus === 'pending') return 'pending';
-       return 'unknown';
-     };
-
-     const getValidationStatusClass = (server: DiscoveredServer) => {
-       const status = getValidationStatus(server);
-       switch (status) {
-         case 'approved':
-           return 'badge badge-success';
-         case 'rejected':
-           return 'badge badge-danger';
-         case 'pending':
-           return 'badge badge-warning';
-         default:
-           return 'badge badge-secondary';
-       }
-     };
-
-     const getValidationStatusLabel = (server: DiscoveredServer) => {
-       const status = getValidationStatus(server);
-       switch (status) {
-         case 'approved':
-           return 'Approved';
-         case 'rejected':
-           return 'Rejected';
-         case 'pending':
-           return 'Pending';
-         default:
-           return 'Unknown';
-       }
-     };
 
     const handleViewServerDetails = (server: DiscoveredServer) => {
       emit('view-server-details', server);
@@ -250,15 +167,11 @@ export default defineComponent({
     };
 
     return {
-      getRiskBadgeClass,
-      getRiskLabel,
-      getSecurityStatusClass,
-      getSecurityStatusLabel,
-      getAddressWithoutPort,
-      getPortFromAddress,
-      getAuthTypeLabel,
-      getValidationStatusClass,
-      getValidationStatusLabel,
+      getStatusClass,
+      getStatusLabel,
+      getRiskClass,
+      formatDate,
+      canRegister,
       handleViewServerDetails,
       handleRegisterServer
     };
@@ -268,118 +181,162 @@ export default defineComponent({
 
 <style scoped>
 .discovered-servers-section {
-  margin-top: 40px;
+  margin-top: 20px;
 }
 
 .discovered-servers-section h2 {
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   color: var(--body-text, #111827);
 }
 
-.discovered-servers-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--card-bg, #ffffff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.discovered-servers-table th,
-.discovered-servers-table td {
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid var(--border, #e5e7eb);
-}
-
-.discovered-servers-table th {
-  background: var(--accent-bg, #f9fafb);
-  font-weight: 600;
-  color: var(--body-text, #111827);
-}
-
-.discovered-servers-table tbody tr:hover {
-  background: var(--accent-bg, #f9fafb);
-}
-
-.discovered-servers-table .loading-row,
-.discovered-servers-table .empty-row {
-  text-align: center;
-  color: var(--muted, #6b7280);
-  font-style: italic;
-  padding: 20px;
-}
-
-/* Badges (matching VirtualMCP styles) */
-.badge {
-  display: inline-block;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 4px;
-  text-align: center;
-}
-
-.badge-success {
-  background: #28a745;
-  color: white;
-}
-
-.badge-warning {
-  background: #ffc107;
-  color: #212529;
-  animation: pulse 1s infinite;
-}
-
-.badge-danger {
-  background: #dc3545;
-  color: white;
-  animation: pulse 1s infinite;
-}
-
-.badge-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.badge-info {
-  background: #17a2b8;
-  color: white;
-}
-
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-  margin: 24px 0;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.btn-icon {
-  padding: 6px;
-  background: var(--accent-bg, #f9fafb);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 4px;
-  color: var(--primary, #007bff);
-  cursor: pointer;
-  transition: all 0.2s ease;
+.loading-state,
+.empty-state {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 32px;
+  gap: 10px;
+  padding: 40px;
+  color: var(--muted, #6b7280);
+  font-style: italic;
 }
 
-.btn-icon:hover {
-  background: var(--primary, #007bff);
+.servers-list {
+  display: grid;
+  gap: 16px;
+}
+
+.server-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.server-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.server-header h3 {
+  margin: 0;
+  color: var(--body-text, #111827);
+  font-size: 18px;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-healthy {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-unhealthy {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-unknown {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.server-details {
+  margin-bottom: 15px;
+}
+
+.detail-row {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.detail-row .label {
+  font-weight: 500;
+  color: var(--muted, #6b7280);
+  min-width: 100px;
+  margin-right: 10px;
+}
+
+.detail-row .value {
+  color: var(--body-text, #111827);
+}
+
+.risk-high {
+  color: #dc3545;
+  font-weight: 500;
+}
+
+.risk-medium {
+  color: #fd7e14;
+  font-weight: 500;
+}
+
+.risk-low {
+  color: #28a745;
+  font-weight: 500;
+}
+
+.risk-unknown {
+  color: var(--muted, #6b7280);
+}
+
+.server-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn-secondary {
+  background: #6c757d;
   color: white;
-  border-color: var(--primary, #007bff);
+  border-color: #6c757d;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #5a6268;
+  border-color: #5a6268;
+}
+
+.btn-primary {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+  border-color: #0056b3;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

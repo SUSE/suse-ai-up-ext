@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { defineProps, withDefaults, ref, computed, onMounted, watch, getCurrentInstance } from 'vue';
+import { ref, computed, onMounted, watch, getCurrentInstance } from 'vue';
 import yaml from 'js-yaml';
 import { Banner } from '@rancher/shell/rancher-components/Banner';
 import Loading from '@shell/components/Loading';

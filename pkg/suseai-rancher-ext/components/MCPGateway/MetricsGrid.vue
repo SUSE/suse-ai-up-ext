@@ -11,20 +11,41 @@
       <span class="metric-value" v-else>...</span>
     </div>
     <div class="metric-card">
-      <h3>Available Registered MCP</h3>
-      <span class="metric-value" v-if="!loading">{{ availableCount }}</span>
-      <span class="metric-value" v-else>...</span>
+      <h3>Proxy Health</h3>
+      <div class="health-badge" :class="proxyHealth?.status?.status || 'unknown'">
+        <i class="icon" :class="getHealthIcon(proxyHealth?.status?.status)"></i>
+        <span class="health-text">{{ getHealthText(proxyHealth?.status?.status) }}</span>
+      </div>
+      <div class="last-checked" v-if="proxyHealth?.status?.timestamp">
+        {{ formatTimestamp(proxyHealth.status.timestamp) }}
+      </div>
     </div>
     <div class="metric-card">
-      <h3>error calls rate</h3>
-      <span class="metric-value" v-if="!loading">{{ errorRate }}</span>
-      <span class="metric-value" v-else>...</span>
+      <h3>Registry Health</h3>
+      <div class="health-badge" :class="registryHealth?.status?.status || 'unknown'">
+        <i class="icon" :class="getHealthIcon(registryHealth?.status?.status)"></i>
+        <span class="health-text">{{ getHealthText(registryHealth?.status?.status) }}</span>
+      </div>
+      <div class="last-checked" v-if="registryHealth?.status?.timestamp">
+        {{ formatTimestamp(registryHealth.status.timestamp) }}
+      </div>
+    </div>
+    <div class="metric-card">
+      <h3>Discovery Health</h3>
+      <div class="health-badge" :class="discoveryHealth?.status?.status || 'unknown'">
+        <i class="icon" :class="getHealthIcon(discoveryHealth?.status?.status)"></i>
+        <span class="health-text">{{ getHealthText(discoveryHealth?.status?.status) }}</span>
+      </div>
+      <div class="last-checked" v-if="discoveryHealth?.status?.timestamp">
+        {{ formatTimestamp(discoveryHealth.status.timestamp) }}
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from 'vue';
+import type { ServiceHealth } from '../../composables/useHealthMonitoring';
 
 export default defineComponent({
   name: 'MetricsGrid',
@@ -37,18 +58,63 @@ export default defineComponent({
       type: Number,
       required: true
     },
-    availableCount: {
-      type: Number,
-      required: true
+    proxyHealth: {
+      type: Object as () => ServiceHealth,
+      default: null
     },
-    errorRate: {
-      type: String,
-      required: true
+    registryHealth: {
+      type: Object as () => ServiceHealth,
+      default: null
+    },
+    discoveryHealth: {
+      type: Object as () => ServiceHealth,
+      default: null
     },
     loading: {
       type: Boolean,
       default: false
     }
+  },
+  setup() {
+    const getHealthIcon = (status: string | undefined) => {
+      switch (status) {
+        case 'healthy':
+          return 'icon-check';
+        case 'unhealthy':
+          return 'icon-error';
+        default:
+          return 'icon-question';
+      }
+    };
+
+    const getHealthText = (status: string | undefined) => {
+      switch (status) {
+        case 'healthy':
+          return 'Healthy';
+        case 'unhealthy':
+          return 'Unhealthy';
+        default:
+          return 'Checking...';
+      }
+    };
+
+    const formatTimestamp = (timestamp: string) => {
+      if (!timestamp) return '';
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      return date.toLocaleTimeString();
+    };
+
+    return {
+      getHealthIcon,
+      getHealthText,
+      formatTimestamp
+    };
   }
 });
 </script>
@@ -81,5 +147,59 @@ export default defineComponent({
   font-size: 28px;
   font-weight: bold;
   color: var(--body-text, #111827);
+}
+
+.health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.health-badge.healthy {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.health-badge.healthy .icon {
+  color: #28a745;
+}
+
+.health-badge.unhealthy {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  animation: blink 1s infinite;
+}
+
+.health-badge.unhealthy .icon {
+  color: #dc3545;
+}
+
+.health-badge.unknown {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.health-badge.unknown .icon {
+  color: #856404;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
+}
+
+.last-checked {
+  font-size: 12px;
+  color: var(--muted, #6b7280);
+  margin-top: 4px;
 }
 </style>

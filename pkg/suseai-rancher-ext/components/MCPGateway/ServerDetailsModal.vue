@@ -6,142 +6,155 @@
         <button @click="$emit('close')" class="btn btn-sm">×</button>
       </div>
       <div class="modal-body">
-        <div v-if="server" class="server-details">
+        <div v-if="loadingDetails" class="loading-state">
+          <i class="icon icon-spinner icon-spin"></i>
+          Loading server details...
+        </div>
+
+        <div v-else-if="detailsError" class="error-state">
+          <i class="icon icon-error"></i>
+          <p>{{ detailsError }}</p>
+          <button class="btn btn-secondary" @click="retryFetchServerDetails()">
+            Retry
+          </button>
+        </div>
+
+        <div v-else-if="displayServer" class="server-details">
             <div class="detail-section">
               <h4>Basic Information</h4>
-              <p><strong>Name:</strong> {{ server.name }}</p>
-              <p><strong>Description:</strong> {{ server.description }}</p>
-              <p><strong>Address:</strong> {{ server.address }}</p>
-              <p><strong>Port:</strong> {{ server.port }}</p>
-              <p><strong>Protocol:</strong> {{ server.protocol || 'Unknown' }}</p>
-              <p><strong>Connection:</strong> {{ server.connection || 'HTTP' }}</p>
-              <p v-if="server.discoveredAt"><strong>Discovered At:</strong> {{ new Date(server.discoveredAt).toLocaleString() }}</p>
-              <p v-if="server.lastSeen"><strong>Last Seen:</strong> {{ new Date(server.lastSeen).toLocaleString() }}</p>
+              <p><strong>Name:</strong> {{ displayServer.name }}</p>
+              <p><strong>Description:</strong> {{ displayServer.description }}</p>
+              <p><strong>Address:</strong> {{ displayServer.address }}</p>
+              <p><strong>Port:</strong> {{ displayServer.port }}</p>
+              <p><strong>Protocol:</strong> {{ displayServer.protocol || 'Unknown' }}</p>
+              <p><strong>Connection:</strong> {{ displayServer.connection || 'HTTP' }}</p>
+              <p v-if="displayServer.discoveredAt"><strong>Discovered At:</strong> {{ new Date(displayServer.discoveredAt).toLocaleString() }}</p>
+              <p v-if="displayServer.lastSeen"><strong>Last Seen:</strong> {{ new Date(displayServer.lastSeen).toLocaleString() }}</p>
             </div>
 
-            <div v-if="server._meta || server.metadata" class="detail-section">
+             <div v-if="displayServer._meta || displayServer.metadata" class="detail-section">
               <h4>Metadata</h4>
-              <div v-if="server._meta">
-                <p v-if="server._meta.source"><strong>Source:</strong> {{ server._meta.source }}</p>
-                <p v-if="server._meta.category"><strong>Category:</strong> {{ server._meta.category }}</p>
-                <p v-if="server._meta.userAuthRequired !== undefined"><strong>Requires Auth:</strong> {{ server._meta.userAuthRequired ? 'Yes' : 'No' }}</p>
-                <p v-if="server._meta.authType"><strong>Auth Type:</strong> {{ server._meta.authType }}</p>
-                <p v-if="server._meta.documentation"><strong>Documentation:</strong> <a :href="server._meta.documentation" target="_blank">{{ server._meta.documentation }}</a></p>
-                <p v-if="server._meta.hosted !== undefined"><strong>Hosted:</strong> {{ server._meta.hosted ? 'Yes' : 'No' }}</p>
-                <p v-if="server._meta.requiresInstallation !== undefined"><strong>Requires Installation:</strong> {{ server._meta.requiresInstallation ? 'Yes' : 'No' }}</p>
-                <p v-if="server._meta.transportType"><strong>Transport Type:</strong> {{ server._meta.transportType }}</p>
-                <p v-if="server._meta.validation_status"><strong>Validation Status:</strong> {{ server._meta.validation_status }}</p>
-                <div v-if="server._meta.tags && server._meta.tags.length">
+              <div v-if="displayServer._meta">
+                <p v-if="displayServer._meta.source"><strong>Source:</strong> {{ displayServer._meta.source }}</p>
+                <p v-if="displayServer._meta.category"><strong>Category:</strong> {{ displayServer._meta.category }}</p>
+                <p v-if="displayServer._meta.userAuthRequired !== undefined"><strong>Requires Auth:</strong> {{ displayServer._meta.userAuthRequired ? 'Yes' : 'No' }}</p>
+                <p v-if="displayServer._meta.authType"><strong>Auth Type:</strong> {{ displayServer._meta.authType }}</p>
+                <p v-if="displayServer._meta.documentation"><strong>Documentation:</strong> <a :href="displayServer._meta.documentation" target="_blank">{{ displayServer._meta.documentation }}</a></p>
+                <p v-if="displayServer._meta.hosted !== undefined"><strong>Hosted:</strong> {{ displayServer._meta.hosted ? 'Yes' : 'No' }}</p>
+                <p v-if="displayServer._meta.requiresInstallation !== undefined"><strong>Requires Installation:</strong> {{ displayServer._meta.requiresInstallation ? 'Yes' : 'No' }}</p>
+                <p v-if="displayServer._meta.transportType"><strong>Transport Type:</strong> {{ displayServer._meta.transportType }}</p>
+                <p v-if="displayServer._meta.validation_status"><strong>Validation Status:</strong> {{ displayServer._meta.validation_status }}</p>
+                <div v-if="displayServer._meta.tags && displayServer._meta.tags.length">
                   <strong>Tags:</strong>
                   <div class="tags-list">
-                    <span v-for="tag in server._meta.tags" :key="tag" class="tag">{{ tag }}</span>
+                    <span v-for="tag in displayServer._meta.tags" :key="tag" class="tag">{{ tag }}</span>
                   </div>
                 </div>
               </div>
-              <div v-if="server.metadata">
-                <p v-if="server.metadata.auth_type"><strong>Auth Type:</strong> {{ server.metadata.auth_type }}</p>
-                <p v-if="server.metadata.detectionMethod"><strong>Detection Method:</strong> {{ server.metadata.detectionMethod }}</p>
-                <p v-if="server.metadata.validation_status"><strong>Validation Status:</strong> {{ server.metadata.validation_status }}</p>
+              <div v-if="displayServer.metadata">
+                <p v-if="displayServer.metadata.auth_type"><strong>Auth Type:</strong> {{ displayServer.metadata.auth_type }}</p>
+                <p v-if="displayServer.metadata.detectionMethod"><strong>Detection Method:</strong> {{ displayServer.metadata.detectionMethod }}</p>
+                <p v-if="displayServer.metadata.validation_status"><strong>Validation Status:</strong> {{ displayServer.metadata.validation_status }}</p>
               </div>
             </div>
 
-           <div v-if="server.packages?.length" class="detail-section">
-             <h4>Packages</h4>
-             <div v-for="pkg in server.packages" :key="pkg.identifier" class="package-item">
-               <p><strong>Identifier:</strong> {{ pkg.identifier }}</p>
-               <p><strong>Type:</strong> {{ pkg.registryType }}</p>
-               <p><strong>Transport:</strong> {{ pkg.transport.type }}</p>
-             </div>
-           </div>
-
-          <div v-if="server.tools?.length" class="detail-section">
-            <h4>Tools</h4>
-            <div v-for="tool in server.tools" :key="tool.name" class="tool-item">
-              <p><strong>Name:</strong> {{ tool.name }}</p>
-              <p><strong>Description:</strong> {{ tool.description }}</p>
+           <div v-if="displayServer.packages?.length" class="detail-section">
+              <h4>Packages</h4>
+              <div v-for="pkg in displayServer.packages" :key="pkg.identifier" class="package-item">
+                <p><strong>Identifier:</strong> {{ pkg.identifier }}</p>
+                <p><strong>Type:</strong> {{ pkg.registryType }}</p>
+                <p><strong>Transport:</strong> {{ pkg.transport.type }}</p>
+              </div>
             </div>
-          </div>
 
-           <div v-if="server.config_template" class="detail-section">
-             <h4>Configuration Template</h4>
-             <div class="config-template">
-               <p><strong>Command:</strong> {{ server.config_template.command }}</p>
-               <p><strong>Arguments:</strong> {{ server.config_template.args?.join(' ') || 'None' }}</p>
-               <p><strong>Transport:</strong> {{ server.config_template.transport }}</p>
-               <p><strong>Image:</strong> {{ server.config_template.image }}</p>
-
-               <div v-if="server.config_template.env && Object.keys(server.config_template.env).length" class="env-vars">
-                 <p><strong>Environment Variables:</strong></p>
-                 <ul>
-                   <li v-for="(value, key) in server.config_template.env" :key="key">
-                     {{ key }}: {{ value || '(user must provide)' }}
-                   </li>
-                 </ul>
-               </div>
-
-               <div v-if="server.config_template.resource_limits" class="resource-limits">
-                 <p><strong>Resource Limits:</strong></p>
-                 <ul>
-                   <li v-if="server.config_template.resource_limits.cpu">
-                     CPU: {{ server.config_template.resource_limits.cpu }}
-                   </li>
-                   <li v-if="server.config_template.resource_limits.memory">
-                     Memory: {{ server.config_template.resource_limits.memory }}
-                   </li>
-                 </ul>
-               </div>
+           <div v-if="displayServer.tools?.length" class="detail-section">
+             <h4>Tools</h4>
+             <div v-for="tool in displayServer.tools" :key="tool.name" class="tool-item">
+               <p><strong>Name:</strong> {{ tool.name }}</p>
+               <p><strong>Description:</strong> {{ tool.description }}</p>
              </div>
            </div>
+
+           <div v-if="displayServer.config_template" class="detail-section">
+              <h4>Configuration Template</h4>
+              <div class="config-template">
+                <p><strong>Command:</strong> {{ displayServer.config_template.command }}</p>
+                <p><strong>Arguments:</strong> {{ displayServer.config_template.args?.join(' ') || 'None' }}</p>
+                <p><strong>Transport:</strong> {{ displayServer.config_template.transport }}</p>
+                <p><strong>Image:</strong> {{ displayServer.config_template.image }}</p>
+
+                <div v-if="displayServer.config_template.env && Object.keys(displayServer.config_template.env).length" class="env-vars">
+                  <p><strong>Environment Variables:</strong></p>
+                  <ul>
+                    <li v-for="(value, key) in displayServer.config_template.env" :key="key">
+                      {{ key }}: {{ value || '(user must provide)' }}
+                    </li>
+                  </ul>
+                </div>
+
+                <div v-if="displayServer.config_template.resource_limits" class="resource-limits">
+                  <p><strong>Resource Limits:</strong></p>
+                  <ul>
+                    <li v-if="displayServer.config_template.resource_limits.cpu">
+                      CPU: {{ displayServer.config_template.resource_limits.cpu }}
+                    </li>
+                    <li v-if="displayServer.config_template.resource_limits.memory">
+                      Memory: {{ displayServer.config_template.resource_limits.memory }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
 
            <div class="detail-section">
              <h4>Spawning Options</h4>
              <div class="spawning-options">
                <p>This server can be automatically spawned as a running MCP adapter.</p>
-               <div class="spawn-config">
-                 <h5>Environment Variables</h5>
-                 <p>Configure the following environment variables when spawning:</p>
-                 <div v-if="server.packages?.length" class="env-config-list">
-                   <div v-for="pkg in server.packages" :key="pkg.identifier" class="env-config-item">
-                     <h6>{{ pkg.registryType }}: {{ pkg.identifier }}</h6>
-                     <div v-if="pkg.environmentVariables?.length" class="env-vars-list">
-                       <div v-for="env in pkg.environmentVariables" :key="env.name" class="env-var-item">
-                         <label>{{ env.name }}</label>
-                         <input
-                           type="text"
-                           :placeholder="env.description"
-                           v-model="spawnEnvVars[env.name]"
-                           class="env-input"
-                         />
-                         <span class="env-type">{{ env.isSecret ? 'Secret' : 'Public' }}</span>
-                       </div>
-                     </div>
-                     <div v-else class="no-env-vars">
-                       No environment variables required
-                     </div>
-                   </div>
-                 </div>
-                 <div v-else class="no-packages">
-                   No package configuration available
-                 </div>
-               </div>
+                <div class="spawn-config">
+                  <h5>Environment Variables</h5>
+                  <p>Configure the following environment variables when spawning:</p>
+                  <div v-if="displayServer.packages?.length" class="env-config-list">
+                    <div v-for="pkg in displayServer.packages" :key="pkg.identifier" class="env-config-item">
+                      <h6>{{ pkg.registryType }}: {{ pkg.identifier }}</h6>
+                      <div v-if="pkg.environmentVariables?.length" class="env-vars-list">
+                        <div v-for="env in pkg.environmentVariables" :key="env.name" class="env-var-item">
+                          <label>{{ env.name }}</label>
+                          <input
+                            type="text"
+                            :placeholder="env.description"
+                            v-model="spawnEnvVars[env.name]"
+                            class="env-input"
+                          />
+                          <span class="env-type">{{ env.isSecret ? 'Secret' : 'Public' }}</span>
+                        </div>
+                      </div>
+                      <div v-else class="no-env-vars">
+                        No environment variables required
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="no-packages">
+                    No package configuration available
+                  </div>
+                </div>
 
-               <div class="spawn-actions">
-                 <div class="action-buttons">
-                   <button
-                     class="btn btn-primary"
-                     @click="spawnServer"
-                     :disabled="!canSpawn"
-                   >
-                     Spawn Server
-                   </button>
-                   <button
-                     v-if="server.config_template"
-                     class="btn btn-secondary"
-                     @click="showDeploymentModal = true"
-                   >
-                     Deploy to K8s
-                   </button>
-                 </div>
+                  <div class="spawn-actions">
+                    <div class="action-buttons">
+                      <button
+                        class="btn btn-primary"
+                        @click="spawnServer"
+                        :disabled="!canSpawn"
+                      >
+                        Spawn Server
+                      </button>
+                      <button
+                        v-if="displayServer?.config_template"
+                        class="btn btn-secondary"
+                        @click="showDeploymentModal = true"
+                      >
+                        Deploy to K8s
+                      </button>
+                    </div>
                  <p class="spawn-note">
                    Spawn creates a running MCP adapter with automatic process management.<br>
                    Deploy creates a Kubernetes deployment for production use.
@@ -150,27 +163,29 @@
              </div>
            </div>
 
-           <div v-if="server._meta" class="detail-section">
-             <h4>Metadata</h4>
-             <pre>{{ JSON.stringify(server._meta, null, 2) }}</pre>
-           </div>
+            <div v-if="displayServer._meta" class="detail-section">
+              <h4>Metadata</h4>
+              <pre>{{ JSON.stringify(displayServer._meta, null, 2) }}</pre>
+            </div>
         </div>
       </div>
     </div>
   </div>
 
-   <DeploymentModal
-     :show="showDeploymentModal"
-     :server="server as any"
-     @close="showDeploymentModal = false"
-     @deployed="handleDeployment"
-   />
+    <DeploymentModal
+      :show="showDeploymentModal"
+      :server="displayServer as any"
+      @close="showDeploymentModal = false"
+      @deployed="handleDeployment"
+    />
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType, computed, ref, reactive } from 'vue';
+import { defineComponent, type PropType, computed, ref, reactive, watch } from 'vue';
 import { useStore } from 'vuex';
 import type { MCPServer } from '../../services/registry-api';
+import type { DiscoveredServer } from '../../services/discovery-api';
+import { registryAPI } from '../../services/registry-api';
 // import { MCPService } from '../../services/mcp-service';
 import { logger } from '../../utils/logger';
 import DeploymentModal from './DeploymentModal.vue';
@@ -187,69 +202,137 @@ export default defineComponent({
       required: true
     },
     server: {
-      type: Object as PropType<MCPServer | null>,
+      type: Object as PropType<DiscoveredServer | MCPServer | null>,
       default: null
     }
   },
 
   emits: ['close', 'serverSpawned'],
 
-   setup(props, { emit }) {
-     const spawnEnvVars = reactive<Record<string, string>>({});
-     const spawning = ref(false);
-     const showDeploymentModal = ref(false);
+    setup(props, { emit }) {
+      const spawnEnvVars = reactive<Record<string, string>>({});
+      const spawning = ref(false);
+      const showDeploymentModal = ref(false);
+      const fullServerDetails = ref<MCPServer | null>(null);
+      const loadingDetails = ref(false);
+      const detailsError = ref<string>('');
 
-     const canSpawn = computed(() => {
-       if (!props.server) return false;
+      const displayServer = computed(() => {
+        // If we have full details, use those
+        if (fullServerDetails.value) return fullServerDetails.value;
+        // If the server is already an MCPServer, use it directly
+        if (props.server && '_meta' in props.server && props.server._meta) return props.server as MCPServer;
+        // Otherwise return null (will show loading or error)
+        return null;
+      });
 
-       // Check if all required environment variables are provided
-       const requiredEnvVars = props.server.packages?.flatMap(pkg =>
-         pkg.environmentVariables?.filter(env => !env.default) || []
-       ) || [];
+      const canSpawn = computed(() => {
+        const server = displayServer.value;
+        if (!server) return false;
 
-       return requiredEnvVars.every(env => spawnEnvVars[env.name]?.trim());
-     });
+        // Check if all required environment variables are provided
+        const requiredEnvVars = server.packages?.flatMap(pkg =>
+          pkg.environmentVariables?.filter(env => !env.default) || []
+        ) || [];
 
-    const spawnServer = async () => {
-      if (!props.server || !canSpawn.value) return;
+        return requiredEnvVars.every(env => spawnEnvVars[env.name]?.trim());
+      });
 
-      spawning.value = true;
-      try {
-        const config = {
-          replicaCount: 1,
-          environmentVariables: { ...spawnEnvVars }
-        };
+      // Watch for modal opening with a discovered server
+      watch(() => props.show, async (newShow) => {
+        if (newShow && props.server) {
+          // Check if this is a discovered server that needs full details
+          if ('vulnerability_score' in props.server) {
+            // This is a discovered server, fetch full details from registry using MCP ID
+            // Transform name to slug format for API call
+            const mcpId = props.server.name?.toLowerCase().replace(/\s+/g, '-') || props.server.id;
+            await fetchServerDetails(mcpId);
+          } else {
+            // This is a full MCPServer from registry - use directly
+            fullServerDetails.value = props.server as MCPServer;
+          }
+        } else {
+          // Modal closing, reset state
+          fullServerDetails.value = null;
+          detailsError.value = '';
+        }
+      });
 
-        // const result = await MCPService.createAdapterFromRegistry(props.server.id, config);
-        console.log('Adapter creation from registry not implemented yet');
-        logger.info('Server spawned successfully', { serverId: props.server.id });
+      const fetchServerDetails = async (serverId: string) => {
+        loadingDetails.value = true;
+        detailsError.value = '';
 
-        // Emit event with spawn result
-        // emit('serverSpawned', result);
+        try {
+          const details = await registryAPI.getServer(serverId);
+          fullServerDetails.value = details;
+          logger.info('Fetched full server details', { serverId, name: details.name });
+        } catch (error) {
+          logger.error('Failed to fetch server details', { serverId, error });
+          detailsError.value = 'Failed to load server details. Please try again.';
+        } finally {
+          loadingDetails.value = false;
+        }
+      };
 
-        // Close modal
-        emit('close');
-      } catch (error) {
-        logger.error('Failed to spawn server', error);
-        alert('Failed to spawn server. Please check the configuration and try again.');
-      } finally {
-        spawning.value = false;
-      }
-    };
+      const retryFetchServerDetails = () => {
+        if (!props.server) return;
+
+        // For discovered servers, transform name to MCP ID
+        if ('vulnerability_score' in props.server) {
+          const mcpId = props.server.name?.toLowerCase().replace(/\s+/g, '-') || props.server.id;
+          fetchServerDetails(mcpId);
+        } else {
+          // For MCPServer objects, use ID directly
+          fetchServerDetails(props.server.id);
+        }
+      };
+
+     const spawnServer = async () => {
+       if (!displayServer.value || !canSpawn.value) return;
+
+       spawning.value = true;
+       try {
+         const config = {
+           replicaCount: 1,
+           environmentVariables: { ...spawnEnvVars }
+         };
+
+         // const result = await MCPService.createAdapterFromRegistry(displayServer.value.id, config);
+         console.log('Adapter creation from registry not implemented yet');
+         logger.info('Server spawned successfully', { serverId: displayServer.value.id });
+
+         // Emit event with spawn result
+         // emit('serverSpawned', result);
+
+         // Close modal
+         emit('close');
+       } catch (error) {
+         logger.error('Failed to spawn server', error);
+         alert('Failed to spawn server. Please check the configuration and try again.');
+       } finally {
+         spawning.value = false;
+       }
+     };
 
     const handleDeployment = (result: any) => {
       console.log('Server deployed successfully:', result);
       alert(`Server deployed to Kubernetes successfully! Deployment ID: ${result.deployment_id}`);
     };
 
-     return {
-       spawnEnvVars,
-       spawning,
-       showDeploymentModal,
-       canSpawn,
-       spawnServer,
-       handleDeployment
-     };
+      return {
+        spawnEnvVars,
+        spawning,
+        showDeploymentModal,
+        fullServerDetails,
+        loadingDetails,
+        detailsError,
+        displayServer,
+        canSpawn,
+        spawnServer,
+        handleDeployment,
+        fetchServerDetails,
+        retryFetchServerDetails
+      };
    }
 });
 </script>

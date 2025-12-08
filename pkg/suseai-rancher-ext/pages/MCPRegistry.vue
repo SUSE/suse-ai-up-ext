@@ -84,11 +84,6 @@
                 :key="server.id"
                 class="clickable-tile"
                 @click="handleViewServer(server)"
-                role="button"
-                tabindex="0"
-                :aria-label="`View details for ${server.name}`"
-                @keydown.enter="handleViewServer(server)"
-                @keydown.space.prevent="handleViewServer(server)"
               >
                  <div class="tile-header">
                    <div class="tile-logo-container">
@@ -99,20 +94,24 @@
                      <div class="tile-meta">
                        <h3 class="tile-title">{{ server.name }}</h3>
                        <p class="tile-description">{{ server.description }}</p>
-                       <div class="tile-badges">
-                         <span v-if="requiresAuth(server)" class="badge badge-warning">
-                           Auth Required
-                         </span>
-                         <span class="badge badge-info">
-                           {{ getAuthType(server) }}
-                         </span>
-                         <span v-if="server._meta?.category" class="badge badge-secondary">
-                           {{ server._meta.category }}
-                         </span>
-                         <span v-if="server._meta?.source" class="badge badge-light">
-                           {{ server._meta.source }}
-                         </span>
-                       </div>
+                        <div class="tile-badges">
+                          <!-- Computed SUSE/CERTIFIED badges -->
+                          <span v-if="isSuseServer(server)" class="badge badge-primary">SUSE</span>
+                          <span v-if="isCertifiedServer(server)" class="badge badge-primary">CERTIFIED</span>
+
+                          <!-- API-provided badges -->
+                          <span v-if="server._meta?.badges && server._meta.badges.length" v-for="badge in server._meta.badges" :key="badge" class="badge badge-primary">
+                            {{ badge }}
+                          </span>
+
+                          <!-- Other badges -->
+                          <span v-if="requiresAuth(server)" class="badge badge-warning">
+                            Auth Required
+                          </span>
+                          <span v-if="server._meta?.hosted" class="badge badge-success">
+                            Hosted
+                          </span>
+                        </div>
                        <div v-if="server._meta?.tags && server._meta.tags.length" class="tile-tags">
                          <span v-for="tag in server._meta.tags.slice(0, 3)" :key="tag" class="tag">
                            {{ tag }}
@@ -124,33 +123,24 @@
                      </div>
                    </div>
                  </div>
-                 <div v-if="server.packages && server.packages.length" class="tile-packages">
-                   <h4 class="packages-title">Available Packages:</h4>
-                   <div class="packages-list">
-                     <div v-for="pkg in server.packages.slice(0, 2)" :key="pkg.identifier" class="package-item">
-                       <div class="package-name">{{ pkg.identifier }}</div>
-                       <div class="package-details">
-                         <span class="package-type">{{ pkg.registryType }}</span>
-                         <span class="package-transport">via {{ pkg.transport.type }}</span>
-                       </div>
-                       <div v-if="pkg.environmentVariables && pkg.environmentVariables.length" class="package-env">
-                         Requires {{ pkg.environmentVariables.filter(v => v.required).length }} env vars
-                       </div>
-                     </div>
-                     <div v-if="server.packages.length > 2" class="package-item more-packages">
-                       +{{ server.packages.length - 2 }} more packages
-                     </div>
-                   </div>
-                 </div>
-                <div class="tile-actions">
-                  <button
-                    class="btn btn-sm btn-primary"
-                    @click.stop="handleCreateAdapter(server)"
-                    :aria-label="`Create adapter for ${server.name}`"
-                  >
-                    Create Adapter
-                  </button>
-                </div>
+
+                  <div class="tile-actions">
+                    <button
+                      class="btn btn-sm btn-secondary"
+                      @click.stop="handleViewServer(server)"
+                      :aria-label="`View details for ${server.name}`"
+                    >
+                      <i class="icon icon-info"></i>
+                      Details
+                    </button>
+                    <button
+                      class="btn btn-sm btn-primary"
+                      @click.stop="handleCreateAdapter(server)"
+                      :aria-label="`Create adapter for ${server.name}`"
+                    >
+                      Create Adapter
+                    </button>
+                  </div>
               </div>
             </div>
           </div>
@@ -221,6 +211,21 @@ export default defineComponent({
     const categoryFilter = ref('')
     const showViewModal = ref(false)
     const selectedServer = ref<any>(null)
+    const expandedCards = ref<Set<string>>(new Set())
+
+    // Check if server is a SUSE server
+    const isSuseServer = (server: MCPServer): boolean => {
+      return server.name?.toLowerCase().includes('suse') ||
+             server._meta?.source?.toLowerCase().includes('suse') ||
+             server._meta?.badges?.some(badge => badge.toLowerCase().includes('suse')) ||
+             false
+    }
+
+    // Check if server is certified
+    const isCertifiedServer = (server: MCPServer): boolean => {
+      // For now, assume SUSE servers are certified
+      return isSuseServer(server)
+    }
 
     // Load initial data
     onMounted(async () => {
@@ -252,6 +257,17 @@ export default defineComponent({
 
     // Get appropriate icon for server
     const getServerIcon = (server: MCPServer): string => {
+      // Check if this is a SUSE server
+      const isSUSEServer = server.name.toLowerCase().includes('suse') ||
+                          server.description.toLowerCase().includes('suse') ||
+                          server._meta?.source?.toLowerCase().includes('suse') ||
+                          server._meta?.tags?.some(tag => tag.toLowerCase().includes('suse'))
+
+      if (isSUSEServer) {
+        // Use SUSE icon for SUSE servers
+        return `<img src="https://avatars.githubusercontent.com/u/1067733" alt="SUSE" style="width: 100%; height: 100%; border-radius: 4px; object-fit: cover;" />`
+      }
+
       // Use official server icon if available, otherwise use generic MCP icon
       return server.icon || genericMCPIcon
     }
@@ -275,6 +291,18 @@ export default defineComponent({
       console.log('Create adapter for server:', server.name)
     }
 
+    const toggleCardExpansion = (serverId: string) => {
+      if (expandedCards.value.has(serverId)) {
+        expandedCards.value.delete(serverId)
+      } else {
+        expandedCards.value.add(serverId)
+      }
+    }
+
+    const isCardExpanded = (serverId: string): boolean => {
+      return expandedCards.value.has(serverId)
+    }
+
     // Service enablement check
     const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled)
     const selectedServices = computed(() => store.state.suseai.settings.selectedServices)
@@ -293,12 +321,16 @@ export default defineComponent({
       availableCategories,
       isEnabled,
 
-      // Methods
-      handleSearch,
-      handleReloadRegistry,
-      handleViewServer,
-      handleCreateAdapter,
-      getServerIcon,
+       // Methods
+       handleSearch,
+       handleReloadRegistry,
+       handleViewServer,
+       handleCreateAdapter,
+       getServerIcon,
+       toggleCardExpansion,
+       isSuseServer,
+       isCertifiedServer,
+      isCardExpanded,
 
       // Composables
       requiresAuth,
@@ -456,10 +488,14 @@ export default defineComponent({
   border: 1px solid #e1e5e9;
   border-radius: 8px;
   padding: 16px;
-  cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.clickable-tile.expanded {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .clickable-tile:hover {
@@ -562,6 +598,16 @@ export default defineComponent({
   color: #6c757d;
 }
 
+.badge-success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.badge-primary {
+  background: #cce5ff;
+  color: #004085;
+}
+
 .tile-tags {
   margin-top: 8px;
   display: flex;
@@ -635,12 +681,54 @@ export default defineComponent({
 }
 
 .package-env {
+  margin-top: 6px;
+}
+
+.env-vars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.env-var-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
-  color: #856404;
-  background: #fff3cd;
   padding: 2px 4px;
+  background: #f8f9fa;
+  border-radius: 3px;
+}
+
+.env-var-name {
+  font-weight: 500;
+  color: #495057;
+}
+
+.env-var-required {
+  background: #dc3545;
+  color: white;
+  padding: 1px 3px;
   border-radius: 2px;
-  display: inline-block;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.env-var-secret {
+  background: #6f42c1;
+  color: white;
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.env-var-more {
+  font-size: 10px;
+  color: #6c757d;
+  font-style: italic;
+  text-align: center;
+  padding: 2px;
 }
 
 .more-packages {
@@ -651,10 +739,64 @@ export default defineComponent({
   border: 1px dashed #ddd;
 }
 
+.tile-expand-btn {
+  margin-left: auto;
+  padding-left: 12px;
+}
+
 .tile-actions {
   margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid #f8f9fa;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tile-expanded {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e9ecef;
+}
+
+.meta-details h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.meta-value {
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+.meta-value a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.meta-value a:hover {
+  text-decoration: underline;
 }
 
 .btn {
@@ -680,6 +822,17 @@ export default defineComponent({
 .btn-primary:hover {
   background: #0056b3;
   border-color: #0056b3;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #007bff;
+  color: #007bff;
+}
+
+.btn-outline:hover {
+  background: #007bff;
+  color: white;
 }
 
 .btn-sm {

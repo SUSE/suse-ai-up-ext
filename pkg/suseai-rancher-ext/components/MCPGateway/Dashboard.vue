@@ -6,8 +6,9 @@
     <MetricsGrid
       :discovered-count="discoveredCount"
       :registered-count="registeredCount"
-      :available-count="availableCount"
-      :error-rate="errorRate"
+      :proxy-health="proxyHealth"
+      :registry-health="registryHealth"
+      :discovery-health="discoveryHealth"
       :loading="loading"
     />
 
@@ -22,8 +23,8 @@
 
     <div class="tabs-container">
       <div class="tab-nav">
-        <button 
-          v-for="tab in tabs" 
+        <button
+          v-for="tab in tabs"
           :key="tab.id"
           :class="['tab-button', { active: activeTab === tab.id }]"
           @click="activeTab = tab.id"
@@ -49,10 +50,10 @@
            <DiscoveredServersTable
              :discovered-servers="discoveredServers"
              :loading="discoveryLoading"
-            :registered-server-ids="registeredServerIds"
-            @view-server-details="handleViewServerDetails"
-            @register-server="handleRegisterServer"
-          />
+             :registered-server-ids="registeredServerIds"
+             @view-server-details="handleViewServerDetails"
+             @register-server="handleRegisterServer"
+           />
         </div>
 
         <!-- Adapter Details Tab -->
@@ -101,19 +102,20 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed } from 'vue';
-import MetricsGrid from './MetricsGrid.vue';
 import ScanActions from './ScanActions.vue';
+import MetricsGrid from './MetricsGrid.vue';
 import AdaptersTable from './AdaptersTable.vue';
 import DiscoveredServersTable from './DiscoveredServersTable.vue';
 import AdapterDetails from './AdapterDetails.vue';
 import SessionManager from './SessionManager.vue';
 import RealTimeMetrics from './RealTimeMetrics.vue';
+import { useHealthMonitoring } from '../../composables/useHealthMonitoring';
 
 export default defineComponent({
   name: 'Dashboard',
   components: {
-    MetricsGrid,
     ScanActions,
+    MetricsGrid,
     AdaptersTable,
     DiscoveredServersTable,
     AdapterDetails,
@@ -150,7 +152,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const activeTab = ref('overview');
     const selectedAdapterName = ref('');
-    
+
     const tabs = [
       { id: 'overview', label: 'Overview' },
       { id: 'adapters', label: 'Adapter Details' },
@@ -162,16 +164,12 @@ export default defineComponent({
       return props.adapters.find(adapter => adapter.name === selectedAdapterName.value) || null;
     });
 
+    // Health monitoring
+    const { proxyHealth, registryHealth, discoveryHealth } = useHealthMonitoring();
+
     // Computed properties for metrics
     const discoveredCount = computed(() => props.discoveredServers.length);
     const registeredCount = computed(() => props.adapters.length);
-    const availableCount = computed(() => props.adapters.filter(a => a.status === 'ready').length);
-    const errorRate = computed(() => {
-      const totalAdapters = props.adapters.length;
-      if (totalAdapters === 0) return '0%';
-      const errorAdapters = props.adapters.filter(a => a.status === 'error').length;
-      return ((errorAdapters / totalAdapters) * 100).toFixed(1) + '%';
-    });
     const loading = computed(() => props.discoveryLoading || props.adaptersLoading);
 
     // Mock data for now (will be updated when we implement sessions/metrics)
@@ -180,7 +178,7 @@ export default defineComponent({
     const systemMetrics = ref(null);
     const loadingMetrics = ref(false);
     const adapterPingResults = ref({});
-    const registeredServerIds = ref(new Set());
+    const registeredServerIds = ref(new Set<string>());
 
     const handleScanStart = () => {
       emit('scan-modal-open');
@@ -196,7 +194,6 @@ export default defineComponent({
 
     const handleSyncAdapter = (adapter: any) => {
       console.log('Sync adapter:', adapter.name);
-      // TODO: Implement adapter sync functionality
     };
 
     const handleEditAdapter = (adapter: any) => {
@@ -219,16 +216,16 @@ export default defineComponent({
       console.log('Register server:', server.name);
     };
 
-    const handleCreateSession = (adapterId: string) => {
-      console.log('Create session for adapter:', adapterId);
+    const handleCreateSession = (adapter: any) => {
+      console.log('Create session for adapter:', adapter.name);
     };
 
-    const handleTerminateSession = (adapterId: string, sessionId: string) => {
-      console.log('Terminate session:', sessionId, 'for adapter:', adapterId);
+    const handleTerminateSession = (session: any) => {
+      console.log('Terminate session:', session.id);
     };
 
-    const handleViewSessionDetails = (sessionId: string) => {
-      console.log('View session details:', sessionId);
+    const handleViewSessionDetails = (session: any) => {
+      console.log('View session details:', session.id);
     };
 
     const handleRefreshMetrics = () => {
@@ -236,43 +233,34 @@ export default defineComponent({
     };
 
     return {
-      // Tab management
       activeTab,
       tabs,
       selectedAdapterName,
       selectedAdapter,
-
-      // Data from props
       discoveredServers: props.discoveredServers,
       adapters: props.adapters,
-      loading,
       scanning: props.scanning,
       scanProgress: props.scanProgress,
-      discoveredCount,
-      registeredCount,
-      availableCount,
-      errorRate,
       adapterPingResults,
       registeredServerIds,
-
-      // Enhanced data (mock for now)
-      sessions,
-      loadingSessions,
-      systemMetrics,
-      loadingMetrics,
-
-      // Handlers
+      proxyHealth,
+      registryHealth,
+      discoveryHealth,
+      discoveredCount,
+      registeredCount,
+      loading,
       handleScanStart,
       handleRuleManagement,
       handleViewAdapterLogs,
+      handleSyncAdapter,
       handleEditAdapter,
       handleDeleteAdapter,
       handleViewServerDetails,
+      handleRefreshAdapters,
       handleRegisterServer,
       handleCreateSession,
       handleTerminateSession,
       handleViewSessionDetails,
-      handleRefreshAdapters,
       handleRefreshMetrics
     };
   }

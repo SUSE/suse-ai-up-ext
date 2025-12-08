@@ -21,6 +21,7 @@
       @security-modal-open="openSecurityModal"
       @rule-modal-open="openRuleModal"
       @sync-adapter="handleSyncAdapter"
+      @view-server-details="openServerDetailsModal"
     />
 
     <ProxyStatus v-if="proxyInstalled && isEnabled" />
@@ -35,6 +36,13 @@
 
     <!-- Schedule Scan Modal -->
     <ScheduleScanModal ref="scanModal" @scanStarted="onScanStarted" />
+
+    <!-- Server Details Modal -->
+    <ServerDetailsModal
+      :show="showServerDetailsModal"
+      :server="selectedServer"
+      @close="closeServerDetailsModal"
+    />
   </div>
 </template>
 
@@ -43,7 +51,7 @@ import { defineComponent, ref, watch, onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useDiscovery } from '../composables/useDiscovery';
 import { useAdapters } from '../composables/useAdapters';
-import { ExperimentalBanner, Dashboard, ProxyStatus } from '../components/MCPGateway';
+import { ExperimentalBanner, Dashboard, ProxyStatus, ServerDetailsModal } from '../components/MCPGateway';
 import FeatureFlag from '../components/shared/FeatureFlag.vue';
 import ScheduleScanModal from '../components/shared/ScheduleScanModal.vue';
 import SecurityFindingsModal from '../components/shared/SecurityFindingsModal.vue';
@@ -58,7 +66,8 @@ export default defineComponent({
     ProxyStatus,
     ScheduleScanModal,
     SecurityFindingsModal,
-    RuleManagementModal
+    RuleManagementModal,
+    ServerDetailsModal
   },
   setup() {
     const store = useStore();
@@ -95,10 +104,7 @@ export default defineComponent({
     // Load data on mount
     onMounted(async () => {
       if (proxyInstalled.value) {
-        await Promise.all([
-          loadDiscoveredServers(),
-          loadAdapters()
-        ]);
+        await loadAdapters()
       }
     });
 
@@ -106,6 +112,10 @@ export default defineComponent({
     const scanModal = ref<any>();
     const securityModal = ref<any>();
     const ruleModal = ref<any>();
+
+    // Server details modal
+    const showServerDetailsModal = ref(false);
+    const selectedServer = ref<any>(null);
 
     // Track if scan was running to detect completion
     const scanWasRunning = ref(false);
@@ -139,6 +149,30 @@ export default defineComponent({
       }
     };
 
+    const openServerDetailsModal = async (server: any) => {
+      selectedServer.value = server;
+      showServerDetailsModal.value = true;
+    };
+
+    const closeServerDetailsModal = () => {
+      showServerDetailsModal.value = false;
+      selectedServer.value = null;
+    };
+
+    const handleSyncAdapter = async (adapter: any) => {
+      try {
+        await syncAdapter(adapter.id)
+        console.log('Adapter synced successfully:', adapter.name)
+      } catch (error) {
+        console.error('Failed to sync adapter:', error)
+      }
+    }
+
+    const onScanStarted = () => {
+      console.log('Scan started');
+      // Additional logic for when scan starts can be added here
+    };
+
     // MCPGateway is now only for management - service discovery handled in Home.vue
 
     return {
@@ -165,21 +199,15 @@ export default defineComponent({
       // Methods
       openScanModal,
       openSecurityModal,
-      openRuleModal
-    }
+      openRuleModal,
+      handleSyncAdapter,
+      onScanStarted,
 
-    const handleSyncAdapter = async (adapter: any) => {
-      try {
-        await syncAdapter(adapter.id)
-        console.log('Adapter synced successfully:', adapter.name)
-      } catch (error) {
-        console.error('Failed to sync adapter:', error)
-      }
-    }
-
-    return {
-      // Methods
-      handleSyncAdapter
+      // Server details modal
+      showServerDetailsModal,
+      selectedServer,
+      openServerDetailsModal,
+      closeServerDetailsModal
     }
   }
 });

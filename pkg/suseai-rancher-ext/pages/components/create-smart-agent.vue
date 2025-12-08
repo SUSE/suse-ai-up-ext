@@ -407,6 +407,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import SmartAgentsService, { type SmartAgent, type CreateAgentRequest, type UpdateAgentRequest } from '../../services/smart-agents-service';
 import { adapterAPI, type Adapter } from '../../services/adapter-api';
+import type { AdapterResource } from '../../types/mcp-types';
 
 interface RemoteProviderData {
   provider: string;
@@ -458,7 +459,7 @@ const isEditing = ref(false);
 const editingAgentId = ref<string | null>(null);
 const showAdvanced = ref(false);
 const submitError = ref<string>('');
-const availableAdapters = ref<AdapterResource[]>([]);
+const availableAdapters = ref<Adapter[]>([]);
 const isLoadingAdapters = ref(false);
 
 const maxRounds = computed(() => {
@@ -830,7 +831,7 @@ const onLocalProviderChange = () => {
     try {
       isLoadingAdapters.value = true;
       const adapters = await adapterAPI.list();
-      availableAdapters.value = adapters.filter(adapter => adapter.connectionType);
+      availableAdapters.value = adapters; // No filtering needed for now
     } catch (error) {
       console.error('Failed to fetch adapters:', error);
       availableAdapters.value = [];
@@ -867,7 +868,7 @@ const onLocalProviderChange = () => {
     if (selectedAdapters.length === 0) return [];
 
     return selectedAdapters.map(adapterName => {
-       const adapter = availableAdapters.value.find((a: AdapterResource) => a.name === adapterName);
+       const adapter = availableAdapters.value.find((a: Adapter) => a.name === adapterName);
       return {
         type: "function",
         function: {

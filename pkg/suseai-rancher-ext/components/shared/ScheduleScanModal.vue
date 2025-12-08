@@ -326,7 +326,7 @@ const removePort = (index: number) => {
 
         const scanResult = await discoveryAPI.startScan(backendConfig);
 
-        logger.info('Discovery scan started', { scanId: scanResult.id, config: backendConfig });
+        logger.info('Discovery scan started', { scanId: scanResult.scan_id, config: backendConfig });
         emit('scanStarted', scanResult);
 
         // Modal stays open during scan - user will close it manually when complete

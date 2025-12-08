@@ -3,17 +3,23 @@
  * Centralizes all API endpoints and base URLs
  */
 
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 
 // Base URLs for different services
-export const getApiBaseUrls = (serviceUrl?: string) => {
+export const getApiBaseUrls = (serviceUrl?: string, useHttps: boolean = false) => {
+  const protocol = useHttps ? 'https' : 'http';
+  const mcpPort = useHttps ? 38913 : 8913;
+  const discoveryPort = useHttps ? 38912 : 8912;
+  const proxyPort = useHttps ? 38911 : 8911;
+
   if (serviceUrl) {
-    // Extract IP from serviceUrl (e.g., http://192.168.1.100:8911 -> 192.168.1.100)
+    // Extract IP from serviceUrl (e.g., http://192.168.1.100:8913 -> 192.168.1.100)
     const url = new URL(serviceUrl);
     const ip = url.hostname;
     return {
-      MCP_GATEWAY: `http://${ip}:8911`,
-      DISCOVERY: `http://${ip}:8912`,
+      MCP_GATEWAY: `${protocol}://${ip}:${mcpPort}`,
+      DISCOVERY: `${protocol}://${ip}:${discoveryPort}`,
+      PROXY: `${protocol}://${ip}:${proxyPort}`,
       REGISTRY: `http://${ip}:8913`,
       PLUGINS: `http://${ip}:8914`,
       VIRTUAL_MCP: `http://${ip}:8912/api/v1`,
@@ -22,8 +28,9 @@ export const getApiBaseUrls = (serviceUrl?: string) => {
     };
   }
   return {
-    MCP_GATEWAY: 'http://192.168.64.17:8911',
-    DISCOVERY: 'http://192.168.64.17:8912',
+    MCP_GATEWAY: `${protocol}://192.168.64.17:${mcpPort}`,
+    DISCOVERY: `${protocol}://192.168.64.17:${discoveryPort}`,
+    PROXY: `${protocol}://192.168.64.17:${proxyPort}`,
     REGISTRY: 'http://192.168.64.17:8913',
     PLUGINS: 'http://192.168.64.17:8914',
     VIRTUAL_MCP: 'http://localhost:8912/api/v1',
@@ -32,15 +39,25 @@ export const getApiBaseUrls = (serviceUrl?: string) => {
   };
 };
 
+// HTTPS configuration
+export const useHttps = ref(false);
+
 // Initialize with default localhost as reactive object
 export const API_BASE_URLS = reactive(getApiBaseUrls());
 
 // Function to update API base URLs dynamically
-export const updateApiBaseUrls = (serviceUrl?: string) => {
-  const newApiBaseUrls = getApiBaseUrls(serviceUrl);
+export const updateApiBaseUrls = (serviceUrl?: string, httpsOverride?: boolean) => {
+  const useHttpsFlag = httpsOverride !== undefined ? httpsOverride : useHttps.value;
+  const newApiBaseUrls = getApiBaseUrls(serviceUrl, useHttpsFlag);
   // Update the reactive object properties
   Object.assign(API_BASE_URLS, newApiBaseUrls);
   return newApiBaseUrls;
+};
+
+// Function to toggle HTTPS mode
+export const setHttpsMode = (enabled: boolean) => {
+  useHttps.value = enabled;
+  updateApiBaseUrls();
 };
 
 // API Endpoints for MCP Gateway
@@ -196,5 +213,7 @@ export default {
   getApiConfig,
   buildUrl,
   getMcpUrl,
-  getSmartAgentsUrl
+  getSmartAgentsUrl,
+  useHttps,
+  setHttpsMode
 };

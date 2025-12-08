@@ -110,7 +110,7 @@ export class ProxyAPI extends BaseAPI {
 
 // Singleton instance
 export const proxyAPI = new ProxyAPI({
-  baseURL: API_BASE_URLS.MCP_GATEWAY,
+  baseURL: API_BASE_URLS.PROXY,
   timeout: 30000,
   retries: 3
 })
