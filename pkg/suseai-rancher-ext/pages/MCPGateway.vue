@@ -10,11 +10,20 @@
     <ExperimentalBanner />
 
     <Dashboard
-      v-if="proxyInstalled && hasSelectedServices"
+      v-if="proxyInstalled && isEnabled"
+      :discovered-servers="discoveredServers as any[]"
+      :adapters="adapters as any[]"
+      :discovery-loading="discoveryLoading"
+      :adapters-loading="adaptersLoading"
+      :scanning="scanning"
+      :scan-progress="scanProgress"
       @scan-modal-open="openScanModal"
       @security-modal-open="openSecurityModal"
       @rule-modal-open="openRuleModal"
+      @sync-adapter="handleSyncAdapter"
     />
+
+    <ProxyStatus v-if="proxyInstalled && isEnabled" />
 
     <!-- Show message when proxy not installed (shouldn't happen since Home.vue handles installation) -->
     <div v-else class="proxy-not-installed">
@@ -32,8 +41,9 @@
 <script lang="ts">
 import { defineComponent, ref, watch, onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
-import { useMCPGateway } from '../composables/useMCPGateway';
-import { ExperimentalBanner, Dashboard } from '../components/MCPGateway';
+import { useDiscovery } from '../composables/useDiscovery';
+import { useAdapters } from '../composables/useAdapters';
+import { ExperimentalBanner, Dashboard, ProxyStatus } from '../components/MCPGateway';
 import FeatureFlag from '../components/shared/FeatureFlag.vue';
 import ScheduleScanModal from '../components/shared/ScheduleScanModal.vue';
 import SecurityFindingsModal from '../components/shared/SecurityFindingsModal.vue';
@@ -45,6 +55,7 @@ export default defineComponent({
   components: {
     ExperimentalBanner,
     Dashboard,
+    ProxyStatus,
     ScheduleScanModal,
     SecurityFindingsModal,
     RuleManagementModal
@@ -52,27 +63,44 @@ export default defineComponent({
   setup() {
     const store = useStore();
 
+    // Use new composables
     const {
-      // Store getters
-      proxyInstalled,
-      hasSelectedServices,
-
-      // Modal data
-      selectedServerFindings,
-      selectedServerName,
-      selectedServer,
-
-      // Scan state
+      discoveredServers,
+      loading: discoveryLoading,
       scanning,
+      currentScan,
+      scanProgress,
+      startScan,
+      loadDiscoveredServers,
+      getServerDetails,
+      hasSecurityFindings,
+      getSecurityRiskLevel,
+      getVulnerabilityScore
+    } = useDiscovery();
 
-      // Methods
-      onScanStarted,
-      onRulesLoaded
-    } = useMCPGateway();
+    const {
+      adapters,
+      loading: adaptersLoading,
+      loadAdapters,
+      createAdapter,
+      deleteAdapter,
+      syncAdapter
+    } = useAdapters();
 
     // Service enablement check
+    const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled);
     const selectedServices = computed(() => store.state.suseai.settings.selectedServices);
     const isEnabled = computed(() => proxyInstalled.value && selectedServices.value.includes('mcp-gateway'));
+
+    // Load data on mount
+    onMounted(async () => {
+      if (proxyInstalled.value) {
+        await Promise.all([
+          loadDiscoveredServers(),
+          loadAdapters()
+        ]);
+      }
+    });
 
     // Modal refs
     const scanModal = ref<any>();
@@ -116,13 +144,18 @@ export default defineComponent({
     return {
       // Store getters
       proxyInstalled,
-      hasSelectedServices,
       isEnabled,
 
-      // Modal data
-      selectedServerFindings,
-      selectedServerName,
-      selectedServer,
+      // Discovery data
+      discoveredServers,
+      discoveryLoading,
+      scanning,
+      currentScan,
+      scanProgress,
+
+      // Adapters data
+      adapters,
+      adaptersLoading,
 
       // Modal refs
       scanModal,
@@ -132,10 +165,22 @@ export default defineComponent({
       // Methods
       openScanModal,
       openSecurityModal,
-      openRuleModal,
-      onScanStarted,
-      onRulesLoaded
-    };
+      openRuleModal
+    }
+
+    const handleSyncAdapter = async (adapter: any) => {
+      try {
+        await syncAdapter(adapter.id)
+        console.log('Adapter synced successfully:', adapter.name)
+      } catch (error) {
+        console.error('Failed to sync adapter:', error)
+      }
+    }
+
+    return {
+      // Methods
+      handleSyncAdapter
+    }
   }
 });
 </script>

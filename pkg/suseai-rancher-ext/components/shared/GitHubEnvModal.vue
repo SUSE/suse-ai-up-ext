@@ -40,6 +40,7 @@
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { logger } from '../../utils/logger';
+import { API_BASE_URLS } from '../../config/api-config';
 
 // Props
 const props = defineProps<{
@@ -124,7 +125,7 @@ const createAdapter = async () => {
     };
 
     // Make direct API call to match curl example
-    await axios.post('http://localhost:8911/api/v1/adapters', adapterData, {
+    await axios.post(`${API_BASE_URLS.MCP_GATEWAY}/adapters`, adapterData, {
       headers: {
         'Content-Type': 'application/json'
       }

@@ -178,7 +178,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { AdapterResource } from '../../services/mcp-service';
+import type { AdapterResource } from '../../types/mcp-types';
 import { API_BASE_URLS } from '../../config/api-config';
 
 interface Props {

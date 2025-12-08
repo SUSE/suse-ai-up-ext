@@ -12,3 +12,4 @@ export { default as ServerDetailsModal } from './ServerDetailsModal.vue';
 export { default as RegistryManagementModal } from './RegistryManagementModal.vue';
 export { default as AdvancedRegistryModal } from './AdvancedRegistryModal.vue';
 export { default as AddRegistryModal } from './AddRegistryModal.vue';
+export { default as ProxyStatus } from './ProxyStatus.vue';

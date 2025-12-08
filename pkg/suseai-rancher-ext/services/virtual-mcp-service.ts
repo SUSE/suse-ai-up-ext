@@ -12,7 +12,7 @@ import type {
 
 // Direct connection to Virtual MCP service
 const apiClient = axios.create({
-  baseURL: 'http://localhost:8912',
+  baseURL: API_BASE_URLS.VIRTUAL_MCP,
   timeout: getApiConfig().timeout,
   headers: {
     'Content-Type': 'application/json',
@@ -23,7 +23,7 @@ export class VirtualMCPService {
   // MCP Server Management
   static async getMCPServers(limit = 10, offset = 0): Promise<MCPListResponse> {
     try {
-      const response = await apiClient.get('/api/v1/mcps', {
+       const response = await apiClient.get('/mcps', {
         params: { limit, offset }
       });
       return response.data;
@@ -35,7 +35,7 @@ export class VirtualMCPService {
 
   static async getMCPServer(id: string): Promise<MCPServer> {
     try {
-      const response = await apiClient.get(`/api/v1/mcps/${id}`);
+       const response = await apiClient.get(`/mcps/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Failed to fetch MCP server ${id}:`, error);
@@ -45,7 +45,7 @@ export class VirtualMCPService {
 
   static async createMCPServer(server: MCPServer): Promise<MCPServer> {
     try {
-      const response = await apiClient.post('/api/v1/mcps', server);
+       const response = await apiClient.post('/mcps', server);
       return response.data;
     } catch (error) {
       console.error('Failed to create MCP server:', error);
@@ -55,7 +55,7 @@ export class VirtualMCPService {
 
   static async updateMCPServer(id: string, server: Partial<MCPServer>): Promise<MCPServer> {
     try {
-      const response = await apiClient.put(`/api/v1/mcps/${id}`, server);
+       const response = await apiClient.put(`/mcps/${id}`, server);
       return response.data;
     } catch (error) {
       console.error(`Failed to update MCP server ${id}:`, error);
@@ -65,7 +65,7 @@ export class VirtualMCPService {
 
   static async deleteMCPServer(id: string): Promise<void> {
     try {
-      await apiClient.delete(`/api/v1/mcps/${id}`);
+       await apiClient.delete(`/mcps/${id}`);
     } catch (error) {
       console.error(`Failed to delete MCP server ${id}:`, error);
       throw error;
@@ -75,7 +75,7 @@ export class VirtualMCPService {
   // Transformation Methods
   static async transformOpenAPI(request: TransformRequest): Promise<MCPServer> {
     try {
-      const response = await apiClient.post('/api/v1/transform/openapi', request);
+       const response = await apiClient.post('/transform/openapi', request);
       return response.data;
     } catch (error) {
       console.error('Failed to transform OpenAPI to MCP:', error);
@@ -85,7 +85,7 @@ export class VirtualMCPService {
 
   static async transformGraphQL(request: TransformRequest): Promise<MCPServer> {
     try {
-      const response = await apiClient.post('/api/v1/transform/graphql', request);
+       const response = await apiClient.post('/transform/graphql', request);
       return response.data;
     } catch (error) {
       console.error('Failed to transform GraphQL to MCP:', error);
@@ -95,7 +95,7 @@ export class VirtualMCPService {
 
   static async transformDatabase(request: TransformRequest): Promise<MCPServer> {
     try {
-      const response = await apiClient.post('/api/v1/transform/database', request);
+       const response = await apiClient.post('/transform/database', request);
       return response.data;
     } catch (error) {
       console.error('Failed to transform database to MCP:', error);
@@ -105,7 +105,7 @@ export class VirtualMCPService {
 
   static async combineServers(request: CombineRequest): Promise<MCPServer> {
     try {
-      const response = await apiClient.post('/api/v1/combine', request);
+       const response = await apiClient.post('/combine', request);
       return response.data;
     } catch (error) {
       console.error('Failed to combine MCP servers:', error);
@@ -116,7 +116,7 @@ export class VirtualMCPService {
   // Health check
   static async ping(): Promise<boolean> {
     try {
-      const response = await axios.get('http://localhost:8912/api/v1/health', { timeout: 5000 });
+       const response = await axios.get(`${API_BASE_URLS.VIRTUAL_MCP}/health`, { timeout: 5000 });
       return response.status === 200;
     } catch (error) {
       console.error('Failed to ping Virtual MCP service:', error);

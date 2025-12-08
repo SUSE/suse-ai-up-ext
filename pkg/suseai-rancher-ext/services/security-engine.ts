@@ -1,5 +1,14 @@
 import type { AxiosError, AxiosResponse } from 'axios'
-import { apiClient } from './mcp-service'
+import axios from 'axios'
+import { getApiConfig, API_BASE_URLS } from '../config/api-config'
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URLS.MCP_GATEWAY,
+  timeout: getApiConfig().timeout,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
 
 export interface SecurityFinding {
   id: string

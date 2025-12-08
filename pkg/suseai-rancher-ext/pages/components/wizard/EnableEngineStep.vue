@@ -88,7 +88,7 @@
 
 <script lang="ts" setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { MCPService } from '../../../services/mcp-service';
+import { proxyAPI } from '../../../services/proxy-api';
 
 interface Props {
   form: {
@@ -127,7 +127,7 @@ const pollForInstance = async () => {
 
   checkingInstance.value = true;
   try {
-    const isResponding = await MCPService.ping();
+    const isResponding = await proxyAPI.health().then(() => true).catch(() => false);
     if (isResponding) {
       instanceFound.value = true;
       checkingInstance.value = false;

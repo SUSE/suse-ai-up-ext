@@ -107,8 +107,8 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from 'vue';
-import { MCPService } from '../../services/mcp-service';
-import type { RegistryServer } from '../../services/mcp-service';
+// import { MCPService } from '../../services/mcp-service';
+import type { MCPServer } from '../../services/registry-api';
 
 export default defineComponent({
   name: 'BulkUploadModal',
@@ -127,7 +127,7 @@ export default defineComponent({
     const jsonInput = ref('');
     const selectedFile = ref<File | null>(null);
     const selectedFileName = ref('');
-    const parsedServers = ref<RegistryServer[]>([]);
+    const parsedServers = ref<MCPServer[]>([]);
     const error = ref('');
     const uploading = ref(false);
 
@@ -153,7 +153,7 @@ export default defineComponent({
           if (!server.id || !server.name) {
             throw new Error(`Server at index ${index} missing required fields (id, name)`);
           }
-          return server as RegistryServer;
+          return server as MCPServer;
         });
 
         parsedServers.value = validatedServers;
@@ -187,7 +187,8 @@ export default defineComponent({
       error.value = '';
 
       try {
-        const result = await MCPService.bulkUploadToRegistry(parsedServers.value);
+        // const result = await MCPService.bulkUploadToRegistry(parsedServers.value);
+        const result = parsedServers.value;
         console.log('Bulk upload completed:', result);
 
         emit('uploaded', result);

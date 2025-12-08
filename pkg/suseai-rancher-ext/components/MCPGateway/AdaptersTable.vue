@@ -35,20 +35,23 @@
            <td>{{ adapter.errorCount || 0 }}</td>
            <td>{{ adapter.lastActive ? new Date(adapter.lastActive).toLocaleString() : 'Never' }}</td>
            <td>
-             <div class="action-buttons">
-               <button class="btn btn-sm role-secondary" @click="handleViewDetails(adapter)" title="View Details">
-                 <i class="icon icon-info"></i>
-               </button>
-               <button class="btn btn-sm role-secondary" @click="handleViewLogs(adapter)" title="View Logs">
-                 <i class="icon icon-file"></i>
-               </button>
-               <button class="btn btn-sm role-secondary" @click="handleEditAdapter(adapter)" title="Edit">
-                 <i class="icon icon-edit"></i>
-               </button>
-               <button class="btn btn-sm role-secondary" @click="handleDeleteAdapter(adapter)" title="Delete">
-                 <i class="icon icon-trash"></i>
-               </button>
-             </div>
+              <div class="action-buttons">
+                <button class="btn btn-sm role-secondary" @click="handleViewDetails(adapter)" title="View Details">
+                  <i class="icon icon-info"></i>
+                </button>
+                <button class="btn btn-sm role-secondary" @click="handleViewLogs(adapter)" title="View Logs">
+                  <i class="icon icon-file"></i>
+                </button>
+                <button class="btn btn-sm role-secondary" @click="handleSyncAdapter(adapter)" title="Sync Capabilities">
+                  <i class="icon icon-refresh"></i>
+                </button>
+                <button class="btn btn-sm role-secondary" @click="handleEditAdapter(adapter)" title="Edit">
+                  <i class="icon icon-edit"></i>
+                </button>
+                <button class="btn btn-sm role-secondary" @click="handleDeleteAdapter(adapter)" title="Delete">
+                  <i class="icon icon-trash"></i>
+                </button>
+              </div>
            </td>
          </tr>
        </tbody>
@@ -65,7 +68,7 @@
 
  <script lang="ts">
 import { defineComponent, ref } from 'vue';
-import { MCPService } from '../../services/mcp-service';
+import { adapterAPI, type Adapter } from '../../services/adapter-api';
 import type { AdapterResource } from '../../types/mcp-types';
 import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
 
@@ -92,7 +95,7 @@ export default defineComponent({
       default: () => ({})
     }
   },
-  emits: ['view-details', 'view-logs', 'edit-adapter', 'delete-adapter', 'refresh-adapters'],
+  emits: ['view-details', 'view-logs', 'sync-adapter', 'edit-adapter', 'delete-adapter', 'refresh-adapters'],
   setup(props, { emit }) {
        const showAdapterDetailsModal = ref(false);
        const selectedAdapter = ref<AdapterResource | null>(null);
@@ -100,7 +103,7 @@ export default defineComponent({
       const handleViewDetails = async (adapter: AdapterResource) => {
         try {
           // Fetch full adapter details including authentication token
-          const adapterDetails = await MCPService.getAdapterDetails(adapter.name);
+          const adapterDetails = await adapterAPI.getAdapter(adapter.name) as any;
           selectedAdapter.value = adapterDetails || adapter;
           showAdapterDetailsModal.value = true;
         } catch (error) {
@@ -111,13 +114,17 @@ export default defineComponent({
         }
       };
 
-     const handleViewLogs = (adapter: AdapterResource) => {
-       emit('view-logs', adapter);
-     };
+      const handleViewLogs = (adapter: AdapterResource) => {
+        emit('view-logs', adapter);
+      };
 
-     const handleEditAdapter = (adapter: AdapterResource) => {
-       emit('edit-adapter', adapter);
-     };
+      const handleSyncAdapter = (adapter: AdapterResource) => {
+        emit('sync-adapter', adapter);
+      };
+
+      const handleEditAdapter = (adapter: AdapterResource) => {
+        emit('edit-adapter', adapter);
+      };
 
       const handleDeleteAdapter = (adapter: AdapterResource) => {
         emit('delete-adapter', adapter);
@@ -138,17 +145,18 @@ export default defineComponent({
          return isAvailable ? 'Available' : 'Checking...';
        };
 
-       return {
-         showAdapterDetailsModal,
-         selectedAdapter,
-         handleViewDetails,
-         handleViewLogs,
-         handleEditAdapter,
-         handleDeleteAdapter,
-         closeAdapterDetailsModal,
-         getStatusClass,
-         getStatusText
-       };
+        return {
+          showAdapterDetailsModal,
+          selectedAdapter,
+          handleViewDetails,
+          handleViewLogs,
+          handleSyncAdapter,
+          handleEditAdapter,
+          handleDeleteAdapter,
+          closeAdapterDetailsModal,
+          getStatusClass,
+          getStatusText
+        };
    }
  });
 </script>

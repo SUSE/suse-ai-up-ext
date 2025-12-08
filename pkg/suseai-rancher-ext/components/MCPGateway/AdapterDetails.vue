@@ -289,7 +289,7 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed } from 'vue';
 import type { AdapterResource, AdapterMetrics, AdapterToken } from '../../types/mcp-types';
-import type { SessionInfo } from '../../services/mcp-service';
+import type { SessionInfo } from '../../types/mcp-types';
 
 export default defineComponent({
   name: 'AdapterDetails',

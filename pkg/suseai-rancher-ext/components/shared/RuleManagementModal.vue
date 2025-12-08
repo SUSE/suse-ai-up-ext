@@ -114,7 +114,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { MCPService } from '../../services/mcp-service';
+// import { MCPService } from '../../services/mcp-service';
 import { logger } from '../../utils/logger';
 
 // Emits

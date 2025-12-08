@@ -6,12 +6,31 @@
 import { reactive } from 'vue';
 
 // Base URLs for different services
-export const getApiBaseUrls = (serviceUrl?: string) => ({
-  MCP_GATEWAY: serviceUrl ? `${serviceUrl}/api/v1` : 'http://192.168.64.17:8911/api/v1',
-  VIRTUAL_MCP: serviceUrl ? `${serviceUrl}/api/v1` : 'http://localhost:8912/api/v1',
-  SMART_AGENTS: 'http://localhost:8910',
-  RANCHER: window.location.origin
-});
+export const getApiBaseUrls = (serviceUrl?: string) => {
+  if (serviceUrl) {
+    // Extract IP from serviceUrl (e.g., http://192.168.1.100:8911 -> 192.168.1.100)
+    const url = new URL(serviceUrl);
+    const ip = url.hostname;
+    return {
+      MCP_GATEWAY: `http://${ip}:8911`,
+      DISCOVERY: `http://${ip}:8912`,
+      REGISTRY: `http://${ip}:8913`,
+      PLUGINS: `http://${ip}:8914`,
+      VIRTUAL_MCP: `http://${ip}:8912/api/v1`,
+      SMART_AGENTS: `http://${ip}:8910`,
+      RANCHER: window.location.origin
+    };
+  }
+  return {
+    MCP_GATEWAY: 'http://192.168.64.17:8911',
+    DISCOVERY: 'http://192.168.64.17:8912',
+    REGISTRY: 'http://192.168.64.17:8913',
+    PLUGINS: 'http://192.168.64.17:8914',
+    VIRTUAL_MCP: 'http://localhost:8912/api/v1',
+    SMART_AGENTS: 'http://localhost:8910',
+    RANCHER: window.location.origin
+  };
+};
 
 // Initialize with default localhost as reactive object
 export const API_BASE_URLS = reactive(getApiBaseUrls());
@@ -27,72 +46,72 @@ export const updateApiBaseUrls = (serviceUrl?: string) => {
 // API Endpoints for MCP Gateway
 export const MCP_ENDPOINTS = {
   // Adapter Management
-  ADAPTERS: '/adapters',
-  ADAPTER_DETAILS: (name: string) => `/adapters/${name}`,
-  ADAPTER_STATUS: (name: string) => `/adapters/${name}/status`,
-  ADAPTER_LOGS: (name: string) => `/adapters/${name}/logs`,
-  ADAPTER_UPDATE: (name: string) => `/adapters/${name}`,
-  ADAPTER_DELETE: (name: string) => `/adapters/${name}`,
-  
+  ADAPTERS: '/api/v1/adapters',
+  ADAPTER_DETAILS: (name: string) => `/api/v1/adapters/${name}`,
+  ADAPTER_STATUS: (name: string) => `/api/v1/adapters/${name}/status`,
+  ADAPTER_LOGS: (name: string) => `/api/v1/adapters/${name}/logs`,
+  ADAPTER_UPDATE: (name: string) => `/api/v1/adapters/${name}`,
+  ADAPTER_DELETE: (name: string) => `/api/v1/adapters/${name}`,
+
   // Session Management
-  SESSIONS: (name: string) => `/adapters/${name}/sessions`,
-  SESSION_DETAILS: (name: string, sessionId: string) => `/adapters/${name}/sessions/${sessionId}`,
-  SESSION_CREATE: (name: string) => `/adapters/${name}/sessions`,
-  SESSION_DELETE: (name: string, sessionId: string) => `/adapters/${name}/sessions/${sessionId}`,
-  SESSION_DELETE_ALL: (name: string) => `/adapters/${name}/sessions`,
-  
+  SESSIONS: (name: string) => `/api/v1/adapters/${name}/sessions`,
+  SESSION_DETAILS: (name: string, sessionId: string) => `/api/v1/adapters/${name}/sessions/${sessionId}`,
+  SESSION_CREATE: (name: string) => `/api/v1/adapters/${name}/sessions`,
+  SESSION_DELETE: (name: string, sessionId: string) => `/api/v1/adapters/${name}/sessions/${sessionId}`,
+  SESSION_DELETE_ALL: (name: string) => `/api/v1/adapters/${name}/sessions`,
+
   // Token Management
-  ADAPTER_TOKEN: (name: string) => `/adapters/${name}/token`,
-  ADAPTER_TOKEN_REFRESH: (name: string) => `/adapters/${name}/token/refresh`,
-  ADAPTER_TOKEN_VALIDATE: (name: string) => `/adapters/${name}/token/validate`,
-  ADAPTER_CLIENT_TOKEN: (name: string) => `/adapters/${name}/client-token`,
-  ADAPTER_TEST_AUTH: (name: string) => `/adapters/${name}/test-auth`,
-  ADAPTER_VALIDATE_AUTH: (name: string) => `/adapters/${name}/validate-auth`,
-  
+  ADAPTER_TOKEN: (name: string) => `/api/v1/adapters/${name}/token`,
+  ADAPTER_TOKEN_REFRESH: (name: string) => `/api/v1/adapters/${name}/token/refresh`,
+  ADAPTER_TOKEN_VALIDATE: (name: string) => `/api/v1/adapters/${name}/token/validate`,
+  ADAPTER_CLIENT_TOKEN: (name: string) => `/api/v1/adapters/${name}/client-token`,
+  ADAPTER_TEST_AUTH: (name: string) => `/api/v1/adapters/${name}/test-auth`,
+  ADAPTER_VALIDATE_AUTH: (name: string) => `/api/v1/adapters/${name}/validate-auth`,
+
   // MCP Communication
-  ADAPTER_SSE: (name: string) => `/adapters/${name}/sse`,
-  ADAPTER_MESSAGES: (name: string) => `/adapters/${name}/messages`,
-  ADAPTER_MCP: (name: string) => `/adapters/${name}/mcp`,
-  ADAPTER_WEBSOCKET: (name: string) => `/adapters/${name}/ws`,
-  
+  ADAPTER_SSE: (name: string) => `/api/v1/adapters/${name}/sse`,
+  ADAPTER_MESSAGES: (name: string) => `/api/v1/adapters/${name}/messages`,
+  ADAPTER_MCP: (name: string) => `/api/v1/adapters/${name}/mcp`,
+  ADAPTER_WEBSOCKET: (name: string) => `/api/v1/adapters/${name}/ws`,
+
   // Network Discovery
-  DISCOVERY_SCAN: '/discovery/scan',
-  DISCOVERY_SERVERS: '/discovery/servers',
-  DISCOVERY_SERVER_DETAILS: (id: string) => `/discovery/servers/${id}`,
-  DISCOVERY_REGISTER: '/discovery/register',
-  
+  DISCOVERY_SCAN: '/api/v1/scan',
+  DISCOVERY_SERVERS: '/api/v1/servers',
+  DISCOVERY_SERVER_DETAILS: (id: string) => `/api/v1/servers/${id}`,
+  DISCOVERY_REGISTER: '/api/v1/registry/upload',
+
   // Legacy endpoints (for backward compatibility)
-  SCAN_START: '/scan',
-  SCAN_STATUS: (scanId: string) => `/scan/${scanId}`,
-  SERVERS: '/servers',
-  REGISTER_SERVER: '/discovery/register',
-  
+  SCAN_START: '/api/v1/scan',
+  SCAN_STATUS: (scanId: string) => `/api/v1/scan/${scanId}`,
+  SERVERS: '/api/v1/servers',
+  REGISTER_SERVER: '/api/v1/registry/upload',
+
   // Registry Management
-  REGISTRY_BROWSE: '/registry/browse',
-  REGISTRY_PUBLIC: '/registry/public',
-  REGISTRY_SYNC_OFFICIAL: '/registry/sync/official',
-  REGISTRY_UPLOAD: '/registry/upload',
-  REGISTRY_UPLOAD_BULK: '/registry/upload/bulk',
-   REGISTRY_UPLOAD_LOCAL_MCP: '/registry/upload/local-mcp',
-   REGISTRY_DETAILS: (id: string) => `/registry/${id}`,
-   REGISTRY_CREATE_ADAPTER: (id: string) => `/registry/${id}/create-adapter`,
-  
+  REGISTRY_BROWSE: '/api/v1/registry/browse',
+  REGISTRY_PUBLIC: '/api/v1/registry/browse',
+  REGISTRY_SYNC_OFFICIAL: '/api/v1/registry/reload',
+  REGISTRY_UPLOAD: '/api/v1/registry/upload',
+  REGISTRY_UPLOAD_BULK: '/api/v1/registry/upload',
+   REGISTRY_UPLOAD_LOCAL_MCP: '/api/v1/registry/upload',
+    REGISTRY_DETAILS: (id: string) => `/api/v1/registry/${id}`,
+    REGISTRY_CREATE_ADAPTER: (id: string) => `/api/v1/registry/${id}/create-adapter`,
+
   // Deployment Management
-  DEPLOYMENT_CONFIG: (serverId: string) => `/deployment/config/${serverId}`,
-  DEPLOYMENT_DEPLOY: '/deployment/deploy',
-  
+  DEPLOYMENT_CONFIG: (serverId: string) => `/api/v1/deployment/config/${serverId}`,
+  DEPLOYMENT_DEPLOY: '/api/v1/deployment/deploy',
+
   // Plugin Services
-  PLUGIN_SERVICES: '/plugins/services',
-  PLUGIN_REGISTER: '/plugins/register',
-  PLUGIN_HEALTH: (serviceId: string) => `/plugins/services/${serviceId}/health`,
-  PLUGIN_UNREGISTER: (serviceId: string) => `/plugins/services/${serviceId}`,
-  PLUGIN_SERVICES_BY_TYPE: (serviceType: string) => `/plugins/services/type/${serviceType}`,
-  
-   // System
-   HEALTH: '/health',
+  PLUGIN_SERVICES: '/api/v1/plugins',
+  PLUGIN_REGISTER: '/api/v1/plugins',
+  PLUGIN_HEALTH: (serviceId: string) => `/api/v1/plugins/${serviceId}/health`,
+  PLUGIN_UNREGISTER: (serviceId: string) => `/api/v1/plugins/${serviceId}`,
+  PLUGIN_SERVICES_BY_TYPE: (serviceType: string) => `/api/v1/plugins/type/${serviceType}`,
+
+    // System
+    HEALTH: '/health',
   METRICS: '/metrics',
   DOCS: '/docs',
-  SWAGGER_JSON: '/swagger/doc.json'
+  SWAGGER_JSON: '/swagger.json'
 } as const;
 
 // API Endpoints for Smart Agents

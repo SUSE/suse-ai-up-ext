@@ -5,11 +5,14 @@ import { MCPService, apiClient, updateApiBaseUrl, type ServiceDiscoveredServer, 
 import type { SecurityFinding } from '../services/security-engine';
 import { tokenService } from '../services/token-service';
 import type {
+  Adapter,
   AdapterResource,
   AdapterData
 } from '../types/mcp-types';
 import type {
-  SessionInfo,
+  SessionInfo
+} from '../types/mcp-types';
+import type {
   SessionListResponse
 } from '../services/mcp-service';
 import type {
@@ -60,7 +63,7 @@ export function useMCPGateway() {
 
   // MCP Gateway state
   const discoveredServers = ref<DiscoveredServer[]>([]);
-  const adapters = ref<AdapterResource[]>([]);
+  const adapters = ref<Adapter[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const scanning = ref(false);

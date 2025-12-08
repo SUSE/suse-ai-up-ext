@@ -13,9 +13,9 @@
 
     <ScanActions
       :scanning="scanning"
-      :security-scanning="securityScanning"
+      :security-scanning="false"
       :scan-progress="scanProgress"
-      :scan-status="scanStatus"
+      :scan-status="scanning ? 'running' : 'idle'"
       @scan-start="handleScanStart"
       @rule-management-open="handleRuleManagement"
     />
@@ -36,19 +36,19 @@
         <!-- Overview Tab -->
         <div v-if="activeTab === 'overview'" class="tab-pane">
            <AdaptersTable
-             :adapters="adapters"
-             :loading="loading"
-             :error="error || undefined"
-             :ping-results="adapterPingResults"
-             @view-logs="handleViewAdapterLogs"
-             @edit-adapter="handleEditAdapter"
-             @delete-adapter="handleDeleteAdapter"
-             @refresh-adapters="handleRefreshAdapters"
-          />
+              :adapters="adapters"
+              :loading="adaptersLoading"
+              :ping-results="adapterPingResults"
+              @view-logs="handleViewAdapterLogs"
+              @sync-adapter="handleSyncAdapter"
+              @edit-adapter="handleEditAdapter"
+              @delete-adapter="handleDeleteAdapter"
+              @refresh-adapters="handleRefreshAdapters"
+           />
 
-          <DiscoveredServersTable
-            :discovered-servers="discoveredServers"
-            :loading="loading"
+           <DiscoveredServersTable
+             :discovered-servers="discoveredServers"
+             :loading="discoveryLoading"
             :registered-server-ids="registeredServerIds"
             @view-server-details="handleViewServerDetails"
             @register-server="handleRegisterServer"
@@ -101,7 +101,6 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed } from 'vue';
-import { useMCPGateway } from '../../composables/useMCPGateway';
 import MetricsGrid from './MetricsGrid.vue';
 import ScanActions from './ScanActions.vue';
 import AdaptersTable from './AdaptersTable.vue';
@@ -121,7 +120,33 @@ export default defineComponent({
     SessionManager,
     RealTimeMetrics
   },
-  emits: ['scan-modal-open', 'security-modal-open', 'rule-modal-open'],
+  emits: ['scan-modal-open', 'security-modal-open', 'rule-modal-open', 'sync-adapter'],
+  props: {
+    discoveredServers: {
+      type: Array as () => any[],
+      default: () => []
+    },
+    adapters: {
+      type: Array as () => any[],
+      default: () => []
+    },
+    discoveryLoading: {
+      type: Boolean,
+      default: false
+    },
+    adaptersLoading: {
+      type: Boolean,
+      default: false
+    },
+    scanning: {
+      type: Boolean,
+      default: false
+    },
+    scanProgress: {
+      type: Number,
+      default: 0
+    }
+  },
   setup(props, { emit }) {
     const activeTab = ref('overview');
     const selectedAdapterName = ref('');
@@ -134,47 +159,28 @@ export default defineComponent({
     ];
 
     const selectedAdapter = computed(() => {
-      return adapters.value.find(adapter => adapter.name === selectedAdapterName.value) || null;
+      return props.adapters.find(adapter => adapter.name === selectedAdapterName.value) || null;
     });
 
-    const {
-      // Dashboard data
-      discoveredServers,
-      adapters,
-      loading,
-      error,
-      scanning,
-      securityScanning,
-      scanProgress,
-      scanStatus,
-      discoveredCount,
-      registeredCount,
-      availableCount,
-      errorRate,
-      adapterPingResults,
-      registeredServerIds,
+    // Computed properties for metrics
+    const discoveredCount = computed(() => props.discoveredServers.length);
+    const registeredCount = computed(() => props.adapters.length);
+    const availableCount = computed(() => props.adapters.filter(a => a.status === 'ready').length);
+    const errorRate = computed(() => {
+      const totalAdapters = props.adapters.length;
+      if (totalAdapters === 0) return '0%';
+      const errorAdapters = props.adapters.filter(a => a.status === 'error').length;
+      return ((errorAdapters / totalAdapters) * 100).toFixed(1) + '%';
+    });
+    const loading = computed(() => props.discoveryLoading || props.adaptersLoading);
 
-      // Enhanced data from useMCPGateway
-      sessions,
-      loadingSessions,
-      systemMetrics,
-      loadingMetrics,
-
-      // Methods
-      loadData,
-      onScanStarted,
-      openRuleManagement,
-      viewAdapterLogs,
-      editAdapter,
-      deleteAdapter,
-      viewServerDetails,
-      registerServer,
-
-      // Enhanced methods
-      createSession,
-      deleteSession,
-      fetchSystemMetrics
-    } = useMCPGateway();
+    // Mock data for now (will be updated when we implement sessions/metrics)
+    const sessions = ref([]);
+    const loadingSessions = ref(false);
+    const systemMetrics = ref(null);
+    const loadingMetrics = ref(false);
+    const adapterPingResults = ref({});
+    const registeredServerIds = ref(new Set());
 
     const handleScanStart = () => {
       emit('scan-modal-open');
@@ -185,45 +191,48 @@ export default defineComponent({
     };
 
     const handleViewAdapterLogs = (adapter: any) => {
-      viewAdapterLogs(adapter);
+      console.log('View adapter logs:', adapter.name);
+    };
+
+    const handleSyncAdapter = (adapter: any) => {
+      console.log('Sync adapter:', adapter.name);
+      // TODO: Implement adapter sync functionality
     };
 
     const handleEditAdapter = (adapter: any) => {
-      editAdapter(adapter);
+      console.log('Edit adapter:', adapter.name);
     };
 
     const handleDeleteAdapter = (adapter: any) => {
-      deleteAdapter(adapter);
+      console.log('Delete adapter:', adapter.name);
     };
 
     const handleViewServerDetails = (server: any) => {
-      viewServerDetails(server);
       emit('security-modal-open');
     };
 
     const handleRefreshAdapters = () => {
-      loadData();
+      console.log('Refresh adapters');
     };
 
     const handleRegisterServer = (server: any) => {
-      registerServer(server);
+      console.log('Register server:', server.name);
     };
 
     const handleCreateSession = (adapterId: string) => {
-      createSession(adapterId);
+      console.log('Create session for adapter:', adapterId);
     };
 
     const handleTerminateSession = (adapterId: string, sessionId: string) => {
-      deleteSession(adapterId, sessionId);
+      console.log('Terminate session:', sessionId, 'for adapter:', adapterId);
     };
 
     const handleViewSessionDetails = (sessionId: string) => {
-      // Implementation for viewing session details
       console.log('View session details:', sessionId);
     };
 
     const handleRefreshMetrics = () => {
-      fetchSystemMetrics();
+      console.log('Refresh metrics');
     };
 
     return {
@@ -233,15 +242,12 @@ export default defineComponent({
       selectedAdapterName,
       selectedAdapter,
 
-      // Data
-      discoveredServers,
-      adapters,
+      // Data from props
+      discoveredServers: props.discoveredServers,
+      adapters: props.adapters,
       loading,
-      error,
-      scanning,
-      securityScanning,
-      scanProgress,
-      scanStatus,
+      scanning: props.scanning,
+      scanProgress: props.scanProgress,
       discoveredCount,
       registeredCount,
       availableCount,
@@ -249,7 +255,7 @@ export default defineComponent({
       adapterPingResults,
       registeredServerIds,
 
-      // Enhanced data
+      // Enhanced data (mock for now)
       sessions,
       loadingSessions,
       systemMetrics,

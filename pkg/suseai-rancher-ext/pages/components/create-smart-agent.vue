@@ -406,7 +406,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import SmartAgentsService, { type SmartAgent, type CreateAgentRequest, type UpdateAgentRequest } from '../../services/smart-agents-service';
-import { MCPService, type AdapterResource } from '../../services/mcp-service';
+import { adapterAPI, type Adapter } from '../../services/adapter-api';
 
 interface RemoteProviderData {
   provider: string;
@@ -829,7 +829,7 @@ const onLocalProviderChange = () => {
   const fetchAvailableAdapters = async () => {
     try {
       isLoadingAdapters.value = true;
-      const adapters = await MCPService.getAdapters();
+      const adapters = await adapterAPI.list();
       availableAdapters.value = adapters.filter(adapter => adapter.connectionType);
     } catch (error) {
       console.error('Failed to fetch adapters:', error);

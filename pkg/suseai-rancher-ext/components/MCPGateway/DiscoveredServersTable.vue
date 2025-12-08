@@ -2,26 +2,27 @@
   <div class="discovered-servers-section">
     <h2>Discovered MCP Servers</h2>
      <table class="discovered-servers-table">
-        <thead>
-          <tr>
-            <th>Risk Status</th>
-            <th>Security Status</th>
-            <th>Name</th>
-            <th>Address</th>
-            <th>Port</th>
-            <th>Connection</th>
-            <th>Authentication Type</th>
-            <th>Discovered At</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
+         <thead>
+           <tr>
+             <th>Risk Status</th>
+             <th>Security Status</th>
+             <th>Name</th>
+             <th>Address</th>
+             <th>Port</th>
+             <th>Connection</th>
+             <th>Authentication Type</th>
+             <th>Validation Status</th>
+             <th>Discovered At</th>
+             <th>Actions</th>
+           </tr>
+         </thead>
       <tbody>
-         <tr v-if="loading">
-           <td colspan="9" class="loading-row">Loading discovered servers...</td>
-         </tr>
-         <tr v-else-if="discoveredServers.length === 0">
-           <td colspan="9" class="empty-row">No servers discovered yet.</td>
-         </tr>
+          <tr v-if="loading">
+            <td colspan="10" class="loading-row">Loading discovered servers...</td>
+          </tr>
+          <tr v-else-if="discoveredServers.length === 0">
+            <td colspan="10" class="empty-row">No servers discovered yet.</td>
+          </tr>
           <tr v-else v-for="server in discoveredServers" :key="server.id">
             <td>
               <span :class="getRiskBadgeClass(server)">
@@ -36,28 +37,40 @@
             <td>{{ server.name || '-' }}</td>
             <td>{{ getAddressWithoutPort(server.address) }}</td>
             <td>{{ getPortFromAddress(server.address) || server.port || '8911' }}</td>
-            <td>{{ server.connection || 'HTTP' }}</td>
-            <td>{{ getAuthTypeLabel(server.metadata?.auth_type) }}</td>
-            <td>{{ server.discoveredAt ? new Date(server.discoveredAt).toLocaleString() : (server.lastSeen ? new Date(server.lastSeen).toLocaleString() : 'Unknown') }}</td>
-            <td>
-              <div class="action-buttons">
-                <button
-                  class="btn btn-sm role-secondary"
-                  @click="handleViewServerDetails(server)"
-                  title="View Server Details"
-                >
-                  <i class="icon icon-info"></i>
-                  View
-                </button>
-                <button
-                  class="btn btn-sm role-primary"
-                  @click="handleRegisterServer(server)"
-                  :disabled="server.status === 'error' || server.status === 'failed'"
-                >
-                  Register
-                </button>
-              </div>
-            </td>
+             <td>{{ server.connection || 'HTTP' }}</td>
+             <td>{{ getAuthTypeLabel(server.metadata?.auth_type) }}</td>
+             <td>
+               <span :class="getValidationStatusClass(server)">
+                 {{ getValidationStatusLabel(server) }}
+               </span>
+             </td>
+             <td>{{ server.discoveredAt ? new Date(server.discoveredAt).toLocaleString() : (server.lastSeen ? new Date(server.lastSeen).toLocaleString() : 'Unknown') }}</td>
+             <td>
+               <div class="action-buttons">
+                 <button
+                   class="btn btn-sm btn-icon"
+                   @click="handleViewServerDetails(server)"
+                   title="View Server Details"
+                   aria-label="View server details"
+                 >
+                   <i class="icon icon-info"></i>
+                 </button>
+                 <button
+                   class="btn btn-sm role-secondary"
+                   @click="handleViewServerDetails(server)"
+                   title="View Server Details"
+                 >
+                   View
+                 </button>
+                 <button
+                   class="btn btn-sm role-primary"
+                   @click="handleRegisterServer(server)"
+                   :disabled="server.status === 'error' || server.status === 'failed'"
+                 >
+                   Register
+                 </button>
+               </div>
+             </td>
           </tr>
       </tbody>
      </table>
@@ -66,7 +79,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
-import type { DiscoveredServer } from '../../services/mcp-service';
+import type { DiscoveredServer } from '../../services/discovery-api';
 
 export default defineComponent({
   name: 'DiscoveredServersTable',
@@ -186,9 +199,47 @@ export default defineComponent({
     };
 
     const getAuthTypeLabel = (authType?: string) => {
-      if (!authType) return 'None';
-      return authType.charAt(0).toUpperCase() + authType.slice(1).toLowerCase();
-    };
+       if (!authType) return 'None';
+       return authType.charAt(0).toUpperCase() + authType.slice(1).toLowerCase();
+     };
+
+     // Validation Status based on server metadata
+     const getValidationStatus = (server: DiscoveredServer): 'approved' | 'pending' | 'rejected' | 'unknown' => {
+       // Check for validation_status in metadata or _meta
+       const validationStatus = server.metadata?.validation_status || (server as any)._meta?.validation_status;
+       if (validationStatus === 'approved') return 'approved';
+       if (validationStatus === 'rejected') return 'rejected';
+       if (validationStatus === 'pending') return 'pending';
+       return 'unknown';
+     };
+
+     const getValidationStatusClass = (server: DiscoveredServer) => {
+       const status = getValidationStatus(server);
+       switch (status) {
+         case 'approved':
+           return 'badge badge-success';
+         case 'rejected':
+           return 'badge badge-danger';
+         case 'pending':
+           return 'badge badge-warning';
+         default:
+           return 'badge badge-secondary';
+       }
+     };
+
+     const getValidationStatusLabel = (server: DiscoveredServer) => {
+       const status = getValidationStatus(server);
+       switch (status) {
+         case 'approved':
+           return 'Approved';
+         case 'rejected':
+           return 'Rejected';
+         case 'pending':
+           return 'Pending';
+         default:
+           return 'Unknown';
+       }
+     };
 
     const handleViewServerDetails = (server: DiscoveredServer) => {
       emit('view-server-details', server);
@@ -201,11 +252,13 @@ export default defineComponent({
     return {
       getRiskBadgeClass,
       getRiskLabel,
+      getSecurityStatusClass,
+      getSecurityStatusLabel,
       getAddressWithoutPort,
       getPortFromAddress,
       getAuthTypeLabel,
-      getSecurityStatusClass,
-      getSecurityStatusLabel,
+      getValidationStatusClass,
+      getValidationStatusLabel,
       handleViewServerDetails,
       handleRegisterServer
     };
@@ -303,8 +356,30 @@ export default defineComponent({
 
 .action-buttons {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin: 24px 0;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-icon {
+  padding: 6px;
+  background: var(--accent-bg, #f9fafb);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 4px;
+  color: var(--primary, #007bff);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+}
+
+.btn-icon:hover {
+  background: var(--primary, #007bff);
+  color: white;
+  border-color: var(--primary, #007bff);
 }
 </style>

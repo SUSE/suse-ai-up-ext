@@ -3,6 +3,7 @@
 
 import { ref, computed, readonly } from 'vue';
 import { logger } from '../utils/logger';
+import { useStore } from 'vuex';
 
 export interface KubernetesPod {
   metadata: {
@@ -47,6 +48,7 @@ export interface DetectedPod extends KubernetesPod {
  * Composable for discovering SUSE AI Universal Proxy service in Kubernetes
  */
 export function useServiceDiscovery() {
+  const store = useStore();
   const isLoading = ref(false);
   const detectedServices = ref<DetectedService[]>([]);
   const error = ref<string | null>(null);
@@ -285,6 +287,12 @@ export function useServiceDiscovery() {
      * Construct accessible URL from pod and cluster data
      */
     const constructPodUrl = (pod: KubernetesPod, clusterInfo: any): string | undefined => {
+      // First, check if service URLs are configured
+      const configuredUrls = store.state.suseai?.settings?.serviceUrls;
+      if (configuredUrls && configuredUrls.length > 0) {
+        return configuredUrls[0]; // Use the first configured service URL
+      }
+
       // First, try to use the cluster's load balancer public IP
       const clusterPublicIP = getClusterPublicIP(clusterInfo);
       if (clusterPublicIP) {

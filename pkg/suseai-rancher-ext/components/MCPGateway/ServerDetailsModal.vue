@@ -7,39 +7,52 @@
       </div>
       <div class="modal-body">
         <div v-if="server" class="server-details">
-          <div class="detail-section">
-            <h4>Basic Information</h4>
-            <p><strong>Name:</strong> {{ server.name }}</p>
-            <p><strong>Description:</strong> {{ server.description }}</p>
-            <p><strong>Version:</strong> {{ server.version }}</p>
-            <p><strong>Protocol:</strong> {{ server.protocol }}</p>
-             <p><strong>URL:</strong> {{ server.url }}</p>
-            <p><strong>Validation Status:</strong> {{ server.validation_status }}</p>
-            <p><strong>Discovered At:</strong> {{ server.discovered_at }}</p>
-          </div>
+            <div class="detail-section">
+              <h4>Basic Information</h4>
+              <p><strong>Name:</strong> {{ server.name }}</p>
+              <p><strong>Description:</strong> {{ server.description }}</p>
+              <p><strong>Address:</strong> {{ server.address }}</p>
+              <p><strong>Port:</strong> {{ server.port }}</p>
+              <p><strong>Protocol:</strong> {{ server.protocol || 'Unknown' }}</p>
+              <p><strong>Connection:</strong> {{ server.connection || 'HTTP' }}</p>
+              <p v-if="server.discoveredAt"><strong>Discovered At:</strong> {{ new Date(server.discoveredAt).toLocaleString() }}</p>
+              <p v-if="server.lastSeen"><strong>Last Seen:</strong> {{ new Date(server.lastSeen).toLocaleString() }}</p>
+            </div>
 
-          <div v-if="server.repository" class="detail-section">
-            <h4>Repository</h4>
-            <p><strong>Source:</strong> {{ server.repository.source }}</p>
-            <p><strong>URL:</strong> <a :href="server.repository.url" target="_blank">{{ server.repository.url }}</a></p>
-          </div>
-
-          <div v-if="server.packages?.length" class="detail-section">
-            <h4>Packages</h4>
-            <div v-for="pkg in server.packages" :key="pkg.identifier" class="package-item">
-              <p><strong>Identifier:</strong> {{ pkg.identifier }}</p>
-              <p><strong>Type:</strong> {{ pkg.registryType }}</p>
-              <p><strong>Transport:</strong> {{ pkg.transport.type }}</p>
-              <div v-if="pkg.environmentVariables?.length" class="env-vars">
-                <p><strong>Environment Variables:</strong></p>
-                <ul>
-                  <li v-for="env in pkg.environmentVariables" :key="env.name">
-                    {{ env.name }}: {{ env.description }} ({{ env.isSecret ? 'Secret' : 'Public' }})
-                  </li>
-                </ul>
+            <div v-if="server._meta || server.metadata" class="detail-section">
+              <h4>Metadata</h4>
+              <div v-if="server._meta">
+                <p v-if="server._meta.source"><strong>Source:</strong> {{ server._meta.source }}</p>
+                <p v-if="server._meta.category"><strong>Category:</strong> {{ server._meta.category }}</p>
+                <p v-if="server._meta.userAuthRequired !== undefined"><strong>Requires Auth:</strong> {{ server._meta.userAuthRequired ? 'Yes' : 'No' }}</p>
+                <p v-if="server._meta.authType"><strong>Auth Type:</strong> {{ server._meta.authType }}</p>
+                <p v-if="server._meta.documentation"><strong>Documentation:</strong> <a :href="server._meta.documentation" target="_blank">{{ server._meta.documentation }}</a></p>
+                <p v-if="server._meta.hosted !== undefined"><strong>Hosted:</strong> {{ server._meta.hosted ? 'Yes' : 'No' }}</p>
+                <p v-if="server._meta.requiresInstallation !== undefined"><strong>Requires Installation:</strong> {{ server._meta.requiresInstallation ? 'Yes' : 'No' }}</p>
+                <p v-if="server._meta.transportType"><strong>Transport Type:</strong> {{ server._meta.transportType }}</p>
+                <p v-if="server._meta.validation_status"><strong>Validation Status:</strong> {{ server._meta.validation_status }}</p>
+                <div v-if="server._meta.tags && server._meta.tags.length">
+                  <strong>Tags:</strong>
+                  <div class="tags-list">
+                    <span v-for="tag in server._meta.tags" :key="tag" class="tag">{{ tag }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="server.metadata">
+                <p v-if="server.metadata.auth_type"><strong>Auth Type:</strong> {{ server.metadata.auth_type }}</p>
+                <p v-if="server.metadata.detectionMethod"><strong>Detection Method:</strong> {{ server.metadata.detectionMethod }}</p>
+                <p v-if="server.metadata.validation_status"><strong>Validation Status:</strong> {{ server.metadata.validation_status }}</p>
               </div>
             </div>
-          </div>
+
+           <div v-if="server.packages?.length" class="detail-section">
+             <h4>Packages</h4>
+             <div v-for="pkg in server.packages" :key="pkg.identifier" class="package-item">
+               <p><strong>Identifier:</strong> {{ pkg.identifier }}</p>
+               <p><strong>Type:</strong> {{ pkg.registryType }}</p>
+               <p><strong>Transport:</strong> {{ pkg.transport.type }}</p>
+             </div>
+           </div>
 
           <div v-if="server.tools?.length" class="detail-section">
             <h4>Tools</h4>
@@ -146,19 +159,19 @@
     </div>
   </div>
 
-  <DeploymentModal
-    :show="showDeploymentModal"
-    :server="server"
-    @close="showDeploymentModal = false"
-    @deployed="handleDeployment"
-  />
+   <DeploymentModal
+     :show="showDeploymentModal"
+     :server="server as any"
+     @close="showDeploymentModal = false"
+     @deployed="handleDeployment"
+   />
 </template>
 
 <script lang="ts">
 import { defineComponent, type PropType, computed, ref, reactive } from 'vue';
 import { useStore } from 'vuex';
-import type { RegistryServer } from '../../services/mcp-service';
-import { MCPService } from '../../services/mcp-service';
+import type { MCPServer } from '../../services/registry-api';
+// import { MCPService } from '../../services/mcp-service';
 import { logger } from '../../utils/logger';
 import DeploymentModal from './DeploymentModal.vue';
 
@@ -174,7 +187,7 @@ export default defineComponent({
       required: true
     },
     server: {
-      type: Object as PropType<RegistryServer | null>,
+      type: Object as PropType<MCPServer | null>,
       default: null
     }
   },
@@ -207,11 +220,12 @@ export default defineComponent({
           environmentVariables: { ...spawnEnvVars }
         };
 
-        const result = await MCPService.createAdapterFromRegistry(props.server.id, config);
+        // const result = await MCPService.createAdapterFromRegistry(props.server.id, config);
+        console.log('Adapter creation from registry not implemented yet');
         logger.info('Server spawned successfully', { serverId: props.server.id });
 
         // Emit event with spawn result
-        emit('serverSpawned', result);
+        // emit('serverSpawned', result);
 
         // Close modal
         emit('close');
@@ -477,6 +491,22 @@ export default defineComponent({
   margin: 8px 0 0 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.tag {
+  background: var(--accent-bg, #f0f0f0);
+  color: var(--body-text, #333);
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* Responsive enhancements */

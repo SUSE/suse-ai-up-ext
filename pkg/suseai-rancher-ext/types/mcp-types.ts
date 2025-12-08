@@ -16,6 +16,9 @@ export interface Adapter {
   lastSeen?: string
   version?: string
   health?: AdapterHealth
+  originalServer?: DiscoveredServer
+  errorCount?: number
+  requestCount?: number
 }
 
 export interface AdapterConfig {
@@ -62,6 +65,23 @@ export interface Session {
   metadata?: Record<string, any>
 }
 
+export interface SessionInfo {
+  sessionId: string
+  adapterName: string
+  targetAddress: string
+  connectionType: string
+  createdAt: string
+  lastActivity: string
+  status: 'active' | 'inactive' | 'error'
+  metadata?: {
+    protocolVersion?: string
+    clientInfo?: {
+      name: string
+      version: string
+    }
+  }
+}
+
 export interface SessionMetrics {
   messagesCount: number
   bytesTransferred: number
@@ -100,6 +120,7 @@ export interface DiscoveredServer {
   name: string
   host: string
   port: number
+  address: string
   protocol: 'http' | 'https' | 'tcp'
   status: 'online' | 'offline' | 'unknown'
   lastSeen: string
@@ -108,10 +129,13 @@ export interface DiscoveredServer {
     capabilities?: string[]
     description?: string
     tags?: string[]
+    auth_type?: string
   }
   scanId?: string
   registered?: boolean
   adapterName?: string
+  security_findings?: any[]
+  vulnerability_score?: string
 }
 
 export interface DiscoveryScan {
@@ -184,6 +208,7 @@ export interface RegistryServer {
   }
   packages?: RegistryPackage[]
   metadata?: Record<string, any>
+  validation_status?: string
   createdAt: string
   updatedAt: string
   isOfficial?: boolean

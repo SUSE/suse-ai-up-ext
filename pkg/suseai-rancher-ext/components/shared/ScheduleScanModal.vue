@@ -140,7 +140,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { MCPService, type ScanConfig } from '../../services/mcp-service';
+import { discoveryAPI, type ScanConfig } from '../../services/discovery-api';
 import type { DiscoveryScanConfig } from '../../types/mcp-types';
 import { logger } from '../../utils/logger';
 import yaml from 'js-yaml';
@@ -324,7 +324,7 @@ const removePort = (index: number) => {
           excludeAddresses: excludeHosts.length > 0 ? excludeHosts : undefined
         };
 
-        const scanResult = await MCPService.startDiscoveryScan(backendConfig);
+        const scanResult = await discoveryAPI.startScan(backendConfig);
 
         logger.info('Discovery scan started', { scanId: scanResult.id, config: backendConfig });
         emit('scanStarted', scanResult);
