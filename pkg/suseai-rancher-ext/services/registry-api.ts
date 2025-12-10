@@ -87,7 +87,10 @@ export class RegistryAPI extends BaseAPI {
         const result = await this.get<RegistryBrowseResult>(url)
 
         // Debug: log the raw result
-        logger.info('Raw registry browse result', { result })
+        logger.info('Raw registry browse result type:', typeof result)
+        logger.info('Is array result?', Array.isArray(result))
+        logger.info('Result length if array:', Array.isArray(result) ? result.length : 'N/A')
+        logger.info('First server id if array:', Array.isArray(result) && result.length > 0 ? result[0].id : 'N/A')
 
         // Ensure result has expected structure
         let servers: MCPServer[] = []
@@ -101,63 +104,22 @@ export class RegistryAPI extends BaseAPI {
 
         // Handle different response formats
         if (Array.isArray(result)) {
-          // Raw array format (fallback for server.json)
+          // API returns array directly - use IDs as they are
           servers = result.map((server: any) => {
             const serverName = server.title || server.name
             return {
-              id: serverName.toLowerCase().replace(/\s+/g, '-'),
-              name: serverName,
-              description: server.description,
-              icon: server.icon,
-              packages: server.packages || [],
-              _meta: {
-                source: 'registry',
-                userAuthRequired: false,
-                authType: 'none',
-                category: 'general',
-                tags: []
-              }
+              ...server,
+              name: serverName
             }
           })
           total = servers.length
           hasMore = false
-          logger.info('Registry returned raw array format, transformed to expected structure')
+          logger.info('Registry returned array format, using IDs as provided')
         } else if (Array.isArray(result.servers)) {
-          // Expected structured format - transform IDs to slug format
-          servers = result.servers.map((server: MCPServer) => {
-            // Transform ID to slug format if it contains spaces or uppercase
-            if (server.id && (server.id.includes(' ') || server.id !== server.id.toLowerCase())) {
-              return {
-                ...server,
-                id: server.name.toLowerCase().replace(/\s+/g, '-')
-              }
-            }
-            return server
-          })
+          // Expected structured format - use the servers as-is
+          servers = result.servers
           total = result.total || servers.length
           hasMore = result.hasMore || false
-         } else if ((result as any).data && Array.isArray((result as any).data)) {
-          // Some APIs wrap the array in a data property
-          servers = (result as any).data.map((server: any) => {
-            const serverName = server.title || server.name
-            return {
-              id: serverName.toLowerCase().replace(/\s+/g, '-'),
-              name: serverName,
-              description: server.description,
-              icon: server.icon,
-              packages: server.packages || [],
-              _meta: {
-                source: 'registry',
-                userAuthRequired: false,
-                authType: 'none',
-                category: 'general',
-                tags: []
-              }
-            }
-          })
-          total = servers.length
-          hasMore = false
-          logger.info('Registry returned data array format, transformed to expected structure')
         } else {
           logger.warn('Invalid registry browse result structure', result)
           return { servers: [], total: 0, hasMore: false }
@@ -167,7 +129,7 @@ export class RegistryAPI extends BaseAPI {
         if (Array.isArray(result)) {
           // Raw array format (fallback for server.json) - transform to expected structure
           servers = result.map((server: any) => ({
-            id: server.name,
+            id: server.id,
             name: server.title || server.name,
             description: server.description,
             icon: server.icon,
@@ -205,64 +167,18 @@ export class RegistryAPI extends BaseAPI {
   /**
     * Get server details by ID
     */
-   async getServer(id: string): Promise<MCPServer> {
-     try {
-       logger.info('Getting server details', { id })
+    async getServer(id: string): Promise<MCPServer> {
+      try {
+        logger.info('Getting server details', { id })
 
-       // Try API first
-       try {
-         const server = await this.get<MCPServer>(`/api/v1/registry/${id}`)
-         logger.info('Server details retrieved from API', { id, name: server.name })
-         return server
-       } catch (apiError) {
-         logger.warn('API call failed, falling back to server.json', { id, error: apiError })
-       }
-
-       // Fallback to server.json
-       try {
-         const response = await fetch('/server.json')
-         const servers = await response.json()
-
-         const server = servers.find((s: any) => {
-           // Try different ID matching strategies
-           const serverId = s.name?.toLowerCase().replace(/\s+/g, '-') ||
-                           s.title?.toLowerCase().replace(/\s+/g, '-') ||
-                           s.id
-           return serverId === id
-         })
-
-         if (server) {
-           // Transform to MCPServer format
-           const transformedServer: MCPServer = {
-             id: server.name?.toLowerCase().replace(/\s+/g, '-') || server.title?.toLowerCase().replace(/\s+/g, '-') || server.id,
-             name: server.title || server.name,
-             description: server.description,
-             icon: server.icon,
-             packages: server.packages || [],
-             _meta: {
-               source: 'registry',
-               userAuthRequired: false,
-               authType: 'none',
-               category: 'general',
-               tags: [],
-               badges: []
-             }
-           }
-
-           logger.info('Server details retrieved from server.json fallback', { id, name: transformedServer.name })
-           return transformedServer
-         } else {
-           throw new Error(`Server with id ${id} not found in server.json`)
-         }
-       } catch (fallbackError) {
-         logger.error('Fallback to server.json also failed', { id, error: fallbackError })
-         throw fallbackError
-       }
-     } catch (error) {
-       logger.error('Failed to get server details', { id, error })
-       throw error
-     }
-   }
+        const server = await this.get<MCPServer>(`/api/v1/registry/${id}`)
+        logger.info('Server details retrieved from API', { id, name: server.name })
+        return server
+      } catch (error) {
+        logger.error('Failed to get server details', { id, error })
+        throw error
+      }
+    }
 
   /**
    * Reload the MCP server registry

@@ -76,23 +76,18 @@ export function useRegistry() {
       // Create cache key from params
       const cacheKey = `browse_${JSON.stringify(params)}_${pagination.value.currentPage}_${pagination.value.pageSize}`
 
-      // Check cache first
-      let result: RegistryBrowseResult | null = registryCache.get(cacheKey)
+      // Clear cache to ensure fresh data
+      registryCache.clear()
+      logger.info('Cache cleared for fresh data')
 
-      if (!result) {
-        // Not in cache, fetch from API
-        result = await registryAPI.browse({
-          ...params,
-          limit: pagination.value.pageSize,
-          offset: (pagination.value.currentPage - 1) * pagination.value.pageSize
-        })
+      // Always fetch from API (no caching for now)
+      const result = await registryAPI.browse({
+        ...params,
+        limit: pagination.value.pageSize,
+        offset: (pagination.value.currentPage - 1) * pagination.value.pageSize
+      })
 
-        // Cache the result for 5 minutes
-        registryCache.set(cacheKey, result, 5 * 60 * 1000)
-        logger.info('Registry servers fetched from API', { count: result.servers.length, total: result.total })
-      } else {
-        logger.info('Registry servers loaded from cache', { count: result.servers.length, total: result.total })
-      }
+      logger.info('Registry servers fetched from API', { count: result.servers.length, total: result.total })
 
       // If this is the first page or a new search, replace the servers array
       // Otherwise, append to existing results for pagination
@@ -117,7 +112,9 @@ export function useRegistry() {
   const getServerDetails = async (id: string): Promise<MCPServer | null> => {
     try {
       logger.info('Getting server details', { id })
-      return await registryAPI.getServer(id)
+      const result = await registryAPI.getServer(id)
+      logger.info('Server details result:', result)
+      return result
     } catch (err: any) {
       logger.error('Failed to get server details', { id, error: err })
       return null

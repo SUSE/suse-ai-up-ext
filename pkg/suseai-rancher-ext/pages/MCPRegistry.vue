@@ -128,7 +128,7 @@
                     <button
                       class="btn btn-sm btn-secondary"
                       @click.stop="handleViewServer(server)"
-                      :aria-label="`View details for ${server.name}`"
+                      :aria-label="`View details for ${server.id}`"
                     >
                       <i class="icon icon-info"></i>
                       Details
@@ -136,7 +136,7 @@
                     <button
                       class="btn btn-sm btn-primary"
                       @click.stop="handleCreateAdapter(server)"
-                      :aria-label="`Create adapter for ${server.name}`"
+                      :aria-label="`Create adapter for ${server.id}`"
                     >
                       Create Adapter
                     </button>
@@ -146,15 +146,15 @@
           </div>
         </div>
       </div>
-    </main>
+      </main>
 
-     <!-- Server Details Modal -->
-     <RegistryServerDetailsModal
-       :show="showViewModal"
-       :server="selectedServer"
-       @close="showViewModal = false"
-     />
-  </div>
+      <!-- Server Details Modal -->
+      <ServerDetailsModal
+        :show="showServerDetailsModal"
+        :server-id="selectedServerId"
+        @close="closeServerDetailsModal"
+      />
+   </div>
 </template>
 
 <script lang="ts">
@@ -162,6 +162,7 @@ import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRegistry } from '../composables/useRegistry'
 import type { MCPServer } from '../services/registry-api'
+import ServerDetailsModal from '../components/MCPRegistry/ServerDetailsModal.vue'
 
 // Generic MCP icon SVG (official logo with currentColor for theming)
 const genericMCPIcon = `<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -180,7 +181,7 @@ const genericMCPIcon = `<svg width="180" height="180" viewBox="0 0 180 180" fill
 export default defineComponent({
   name: 'MCPRegistry',
   components: {
-    RegistryServerDetailsModal: () => import('../components/MCPRegistry/RegistryServerDetailsModal.vue')
+    ServerDetailsModal
   },
 
   metaInfo() {
@@ -209,8 +210,8 @@ export default defineComponent({
     // Local state for UI
     const searchQuery = ref('')
     const categoryFilter = ref('')
-    const showViewModal = ref(false)
-    const selectedServer = ref<any>(null)
+    const showServerDetailsModal = ref(false)
+    const selectedServerId = ref<string>('')
     const expandedCards = ref<Set<string>>(new Set())
 
     // Check if server is a SUSE server
@@ -282,23 +283,21 @@ export default defineComponent({
     }
 
     const handleViewServer = async (server: MCPServer) => {
-      console.log('Opening details for registry server:', server.name, 'with ID:', server.id)
-      try {
-        // For registry servers, always fetch full details from registry API
-        const fullServerDetails = await getServerDetails(server.id)
-        console.log('Registry server details loaded:', fullServerDetails?.name)
-        selectedServer.value = fullServerDetails
-      } catch (error) {
-        console.error('Failed to load registry server details, using browse data:', error)
-        // Fallback to browse data if API fails
-        selectedServer.value = server
-      }
-      showViewModal.value = true
+      console.log('handleViewServer called with server:', server.name, 'id:', server.id)
+      console.log('Full server object:', JSON.stringify(server, null, 2))
+      selectedServerId.value = server.id
+      showServerDetailsModal.value = true
+      console.log('selectedServerId set to:', selectedServerId.value)
     }
 
     const handleCreateAdapter = (server: MCPServer) => {
       // TODO: Implement adapter creation flow
       console.log('Create adapter for server:', server.name)
+    }
+
+    const closeServerDetailsModal = () => {
+      showServerDetailsModal.value = false
+      selectedServerId.value = ''
     }
 
     const toggleCardExpansion = (serverId: string) => {
@@ -325,8 +324,8 @@ export default defineComponent({
       error,
       searchQuery,
       categoryFilter,
-      showViewModal,
-      selectedServer,
+      showServerDetailsModal,
+      selectedServerId,
       filteredServers,
       availableCategories,
       isEnabled,
@@ -336,6 +335,7 @@ export default defineComponent({
        handleReloadRegistry,
        handleViewServer,
        handleCreateAdapter,
+       closeServerDetailsModal,
        getServerIcon,
        toggleCardExpansion,
        isSuseServer,
