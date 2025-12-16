@@ -26,7 +26,7 @@ chmod +x start-test-servers.sh
 Currently simulates 4 MCP servers:
 - `mcp-server-1:8911`
 - `mcp-server-2:8912`
-- `mcp-server-3:8913`
+- `mcp-server-3:8911`
 - `mcp-server-4:8914`
 
 ## Timing Sequence

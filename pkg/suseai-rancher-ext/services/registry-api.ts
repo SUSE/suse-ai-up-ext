@@ -3,13 +3,25 @@
 
 import { BaseAPI, APIConfig } from './base-api'
 import { logger } from '../utils/logger'
-import { API_BASE_URLS } from '../config/api-config'
+import { API_BASE_URLS, MCP_ENDPOINTS } from '../config/api-config'
 
 export interface MCPServer {
   readonly id: string
   readonly name: string
   readonly description: string
   readonly icon?: string
+  readonly about?: {
+    readonly icon_url: string
+    readonly title: string
+  }
+  readonly secrets?: readonly {
+    readonly name: string
+    readonly description?: string
+    readonly value?: string
+  }[]
+  readonly tags?: readonly string[]
+  readonly source_url?: string
+  readonly project_url?: string
   readonly packages: readonly Package[]
   readonly tools?: readonly any[]
   readonly config_template?: any
@@ -76,13 +88,13 @@ export class RegistryAPI extends BaseAPI {
     try {
       logger.info('Browsing MCP registry', { params })
 
-      const queryParams = new URLSearchParams()
-      if (params.q) queryParams.append('q', params.q)
-      if (params.category) queryParams.append('category', params.category)
-      if (params.limit) queryParams.append('limit', params.limit.toString())
-      if (params.offset) queryParams.append('offset', params.offset.toString())
+        const queryParams = new URLSearchParams()
+       if (params.q) queryParams.append('q', params.q)
+       if (params.category) queryParams.append('category', params.category)
+       if (params.limit) queryParams.append('limit', params.limit.toString())
+       if (params.offset) queryParams.append('offset', params.offset.toString())
 
-       const url = `/api/v1/registry/browse${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+         const url = `${MCP_ENDPOINTS.REGISTRY_BROWSE}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
 
         const result = await this.get<RegistryBrowseResult>(url)
 
@@ -127,21 +139,28 @@ export class RegistryAPI extends BaseAPI {
 
         // Handle different response formats
         if (Array.isArray(result)) {
-          // Raw array format (fallback for server.json) - transform to expected structure
-          servers = result.map((server: any) => ({
-            id: server.id,
-            name: server.title || server.name,
-            description: server.description,
-            icon: server.icon,
-            packages: server.packages || [],
-            _meta: {
-              source: 'registry',
-              userAuthRequired: false,
-              authType: 'none',
-              category: 'general',
-              tags: []
-            }
-          }))
+           // Raw array format (fallback for server.json) - transform to expected structure
+           servers = result.map((server: any) => ({
+             id: server.id || server.name, // Use name as id if id is not provided
+             name: server.title || server.name,
+             description: server.description || server.about?.description,
+             icon: server.icon || server.about?.icon,
+             about: server.about,
+             tags: server.tags || server.meta?.tags || [],
+             packages: server.packages || [],
+             _meta: {
+               source: server.source || 'registry',
+               userAuthRequired: false,
+               authType: 'none',
+               category: server.meta?.category || 'general',
+               tags: server.meta?.tags || [],
+               hosted: server.meta?.hosted,
+               requiresInstallation: server.meta?.requiresInstallation,
+               transportType: server.meta?.transportType,
+               validation_status: server.meta?.validation_status,
+               badges: server.meta?.badges
+             }
+           }))
           total = servers.length
           hasMore = false
           logger.info('Registry returned raw array format, transformed to expected structure')
@@ -165,20 +184,20 @@ export class RegistryAPI extends BaseAPI {
   }
 
   /**
-    * Get server details by ID
-    */
-    async getServer(id: string): Promise<MCPServer> {
-      try {
-        logger.info('Getting server details', { id })
+      * Get server details by ID
+      */
+     async getServer(id: string): Promise<MCPServer> {
+       try {
+         logger.info('Getting server details', { id })
 
-        const server = await this.get<MCPServer>(`/api/v1/registry/${id}`)
-        logger.info('Server details retrieved from API', { id, name: server.name })
-        return server
-      } catch (error) {
-        logger.error('Failed to get server details', { id, error })
-        throw error
-      }
-    }
+         const server = await this.get<MCPServer>(MCP_ENDPOINTS.REGISTRY_DETAILS(id))
+         logger.info('Server details retrieved from API', { id, name: server.name })
+         return server
+       } catch (error) {
+         logger.error('Failed to get server details', { id, error })
+         throw error
+       }
+     }
 
   /**
    * Reload the MCP server registry
@@ -187,7 +206,7 @@ export class RegistryAPI extends BaseAPI {
     try {
       logger.info('Reloading MCP registry')
 
-       const result = await this.post<{ status: string; message: string }>('/api/v1/registry/reload')
+        const result = await this.post<{ status: string; message: string }>('/registry/reload')
       logger.info('Registry reload completed', result)
 
       return result

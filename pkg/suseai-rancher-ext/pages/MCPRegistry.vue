@@ -95,31 +95,25 @@
                        <h3 class="tile-title">{{ server.name }}</h3>
                        <p class="tile-description">{{ server.description }}</p>
                         <div class="tile-badges">
-                          <!-- Computed SUSE/CERTIFIED badges -->
-                          <span v-if="isSuseServer(server)" class="badge badge-primary">SUSE</span>
-                          <span v-if="isCertifiedServer(server)" class="badge badge-primary">CERTIFIED</span>
+                            <!-- Certified badge if tags include 'suse' -->
+                            <span v-if="isCertifiedServer(server)" class="badge badge-success">CERTIFIED</span>
 
-                          <!-- API-provided badges -->
-                          <span v-if="server._meta?.badges && server._meta.badges.length" v-for="badge in server._meta.badges" :key="badge" class="badge badge-primary">
-                            {{ badge }}
+                            <!-- Other badges -->
+                            <span v-if="requiresAuth(server)" class="badge badge-warning">
+                              Auth Required
+                            </span>
+                            <span v-if="server._meta?.hosted" class="badge badge-success">
+                              Hosted
+                            </span>
+                          </div>
+                        <div v-if="server.tags && server.tags.length" class="tile-tags">
+                          <span v-for="tag in server.tags.slice(0, 2)" :key="tag" class="tag">
+                            {{ tag }}
                           </span>
-
-                          <!-- Other badges -->
-                          <span v-if="requiresAuth(server)" class="badge badge-warning">
-                            Auth Required
-                          </span>
-                          <span v-if="server._meta?.hosted" class="badge badge-success">
-                            Hosted
+                          <span v-if="server.tags.length > 2" class="tag more-tags">
+                            +{{ server.tags.length - 2 }} more
                           </span>
                         </div>
-                       <div v-if="server._meta?.tags && server._meta.tags.length" class="tile-tags">
-                         <span v-for="tag in server._meta.tags.slice(0, 3)" :key="tag" class="tag">
-                           {{ tag }}
-                         </span>
-                         <span v-if="server._meta.tags.length > 3" class="tag more-tags">
-                           +{{ server._meta.tags.length - 3 }} more
-                         </span>
-                       </div>
                      </div>
                    </div>
                  </div>
@@ -216,16 +210,17 @@ export default defineComponent({
 
     // Check if server is a SUSE server
     const isSuseServer = (server: MCPServer): boolean => {
-      return server.name?.toLowerCase().includes('suse') ||
-             server._meta?.source?.toLowerCase().includes('suse') ||
-             server._meta?.badges?.some(badge => badge.toLowerCase().includes('suse')) ||
+      return (server.name?.toLowerCase() || '').includes('suse') ||
+             (server.description?.toLowerCase() || '').includes('suse') ||
+             (typeof server._meta?.source === 'string' ? server._meta.source.toLowerCase() : '').includes('suse') ||
+             server._meta?.badges?.some(badge => (badge?.toLowerCase() || '').includes('suse')) ||
              false
     }
 
     // Check if server is certified
     const isCertifiedServer = (server: MCPServer): boolean => {
-      // For now, assume SUSE servers are certified
-      return isSuseServer(server)
+      // Server is certified if tags include 'suse'
+      return server.tags?.some(tag => tag.toLowerCase() === 'suse') || false
     }
 
     // Load initial data
@@ -241,8 +236,8 @@ export default defineComponent({
       if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase()
         filtered = filtered.filter(server =>
-          server.name.toLowerCase().includes(query) ||
-          server.description.toLowerCase().includes(query)
+          (server.name?.toLowerCase() || '').includes(query) ||
+          (server.description?.toLowerCase() || '').includes(query)
         )
       }
 
@@ -258,19 +253,34 @@ export default defineComponent({
 
     // Get appropriate icon for server
     const getServerIcon = (server: MCPServer): string => {
-      // Check if this is a SUSE server
-      const isSUSEServer = server.name.toLowerCase().includes('suse') ||
-                          server.description.toLowerCase().includes('suse') ||
-                          server._meta?.source?.toLowerCase().includes('suse') ||
-                          server._meta?.tags?.some(tag => tag.toLowerCase().includes('suse'))
+      // Use icon from about section if available
+      if (server.about?.icon_url) {
+        return `<img src="${server.about.icon_url}" alt="${server.about.title || server.name}" style="width: 100%; height: 100%; border-radius: 4px; object-fit: cover;" />`
+      }
+
+       // Check if this is a SUSE server
+       const isSUSEServer = (server.name?.toLowerCase() || '').includes('suse') ||
+                           (server.description?.toLowerCase() || '').includes('suse') ||
+                           (typeof server._meta?.source === 'string' ? server._meta.source.toLowerCase() : '').includes('suse') ||
+                           server._meta?.tags?.some(tag => (tag?.toLowerCase() || '').includes('suse'))
 
       if (isSUSEServer) {
         // Use SUSE icon for SUSE servers
         return `<img src="https://avatars.githubusercontent.com/u/1067733" alt="SUSE" style="width: 100%; height: 100%; border-radius: 4px; object-fit: cover;" />`
       }
 
-      // Use official server icon if available, otherwise use generic MCP icon
-      return server.icon || genericMCPIcon
+      // Use official server icon if available
+      if (server.icon) {
+        // Check if icon is a URL (starts with http/https)
+        if (server.icon.startsWith('http://') || server.icon.startsWith('https://')) {
+          return `<img src="${server.icon}" alt="${server.name}" style="width: 100%; height: 100%; border-radius: 4px; object-fit: cover;" />`
+        }
+        // Otherwise assume it's SVG content
+        return server.icon
+      }
+
+      // Use generic MCP icon as fallback
+      return genericMCPIcon
     }
 
     // Event handlers
@@ -549,6 +559,13 @@ export default defineComponent({
   height: 24px;
   fill: currentColor;
   stroke: currentColor;
+}
+
+.tile-icon img {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  object-fit: cover;
 }
 
 .tile-info {

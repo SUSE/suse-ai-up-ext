@@ -92,11 +92,11 @@ export function useServiceDiscovery() {
         const allPods = response?.data?.items || response?.data || response?.items || [];
         console.log(`📊 [ServiceDiscovery] Extracted ${allPods.length} pods from response`);
 
-        // Filter for SUSE AI UP pods (name starts with 'suse-ai-up' and has port 8913)
+        // Filter for SUSE AI UP pods (name starts with 'suse-ai-up' and has port 8911)
         const suseAIPods = allPods.filter((pod: any) => {
           const podName = pod.metadata?.name || '';
           const hasCorrectPort = pod.spec?.containers?.some((container: any) =>
-            container.ports?.some((port: any) => port.containerPort === 8913)
+            container.ports?.some((port: any) => port.containerPort === 8911)
           );
           const isSuseAIPod = podName.startsWith('suse-ai-up');
           
@@ -159,11 +159,11 @@ export function useServiceDiscovery() {
          const services = servicesData.items;
          console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for suse-ai-up`);
 
-          // Find services named 'suse-ai-up' with port 8913
+          // Find services named 'suse-ai-up' with port 8911
           const suseAIServices = services.filter((service: any) => {
             const serviceName = service.metadata?.name;
-            const hasPort8913 = service.spec?.ports?.some((p: any) => p.port === 8913 || p.targetPort === 8913);
-            return serviceName === 'suse-ai-up' && hasPort8913;
+            const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
+            return serviceName === 'suse-ai-up' && hasPort8911;
           });
 
          console.log(`🎯 [ServiceDiscovery] Found ${suseAIServices.length} SUSE AI UP services`);
@@ -184,7 +184,7 @@ export function useServiceDiscovery() {
            // Perform health check
            let isHealthy = false;
            try {
-              const healthResponse = await fetch(`http://${serviceIP}:8913/health`, {
+              const healthResponse = await fetch(`http://${serviceIP}:8911/health`, {
                method: 'GET',
                mode: 'cors',
                headers: { 'Content-Type': 'application/json' }
@@ -296,25 +296,25 @@ export function useServiceDiscovery() {
       // First, try to use the cluster's load balancer public IP
       const clusterPublicIP = getClusterPublicIP(clusterInfo);
       if (clusterPublicIP) {
-        return `http://${clusterPublicIP}:8913`;
+        return `http://${clusterPublicIP}:8911`;
       }
 
       // Fallback: Use pod IP if available
       if (pod.status.podIP) {
-        return `http://${pod.status.podIP}:8913`;
+        return `http://${pod.status.podIP}:8911`;
       }
 
       // Use host IP as fallback
       if (pod.status.hostIP) {
-        return `http://${pod.status.hostIP}:8913`;
+        return `http://${pod.status.hostIP}:8911`;
       }
 
       // Default fallback
-      return 'http://localhost:8913';
+      return 'http://localhost:8911';
     };
 
   /**
-    * Discover SUSE AI pods with port 8913
+    * Discover SUSE AI pods with port 8911
     */
     const discoverPods = async (store: any, clusterId: string, clusterInfo?: any): Promise<DetectedService[]> => {
      isLoading.value = true;
@@ -342,7 +342,7 @@ export function useServiceDiscovery() {
          logger.info(`Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`)
           const suseAIPods = pods.filter(pod => {
            const hasCorrectPort = pod.spec?.containers?.some(container =>
-             container.ports?.some((port: any) => port.containerPort === 8913)
+             container.ports?.some((port: any) => port.containerPort === 8911)
            );
           const podName = pod.metadata?.name || 'unknown';
           const podNamespace = pod.metadata?.namespace || 'unknown';
@@ -378,7 +378,7 @@ export function useServiceDiscovery() {
                 detected.push({
                   name: podName,
                   namespace: podNamespace,
-                  port: 8913,
+                  port: 8911,
                   type: 'Pod',
                  clusterIP: pod.status?.podIP,
                  externalIPs: pod.status?.hostIP ? [pod.status.hostIP] : undefined,
@@ -405,7 +405,7 @@ export function useServiceDiscovery() {
   };
 
   /**
-    * Discover SUSE AI pods with port 8913 (returns pod objects for UI)
+    * Discover SUSE AI pods with port 8911 (returns pod objects for UI)
     * Uses hybrid approach: tries service discovery first, then falls back to pod discovery
     */
   const discoverPodObjects = async (store: any, clusterId: string): Promise<DetectedPod[]> => {
@@ -456,7 +456,7 @@ export function useServiceDiscovery() {
           let isHealthy = false;
           if (primaryIP) {
             try {
-              const healthResponse = await fetch(`http://${primaryIP}:8913/health`, {
+              const healthResponse = await fetch(`http://${primaryIP}:8911/health`, {
                 method: 'GET',
                 mode: 'cors',
                 headers: { 'Content-Type': 'application/json' }
@@ -478,7 +478,7 @@ export function useServiceDiscovery() {
               },
               spec: {
                 containers: [{
-                  ports: [{ containerPort: 8913, protocol: 'TCP' }]
+                  ports: [{ containerPort: 8911, protocol: 'TCP' }]
                 }]
               },
               status: {

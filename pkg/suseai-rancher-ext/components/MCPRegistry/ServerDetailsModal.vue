@@ -86,13 +86,28 @@
             </div>
           </div>
 
-          <!-- Tags -->
-          <div v-if="serverData._meta?.tags?.length" class="detail-section">
-            <h4>Tags</h4>
-            <div class="tags-list">
-              <span v-for="tag in serverData._meta.tags" :key="tag" class="tag">{{ tag }}</span>
-            </div>
-          </div>
+           <!-- Tags -->
+           <div v-if="serverData.tags?.length || serverData._meta?.tags?.length" class="detail-section">
+             <h4>Tags</h4>
+             <div class="tags-list">
+               <span v-for="tag in (serverData.tags || serverData._meta?.tags || [])" :key="tag" class="tag">{{ tag }}</span>
+             </div>
+           </div>
+
+           <!-- Links -->
+           <div v-if="serverData.source_url || serverData.project_url" class="detail-section">
+             <h4>Links</h4>
+             <div class="links-list">
+               <a v-if="serverData.source_url" :href="serverData.source_url" target="_blank" class="link-item">
+                 Source Code
+                 <i class="icon icon-external-link"></i>
+               </a>
+               <a v-if="serverData.project_url" :href="serverData.project_url" target="_blank" class="link-item">
+                 Project Page
+                 <i class="icon icon-external-link"></i>
+               </a>
+             </div>
+           </div>
         </div>
       </div>
     </div>
@@ -122,13 +137,28 @@ export default defineComponent({
     const error = ref<string | null>(null)
 
     const getAllEnvironmentVariables = () => {
-      if (!serverData.value?.packages) return []
       const allVars: any[] = []
-      serverData.value.packages.forEach((pkg: any) => {
-        if (pkg.environmentVariables) {
-          allVars.push(...pkg.environmentVariables)
-        }
-      })
+
+      // Add secrets from the new API structure
+      if (serverData.value?.secrets) {
+        allVars.push(...serverData.value.secrets.map((secret: any) => ({
+          name: secret.name,
+          description: secret.description,
+          default: secret.value,
+          isSecret: true, // Mark as secret since they come from secrets array
+          required: false // Assume not required unless specified
+        })))
+      }
+
+      // Add environment variables from packages (legacy support)
+      if (serverData.value?.packages) {
+        serverData.value.packages.forEach((pkg: any) => {
+          if (pkg.environmentVariables) {
+            allVars.push(...pkg.environmentVariables)
+          }
+        })
+      }
+
       return allVars
     }
 
@@ -419,6 +449,34 @@ export default defineComponent({
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
+}
+
+/* Links */
+.links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary, #007bff);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 6px;
+  background: var(--accent-bg, #f8f9fa);
+  transition: all 0.2s ease;
+}
+
+.link-item:hover {
+  background: var(--primary, #007bff);
+  color: white;
+  text-decoration: none;
+  border-color: var(--primary, #007bff);
 }
 
 .btn {

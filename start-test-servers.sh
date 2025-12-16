@@ -8,7 +8,7 @@
 SERVERS=(
     "mcp-server-1:8911"
     "mcp-server-2:8912"
-    "mcp-server-3:8913"
+    "mcp-server-3:8911"
     "mcp-server-4:8914"
 )
 

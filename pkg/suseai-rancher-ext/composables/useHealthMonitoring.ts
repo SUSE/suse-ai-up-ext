@@ -79,7 +79,7 @@ export function useHealthMonitoring() {
 
     try {
       const proxyHost = window.location.hostname;
-      const response = await fetch(`http://${proxyHost}:8913/health`, {
+      const response = await fetch(`http://${proxyHost}:8911/health`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });

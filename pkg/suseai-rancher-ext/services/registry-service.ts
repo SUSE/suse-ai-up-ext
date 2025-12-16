@@ -4,7 +4,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios'
-import { getMcpUrl, getApiConfig } from '../config/api-config'
+import { getMcpUrl, getApiConfig, MCP_ENDPOINTS } from '../config/api-config'
 import { logger } from '../utils/logger'
 
 export interface RegistryServer {
@@ -175,7 +175,7 @@ export class RegistryService {
       if (options.sortOrder) params.append('sortOrder', options.sortOrder)
 
       const response = await this.api.get(
-        getMcpUrl('/registry/browse'),
+        getMcpUrl(MCP_ENDPOINTS.REGISTRY_BROWSE),
         { params }
       )
       return response.data

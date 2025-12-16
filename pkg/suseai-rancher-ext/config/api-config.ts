@@ -8,19 +8,19 @@ import { reactive, ref } from 'vue';
 // Base URLs for different services
 export const getApiBaseUrls = (serviceUrl?: string, useHttps: boolean = false) => {
   const protocol = useHttps ? 'https' : 'http';
-  const mcpPort = useHttps ? 38913 : 8913;
+  const mcpPort = useHttps ? 38911 : 8911;
   const discoveryPort = useHttps ? 38912 : 8912;
   const proxyPort = useHttps ? 38911 : 8911;
 
   if (serviceUrl) {
-    // Extract IP from serviceUrl (e.g., http://192.168.1.100:8913 -> 192.168.1.100)
+    // Extract IP from serviceUrl (e.g., http://192.168.1.100:8911 -> 192.168.1.100)
     const url = new URL(serviceUrl);
     const ip = url.hostname;
     return {
       MCP_GATEWAY: `${protocol}://${ip}:${mcpPort}`,
       DISCOVERY: `${protocol}://${ip}:${discoveryPort}`,
       PROXY: `${protocol}://${ip}:${proxyPort}`,
-      REGISTRY: `http://${ip}:8913`,
+      REGISTRY: `http://${ip}:8911`,
       PLUGINS: `http://${ip}:8914`,
       VIRTUAL_MCP: `http://${ip}:8912/api/v1`,
       SMART_AGENTS: `http://${ip}:8910`,
@@ -31,7 +31,7 @@ export const getApiBaseUrls = (serviceUrl?: string, useHttps: boolean = false) =
     MCP_GATEWAY: `${protocol}://192.168.64.17:${mcpPort}`,
     DISCOVERY: `${protocol}://192.168.64.17:${discoveryPort}`,
     PROXY: `${protocol}://192.168.64.17:${proxyPort}`,
-    REGISTRY: 'http://192.168.64.17:8913',
+    REGISTRY: 'http://192.168.64.17:8911',
     PLUGINS: 'http://192.168.64.17:8914',
     VIRTUAL_MCP: 'http://localhost:8912/api/v1',
     SMART_AGENTS: 'http://localhost:8910',

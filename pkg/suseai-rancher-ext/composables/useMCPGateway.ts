@@ -173,9 +173,9 @@ export function useMCPGateway() {
     setTimeout(() => {
       fakeInstalling.value = false;
       serviceFound.value = true;
-      serviceUrl.value = 'http://localhost:8913';
+      serviceUrl.value = 'http://localhost:8911';
       useExistingService.value = true; // Auto-select the found service
-      logger.info('Fake installation completed - service discovered at localhost:8913');
+      logger.info('Fake installation completed - service discovered at localhost:8911');
     }, 10000); // 10 seconds
   };
 
@@ -278,7 +278,7 @@ export function useMCPGateway() {
       const isResponding = await MCPService.ping();
       if (isResponding) {
         serviceFound.value = true;
-        serviceUrl.value = 'http://localhost:8913';
+        serviceUrl.value = 'http://localhost:8911';
         stopServiceChecking();
         logger.info('Existing SUSE AI Universal Proxy service found');
       } else {
@@ -1015,7 +1015,7 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
     }
 
     try {
-      const baseUrl = apiClient.defaults.baseURL?.replace('/api/v1', '') || 'http://localhost:8913';
+      const baseUrl = apiClient.defaults.baseURL?.replace('/api/v1', '') || 'http://localhost:8911';
       eventSource.value = new EventSource(`${baseUrl}/events`);
       
       eventSource.value.onmessage = (event) => {
@@ -1083,7 +1083,7 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
   // Helper function for server deduplication
   const generateServerKey = (server: DiscoveredServer): string => {
     const extractedPort = getPortFromAddress(server.address);
-    const effectivePort = extractedPort || server.port || 8913;
+    const effectivePort = extractedPort || server.port || 8911;
     const name = server.name || 'unknown';
     const authType = server.metadata?.auth_type || 'none';
     return `${server.address}:${effectivePort}:${name}:${authType}`;
