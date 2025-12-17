@@ -92,18 +92,19 @@ export function useServiceDiscovery() {
         const allPods = response?.data?.items || response?.data || response?.items || [];
         console.log(`📊 [ServiceDiscovery] Extracted ${allPods.length} pods from response`);
 
-        // Filter for SUSE AI UP pods (name starts with 'suse-ai-up' and has port 8911)
+        // Filter for SUSE AI UP pods (name starts with 'uniproxy' in namespace 'suse-ai-up' and has port 8911)
         const suseAIPods = allPods.filter((pod: any) => {
           const podName = pod.metadata?.name || '';
+          const podNamespace = pod.metadata?.namespace || '';
           const hasCorrectPort = pod.spec?.containers?.some((container: any) =>
             container.ports?.some((port: any) => port.containerPort === 8911)
           );
-          const isSuseAIPod = podName.startsWith('suse-ai-up');
-          
+          const isSuseAIPod = podName.startsWith('uniproxy') && podNamespace === 'suse-ai-up';
+
           if (isSuseAIPod) {
             console.log(`🔍 [ServiceDiscovery] Checking pod ${podName}: port=${hasCorrectPort}, name=${isSuseAIPod}`);
           }
-          
+
           return hasCorrectPort && isSuseAIPod;
         });
 
@@ -157,14 +158,15 @@ export function useServiceDiscovery() {
        const servicesData = response?.data;
        if (servicesData && servicesData.items) {
          const services = servicesData.items;
-         console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for suse-ai-up`);
+            console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for uniproxy service`);
 
-          // Find services named 'suse-ai-up' with port 8911
-          const suseAIServices = services.filter((service: any) => {
-            const serviceName = service.metadata?.name;
-            const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
-            return serviceName === 'suse-ai-up' && hasPort8911;
-          });
+            // Find services named 'uniproxy' with port 8911
+             const suseAIServices = services.filter((service: any) => {
+               const serviceName = service.metadata?.name;
+               const serviceNamespace = service.metadata?.namespace;
+               const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
+               return serviceName === 'uniproxy' && serviceNamespace === 'suse-ai-up' && hasPort8911;
+             });
 
          console.log(`🎯 [ServiceDiscovery] Found ${suseAIServices.length} SUSE AI UP services`);
 
@@ -340,18 +342,18 @@ export function useServiceDiscovery() {
 
          console.log(`✅ [ServiceDiscovery] Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`);
          logger.info(`Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`)
-          const suseAIPods = pods.filter(pod => {
-           const hasCorrectPort = pod.spec?.containers?.some(container =>
-             container.ports?.some((port: any) => port.containerPort === 8911)
-           );
-          const podName = pod.metadata?.name || 'unknown';
-          const podNamespace = pod.metadata?.namespace || 'unknown';
-          const isSuseAIPod = podName.startsWith('suse-ai-up');
+           const suseAIPods = pods.filter(pod => {
+            const hasCorrectPort = pod.spec?.containers?.some(container =>
+              container.ports?.some((port: any) => port.containerPort === 8911)
+            );
+            const podName = pod.metadata?.name || 'unknown';
+            const podNamespace = pod.metadata?.namespace || 'unknown';
+            const isSuseAIPod = podName.startsWith('uniproxy') && podNamespace === 'suse-ai-up';
 
-          console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: port=${hasCorrectPort}, name=${isSuseAIPod}`);
+           console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: port=${hasCorrectPort}, name=${isSuseAIPod}`);
 
-          return hasCorrectPort && isSuseAIPod;
-        });
+           return hasCorrectPort && isSuseAIPod;
+         });
 
        logger.info(`Found ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`)
 
@@ -472,7 +474,7 @@ export function useServiceDiscovery() {
             // Create a synthetic pod object from service
             const syntheticPod: DetectedPod = {
               metadata: {
-                name: service.metadata?.name || 'suse-ai-up-service',
+                name: service.metadata?.name || 'uniproxy',
                 namespace: service.metadata?.namespace || 'suse-ai-up',
                 annotations: service.metadata?.annotations
               },

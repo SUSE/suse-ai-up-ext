@@ -31,22 +31,159 @@
             <p class="server-description">{{ serverData.description }}</p>
           </div>
 
-          <!-- Environment Variables -->
-          <div v-if="getAllEnvironmentVariables().length > 0" class="detail-section">
-            <h4>Environment Variables</h4>
-            <div class="env-vars-list">
-              <div v-for="env in getAllEnvironmentVariables()" :key="env.name" class="env-var-item">
-                <div class="env-var-header">
-                  <code class="env-var-name">{{ env.name }}</code>
-                  <div class="env-var-flags">
-                    <span v-if="env.isSecret" class="flag secret">Secret</span>
-                    <span v-if="env.required" class="flag required">Required</span>
-                  </div>
-                </div>
-                <p v-if="env.description" class="env-var-description">{{ env.description }}</p>
-              </div>
-            </div>
-          </div>
+           <!-- Connection Details -->
+           <div v-if="serverData.address || serverData.port || serverData.protocol || serverData.connection" class="detail-section">
+             <h4>Connection Details</h4>
+             <div class="connection-details">
+               <div class="connection-grid">
+                 <div v-if="serverData.protocol" class="connection-item">
+                   <div class="connection-label">Protocol</div>
+                   <div class="connection-value">{{ serverData.protocol }}</div>
+                 </div>
+                 <div v-if="serverData.address" class="connection-item">
+                   <div class="connection-label">Address</div>
+                   <div class="connection-value">{{ serverData.address }}</div>
+                 </div>
+                 <div v-if="serverData.port" class="connection-item">
+                   <div class="connection-label">Port</div>
+                   <div class="connection-value">{{ serverData.port }}</div>
+                 </div>
+                 <div v-if="serverData.connection" class="connection-item">
+                   <div class="connection-label">Connection Type</div>
+                   <div class="connection-value">{{ serverData.connection }}</div>
+                 </div>
+               </div>
+             </div>
+           </div>
+
+           <!-- Server Configuration -->
+           <div v-if="serverData._meta?.config" class="detail-section">
+             <h4>Server Configuration</h4>
+             <div class="server-config">
+               <p v-if="serverData._meta.config.description" class="config-description">{{ serverData._meta.config.description }}</p>
+
+               <!-- Parameters -->
+               <div v-if="serverData._meta.config.parameters?.properties" class="config-section">
+                 <h5>Parameters</h5>
+                 <div class="parameters-list">
+                   <div v-for="(param, paramKey) in serverData._meta.config.parameters.properties" :key="paramKey" class="parameter-item">
+                     <div class="parameter-header">
+                       <code class="parameter-name">{{ paramKey }}</code>
+                       <span v-if="serverData._meta.config.parameters.required?.includes(paramKey)" class="parameter-required">Required</span>
+                     </div>
+                     <p v-if="param.description" class="parameter-description">{{ param.description }}</p>
+                     <div class="parameter-details">
+                       <span class="parameter-type">Type: {{ param.type }}</span>
+                       <span v-if="param.default !== undefined" class="parameter-default">Default: {{ param.default }}</span>
+                       <span v-if="param.example" class="parameter-example">Example: {{ param.example }}</span>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+               <!-- Environment Variables -->
+               <div v-if="serverData._meta.config.env?.length" class="config-section">
+                 <h5>Environment Variables</h5>
+                 <div class="env-vars-list">
+                   <div v-for="env in serverData._meta.config.env" :key="env.name" class="env-var-item">
+                     <div class="env-var-header">
+                       <code class="env-var-name">{{ env.name }}</code>
+                     </div>
+                     <p v-if="env.description" class="env-var-description">{{ env.description }}</p>
+                     <div class="env-var-details">
+                       <span v-if="env.value" class="env-var-value">Value: {{ env.value }}</span>
+                       <span v-if="env.example" class="env-var-example">Example: {{ env.example }}</span>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+               <!-- Secrets -->
+               <div v-if="serverData._meta.config.secrets?.length" class="config-section">
+                 <h5>Secrets</h5>
+                 <div class="secrets-list">
+                   <div v-for="secret in serverData._meta.config.secrets" :key="secret.name" class="secret-item">
+                     <div class="secret-header">
+                       <code class="secret-name">{{ secret.name }}</code>
+                       <span v-if="secret.required" class="secret-required">Required</span>
+                     </div>
+                     <p v-if="secret.description" class="secret-description">{{ secret.description }}</p>
+                     <div class="secret-details">
+                       <span class="secret-env">Env: {{ secret.env }}</span>
+                       <span v-if="secret.example" class="secret-example">Example: {{ secret.example }}</span>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           </div>
+
+           <!-- Configuration Template -->
+           <div v-if="serverData.config_template" class="detail-section">
+             <h4>Configuration Template</h4>
+             <div class="config-template">
+               <pre class="config-code">{{ formatConfigTemplate(serverData.config_template) }}</pre>
+             </div>
+           </div>
+
+           <!-- Tools -->
+           <div v-if="serverData.tools && serverData.tools.length > 0" class="detail-section">
+             <h4>Available Tools ({{ serverData.tools.length }})</h4>
+             <div class="tools-list">
+               <div v-for="tool in serverData.tools" :key="tool.name || tool" class="tool-item">
+                 <div class="tool-name">{{ tool.name || tool }}</div>
+                 <div v-if="tool.description" class="tool-description">{{ tool.description }}</div>
+               </div>
+             </div>
+           </div>
+
+           <!-- Packages -->
+           <div v-if="serverData.packages && serverData.packages.length > 0" class="detail-section">
+             <h4>Packages ({{ serverData.packages.length }})</h4>
+             <div class="packages-list">
+               <div v-for="pkg in serverData.packages" :key="pkg.identifier || pkg.name" class="package-item">
+                 <div class="package-header">
+                   <div class="package-name">{{ pkg.identifier || pkg.name }}</div>
+                   <div class="package-type">{{ pkg.registryType || pkg.type }}</div>
+                 </div>
+                 <div class="package-transport">
+                   Transport: {{ pkg.transport?.type || 'Unknown' }}
+                 </div>
+                 <div v-if="pkg.environmentVariables && pkg.environmentVariables.length > 0" class="package-envs">
+                   <div class="env-count">{{ pkg.environmentVariables.length }} environment variable{{ pkg.environmentVariables.length !== 1 ? 's' : '' }}</div>
+                   <div class="env-vars-preview">
+                     <div v-for="env in pkg.environmentVariables.slice(0, 3)" :key="env.name" class="env-preview">
+                       <code class="env-name">{{ env.name }}</code>
+                       <span v-if="env.required" class="env-required">*</span>
+                     </div>
+                     <div v-if="pkg.environmentVariables.length > 3" class="env-more">
+                       +{{ pkg.environmentVariables.length - 3 }} more
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           </div>
+
+           <!-- Environment Variables -->
+           <div v-if="getAllEnvironmentVariables().length > 0" class="detail-section">
+             <h4>Environment Variables</h4>
+             <div class="env-vars-list">
+               <div v-for="env in getAllEnvironmentVariables()" :key="env.name" class="env-var-item">
+                 <div class="env-var-header">
+                   <code class="env-var-name">{{ env.name }}</code>
+                   <div class="env-var-flags">
+                     <span v-if="env.isSecret" class="flag secret">Secret</span>
+                     <span v-if="env.required" class="flag required">Required</span>
+                   </div>
+                 </div>
+                 <p v-if="env.description" class="env-var-description">{{ env.description }}</p>
+                 <div v-if="env.default" class="env-var-default">
+                   <strong>Default:</strong> <code>{{ env.default }}</code>
+                 </div>
+               </div>
+             </div>
+           </div>
 
           <!-- Setup Instructions -->
           <div v-if="serverData._meta?.setupInstructions" class="detail-section">
@@ -170,6 +307,16 @@ export default defineComponent({
       }
     }
 
+    const formatConfigTemplate = (config: any) => {
+      if (typeof config === 'string') {
+        return config
+      }
+      if (typeof config === 'object') {
+        return JSON.stringify(config, null, 2)
+      }
+      return String(config)
+    }
+
     const fetchServerDetails = async () => {
       if (!props.serverId) return
       loading.value = true
@@ -207,7 +354,8 @@ export default defineComponent({
       loading,
       error,
       getAllEnvironmentVariables,
-      formatDate
+      formatDate,
+      formatConfigTemplate
     }
   }
 })
@@ -330,6 +478,269 @@ export default defineComponent({
   color: var(--body-text);
 }
 
+/* Connection Details */
+.connection-details {
+  background: var(--accent-bg, #f8f9fa);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.connection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.connection-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.connection-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.connection-value {
+  font-size: 14px;
+  color: var(--body-text);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  background: var(--body-bg, white);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #e0e0e0);
+}
+
+/* Configuration Template */
+.config-template {
+  background: var(--code-bg, #f6f8fa);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.config-code {
+  margin: 0;
+  padding: 16px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--body-text);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Tools */
+.tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-item {
+  padding: 12px;
+  border: 1px solid var(--border-light, #e9ecef);
+  border-radius: 6px;
+  background: var(--accent-bg, #f8f9fa);
+}
+
+.tool-name {
+  font-weight: 600;
+  color: var(--body-text);
+  margin-bottom: 4px;
+}
+
+.tool-description {
+  font-size: 14px;
+  color: var(--muted, #666);
+  margin: 0;
+}
+
+/* Packages */
+.packages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.package-item {
+  padding: 16px;
+  border: 1px solid var(--border-light, #e9ecef);
+  border-radius: 8px;
+  background: var(--accent-bg, #f8f9fa);
+}
+
+.package-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.package-name {
+  font-weight: 600;
+  color: var(--body-text);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.package-type {
+  padding: 2px 8px;
+  background: var(--primary, #007bff);
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.package-transport {
+  font-size: 14px;
+  color: var(--muted, #666);
+  margin-bottom: 8px;
+}
+
+.package-envs {
+  border-top: 1px solid var(--border, #e0e0e0);
+  padding-top: 8px;
+}
+
+.env-count {
+  font-size: 12px;
+  color: var(--muted, #666);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.env-vars-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.env-preview {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.env-name {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  background: var(--code-bg, #f6f8fa);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--body-text);
+}
+
+.env-required {
+  color: var(--error, #dc3545);
+  font-weight: bold;
+}
+
+.env-more {
+  font-size: 12px;
+  color: var(--muted, #666);
+  font-style: italic;
+}
+
+/* Server Configuration */
+.server-config {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.config-description {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--body-text);
+  line-height: 1.5;
+}
+
+.config-section {
+  border: 1px solid var(--border-light, #e9ecef);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--accent-bg, #f8f9fa);
+}
+
+.config-section h5 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+/* Parameters */
+.parameters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.parameter-item {
+  padding: 12px;
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 6px;
+  background: var(--body-bg, white);
+}
+
+.parameter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.parameter-name {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  background: var(--code-bg, #f6f8fa);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--body-text);
+}
+
+.parameter-required {
+  background: var(--error, #dc3545);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.parameter-description {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: var(--muted, #666);
+  line-height: 1.4;
+}
+
+.parameter-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted, #666);
+}
+
+.parameter-type,
+.parameter-default,
+.parameter-example {
+  padding: 2px 0;
+}
+
+.parameter-default,
+.parameter-example {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
 /* Environment Variables */
 .env-vars-list {
   display: flex;
@@ -339,9 +750,9 @@ export default defineComponent({
 
 .env-var-item {
   padding: 12px;
-  border: 1px solid var(--border-light, #e9ecef);
+  border: 1px solid var(--border, #e0e0e0);
   border-radius: 6px;
-  background: var(--accent-bg, #f8f9fa);
+  background: var(--body-bg, white);
 }
 
 .env-var-header {
@@ -383,9 +794,98 @@ export default defineComponent({
 }
 
 .env-var-description {
-  margin: 0;
+  margin: 0 0 8px 0;
   font-size: 14px;
   color: var(--muted, #666);
+  line-height: 1.4;
+}
+
+.env-var-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted, #666);
+}
+
+.env-var-value,
+.env-var-example {
+  padding: 2px 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.env-var-default {
+  margin: 0;
+  font-size: 13px;
+  color: var(--body-text);
+}
+
+.env-var-default code {
+  background: var(--code-bg, #f6f8fa);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+}
+
+/* Secrets */
+.secrets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.secret-item {
+  padding: 12px;
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 6px;
+  background: var(--body-bg, white);
+}
+
+.secret-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.secret-name {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  background: var(--code-bg, #f6f8fa);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--body-text);
+}
+
+.secret-required {
+  background: var(--error, #dc3545);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.secret-description {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: var(--muted, #666);
+  line-height: 1.4;
+}
+
+.secret-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted, #666);
+}
+
+.secret-env,
+.secret-example {
+  padding: 2px 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
 /* Setup Instructions */

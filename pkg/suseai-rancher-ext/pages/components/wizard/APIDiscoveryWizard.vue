@@ -913,9 +913,9 @@ const getClusterStatusText = (cluster: any): string => {
       try {
         console.log(`Discovering SUSE AI UP service in cluster: ${cluster.name} (${cluster.id})`);
 
-        // Use the specific service endpoint: /k8s/clusters/{cluster-id}/v1/services/suse-ai-up/suse-ai-up
+        // Use the specific service endpoint: /k8s/clusters/{cluster-id}/v1/services/suse-ai-up/uniproxy-service
         const serviceResponse = await store.dispatch('rancher/request', {
-          url: `/k8s/clusters/${cluster.id}/v1/services/suse-ai-up/suse-ai-up`,
+          url: `/k8s/clusters/${cluster.id}/v1/services/suse-ai-up/uniproxy-service`,
           method: 'GET'
         });
 

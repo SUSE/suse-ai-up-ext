@@ -1,7 +1,7 @@
 // Registry API Service
 // Handles MCP server registry operations (browsing, details, reload)
 
-import { BaseAPI, APIConfig } from './base-api'
+import { BaseAPI, APIConfig, AuthHeaders } from './base-api'
 import { logger } from '../utils/logger'
 import { API_BASE_URLS, MCP_ENDPOINTS } from '../config/api-config'
 
@@ -81,6 +81,11 @@ export class RegistryAPI extends BaseAPI {
     super(config)
   }
 
+  protected getAuthHeaders(): AuthHeaders | null {
+    // Registry browsing is public, no auth required
+    return null
+  }
+
   /**
    * Browse MCP servers from registry
    */
@@ -139,28 +144,31 @@ export class RegistryAPI extends BaseAPI {
 
         // Handle different response formats
         if (Array.isArray(result)) {
-           // Raw array format (fallback for server.json) - transform to expected structure
-           servers = result.map((server: any) => ({
-             id: server.id || server.name, // Use name as id if id is not provided
-             name: server.title || server.name,
-             description: server.description || server.about?.description,
-             icon: server.icon || server.about?.icon,
-             about: server.about,
-             tags: server.tags || server.meta?.tags || [],
-             packages: server.packages || [],
-             _meta: {
-               source: server.source || 'registry',
-               userAuthRequired: false,
-               authType: 'none',
-               category: server.meta?.category || 'general',
-               tags: server.meta?.tags || [],
-               hosted: server.meta?.hosted,
-               requiresInstallation: server.meta?.requiresInstallation,
-               transportType: server.meta?.transportType,
-               validation_status: server.meta?.validation_status,
-               badges: server.meta?.badges
-             }
-           }))
+            // Raw array format (fallback for server.json) - transform to expected structure
+            servers = result.map((server: any) => ({
+              id: server.id || server.name, // Use name as id if id is not provided
+              name: server._meta?.about?.title || server._meta?.title || server.title || server.name,
+              description: server._meta?.about?.description || server._meta?.description || server.description || server.about?.description,
+              icon: server._meta?.about?.icon || server._meta?.icon || server.icon || server.about?.icon,
+              about: {
+                icon_url: server._meta?.about?.icon || server.about?.icon_url,
+                title: server._meta?.about?.title || server.about?.title
+              },
+              tags: server.tags || server._meta?.tags || [],
+              packages: server.packages || [],
+              _meta: {
+                source: server.source || 'registry',
+                userAuthRequired: false,
+                authType: 'none',
+                category: server._meta?.category || 'general',
+                tags: server._meta?.tags || [],
+                hosted: server._meta?.hosted,
+                requiresInstallation: server._meta?.requiresInstallation,
+                transportType: server._meta?.transportType,
+                validation_status: server._meta?.validation_status,
+                badges: server._meta?.badges
+              }
+            }))
           total = servers.length
           hasMore = false
           logger.info('Registry returned raw array format, transformed to expected structure')

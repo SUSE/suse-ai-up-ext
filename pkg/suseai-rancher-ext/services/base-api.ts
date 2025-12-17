@@ -73,7 +73,7 @@ export class BaseAPI {
       // For now, return basic headers - this will be updated with proper auth
       return {
         'X-API-Key': 'rancher-managed-key',
-        'X-User-ID': 'default-user'
+        'X-User-ID': 'admin'
       }
     } catch (error) {
       logger.warn('Failed to get auth headers:', error)

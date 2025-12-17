@@ -85,38 +85,94 @@
                 class="clickable-tile"
                 @click="handleViewServer(server)"
               >
-                 <div class="tile-header">
-                   <div class="tile-logo-container">
-                     <div class="tile-icon" v-html="getServerIcon(server)">
-                     </div>
-                   </div>
-                   <div class="tile-info">
-                     <div class="tile-meta">
-                       <h3 class="tile-title">{{ server.name }}</h3>
-                       <p class="tile-description">{{ server.description }}</p>
-                        <div class="tile-badges">
-                            <!-- Certified badge if tags include 'suse' -->
-                            <span v-if="isCertifiedServer(server)" class="badge badge-success">CERTIFIED</span>
+                  <div class="tile-header">
+                    <div class="tile-logo-container">
+                      <div class="tile-icon" v-html="getServerIcon(server)">
+                      </div>
+                    </div>
+                    <div class="tile-info">
+                      <div class="tile-meta">
+                        <h3 class="tile-title">{{ server.name }}</h3>
+                        <p class="tile-description">{{ server.description }}</p>
 
-                            <!-- Other badges -->
-                            <span v-if="requiresAuth(server)" class="badge badge-warning">
-                              Auth Required
-                            </span>
-                            <span v-if="server._meta?.hosted" class="badge badge-success">
-                              Hosted
-                            </span>
+                        <!-- Connection Info -->
+                        <div v-if="server.protocol || server.address || server.port" class="tile-connection">
+                          <div class="connection-details">
+                            <span v-if="server.protocol" class="connection-protocol">{{ server.protocol }}</span>
+                            <span v-if="server.address" class="connection-address">{{ server.address }}</span>
+                            <span v-if="server.port" class="connection-port">:{{ server.port }}</span>
                           </div>
-                        <div v-if="server.tags && server.tags.length" class="tile-tags">
-                          <span v-for="tag in server.tags.slice(0, 2)" :key="tag" class="tag">
-                            {{ tag }}
-                          </span>
-                          <span v-if="server.tags.length > 2" class="tag more-tags">
-                            +{{ server.tags.length - 2 }} more
-                          </span>
                         </div>
-                     </div>
-                   </div>
-                 </div>
+
+                        <!-- Links -->
+                        <div class="tile-links" v-if="server.source_url || server.project_url || server._meta?.documentation">
+                          <a v-if="server.source_url" :href="server.source_url" target="_blank" class="tile-link" title="Source Code">
+                            <i class="icon icon-external-link"></i> Source
+                          </a>
+                          <a v-if="server.project_url" :href="server.project_url" target="_blank" class="tile-link" title="Project Page">
+                            <i class="icon icon-external-link"></i> Project
+                          </a>
+                          <a v-if="server._meta?.documentation" :href="server._meta.documentation" target="_blank" class="tile-link" title="Documentation">
+                            <i class="icon icon-external-link"></i> Docs
+                          </a>
+                        </div>
+
+                         <div class="tile-badges">
+                             <!-- Certified badge if tags include 'suse' -->
+                             <span v-if="isCertifiedServer(server)" class="badge badge-success">CERTIFIED</span>
+
+                             <!-- Other badges -->
+                             <span v-if="requiresAuth(server)" class="badge badge-warning">
+                               Auth Required
+                             </span>
+                             <span v-if="server._meta?.hosted" class="badge badge-success">
+                               Hosted
+                             </span>
+                             <span v-if="server.validation_status" :class="getValidationBadgeClass(server.validation_status)" class="badge">
+                               {{ server.validation_status }}
+                             </span>
+                           </div>
+
+                         <!-- Category -->
+                         <div v-if="server._meta?.category" class="tile-category">
+                           <span class="category-label">Category: {{ server._meta.category }}</span>
+                         </div>
+
+                         <div v-if="server.tags && server.tags.length" class="tile-tags">
+                           <span v-for="tag in server.tags.slice(0, 3)" :key="tag" class="tag">
+                             {{ tag }}
+                           </span>
+                           <span v-if="server.tags.length > 3" class="tag more-tags">
+                             +{{ server.tags.length - 3 }} more
+                           </span>
+                         </div>
+
+                         <!-- Package and Tool counts -->
+                         <div class="tile-capabilities" v-if="server.packages?.length || server.tools?.length">
+                           <div class="capability-item" v-if="server.packages?.length">
+                             <i class="icon icon-package"></i>
+                             <span>{{ server.packages.length }} package{{ server.packages.length !== 1 ? 's' : '' }}</span>
+                           </div>
+                           <div class="capability-item" v-if="server.tools?.length">
+                             <i class="icon icon-tools"></i>
+                             <span>{{ server.tools.length }} tool{{ server.tools.length !== 1 ? 's' : '' }}</span>
+                           </div>
+                         </div>
+
+                         <!-- Timestamps -->
+                         <div class="tile-timestamps" v-if="server.lastSeen || server.discoveredAt">
+                           <div class="timestamp-item" v-if="server.lastSeen">
+                             <span class="timestamp-label">Last seen:</span>
+                             <span class="timestamp-value">{{ formatTimestamp(server.lastSeen) }}</span>
+                           </div>
+                           <div class="timestamp-item" v-if="server.discoveredAt">
+                             <span class="timestamp-label">Discovered:</span>
+                             <span class="timestamp-value">{{ formatTimestamp(server.discoveredAt) }}</span>
+                           </div>
+                         </div>
+                      </div>
+                    </div>
+                  </div>
 
                   <div class="tile-actions">
                     <button
@@ -223,6 +279,33 @@ export default defineComponent({
       return server.tags?.some(tag => tag.toLowerCase() === 'suse') || false
     }
 
+    // Get validation status badge class
+    const getValidationBadgeClass = (status: string): string => {
+      switch (status.toLowerCase()) {
+        case 'valid':
+        case 'validated':
+          return 'badge-success'
+        case 'invalid':
+        case 'failed':
+          return 'badge-danger'
+        case 'pending':
+        case 'unknown':
+        default:
+          return 'badge-secondary'
+      }
+    }
+
+    // Format timestamp for display
+    const formatTimestamp = (timestamp: string): string => {
+      if (!timestamp) return ''
+      try {
+        const date = new Date(timestamp)
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      } catch {
+        return timestamp
+      }
+    }
+
     // Load initial data
     onMounted(async () => {
       await browseServers()
@@ -246,6 +329,18 @@ export default defineComponent({
         filtered = filtered.filter(server => server._meta?.category === categoryFilter.value)
       }
 
+      // Sort: SUSE servers first, then by name alphabetically
+      return [...filtered].sort((a: MCPServer, b: MCPServer) => {
+        const aIsSUSE = isSuseServer(a)
+        const bIsSUSE = isSuseServer(b)
+
+        if (aIsSUSE && !bIsSUSE) return -1
+        if (!aIsSUSE && bIsSUSE) return 1
+
+        // Both SUSE or both non-SUSE, sort by name
+        return (a.name || '').localeCompare(b.name || '')
+      })
+
       return filtered
     })
 
@@ -253,24 +348,20 @@ export default defineComponent({
 
     // Get appropriate icon for server
     const getServerIcon = (server: MCPServer): string => {
+      console.log('getServerIcon called for server:', server.name, 'id:', server.id)
+      console.log('server.about:', server.about)
+      console.log('server.icon:', server.icon)
+      console.log('server._meta:', server._meta)
+
       // Use icon from about section if available
       if (server.about?.icon_url) {
+        console.log('Using server.about.icon_url:', server.about.icon_url)
         return `<img src="${server.about.icon_url}" alt="${server.about.title || server.name}" style="width: 100%; height: 100%; border-radius: 4px; object-fit: cover;" />`
       }
 
-       // Check if this is a SUSE server
-       const isSUSEServer = (server.name?.toLowerCase() || '').includes('suse') ||
-                           (server.description?.toLowerCase() || '').includes('suse') ||
-                           (typeof server._meta?.source === 'string' ? server._meta.source.toLowerCase() : '').includes('suse') ||
-                           server._meta?.tags?.some(tag => (tag?.toLowerCase() || '').includes('suse'))
-
-      if (isSUSEServer) {
-        // Use SUSE icon for SUSE servers
-        return `<img src="https://avatars.githubusercontent.com/u/1067733" alt="SUSE" style="width: 100%; height: 100%; border-radius: 4px; object-fit: cover;" />`
-      }
-
-      // Use official server icon if available
+      // Use icon field if available
       if (server.icon) {
+        console.log('Using server.icon:', server.icon)
         // Check if icon is a URL (starts with http/https)
         if (server.icon.startsWith('http://') || server.icon.startsWith('https://')) {
           return `<img src="${server.icon}" alt="${server.name}" style="width: 100%; height: 100%; border-radius: 4px; object-fit: cover;" />`
@@ -279,6 +370,19 @@ export default defineComponent({
         return server.icon
       }
 
+       // Check if this is a SUSE server
+        const isSUSEServer = (server.name?.toLowerCase() || '').includes('suse') ||
+                            (server.description?.toLowerCase() || '').includes('suse') ||
+                            (typeof server._meta?.source === 'string' ? server._meta.source.toLowerCase() : '').includes('suse') ||
+                            server._meta?.tags?.some(tag => (tag?.toLowerCase() || '').includes('suse'))
+
+       if (isSUSEServer) {
+         console.log('Using SUSE icon for SUSE server')
+         // Use SUSE icon for SUSE servers
+         return `<img src="https://avatars.githubusercontent.com/u/1067733" alt="SUSE" style="width: 100%; height: 100%; border-radius: 4px; object-fit: cover;" />`
+       }
+
+       console.log('Using generic MCP icon as fallback')
       // Use generic MCP icon as fallback
       return genericMCPIcon
     }
@@ -340,17 +444,19 @@ export default defineComponent({
       availableCategories,
       isEnabled,
 
-       // Methods
-       handleSearch,
-       handleReloadRegistry,
-       handleViewServer,
-       handleCreateAdapter,
-       closeServerDetailsModal,
-       getServerIcon,
-       toggleCardExpansion,
-       isSuseServer,
-       isCertifiedServer,
-      isCardExpanded,
+        // Methods
+        handleSearch,
+        handleReloadRegistry,
+        handleViewServer,
+        handleCreateAdapter,
+        closeServerDetailsModal,
+        getServerIcon,
+        toggleCardExpansion,
+        isSuseServer,
+        isCertifiedServer,
+        isCardExpanded,
+        getValidationBadgeClass,
+        formatTimestamp,
 
       // Composables
       requiresAuth,
@@ -594,6 +700,122 @@ export default defineComponent({
   line-height: 1.4;
 }
 
+.tile-connection {
+  margin-bottom: 8px;
+}
+
+.connection-details {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--body-text, #1a1a1a);
+  font-family: monospace;
+  background: var(--accent-bg, #f8f9fa);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.connection-protocol {
+  font-weight: 600;
+  color: var(--primary, #007bff);
+}
+
+.connection-address {
+  color: var(--body-text, #1a1a1a);
+}
+
+.connection-port {
+  color: var(--muted, #666);
+}
+
+.tile-links {
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--primary, #007bff);
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--primary-bg, #cce5ff);
+  transition: all 0.2s ease;
+}
+
+.tile-link:hover {
+  background: var(--primary, #007bff);
+  color: white;
+}
+
+.tile-link i {
+  font-size: 11px;
+}
+
+.tile-category {
+  margin-bottom: 8px;
+}
+
+.category-label {
+  font-size: 12px;
+  color: var(--muted, #666);
+  background: var(--light-bg, #f8f9fa);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.tile-capabilities {
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.capability-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, #666);
+  background: var(--accent-bg, #f8f9fa);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.capability-item i {
+  font-size: 11px;
+}
+
+.tile-timestamps {
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.timestamp-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted, #666);
+}
+
+.timestamp-label {
+  font-weight: 500;
+}
+
+.timestamp-value {
+  font-family: monospace;
+}
+
 .tile-badges {
   display: flex;
   flex-wrap: wrap;
@@ -631,6 +853,11 @@ export default defineComponent({
 .badge-success {
   background: var(--success-bg, #d4edda);
   color: var(--success-text, #155724);
+}
+
+.badge-danger {
+  background: var(--danger-bg, #f8d7da);
+  color: var(--danger-text, #721c24);
 }
 
 .badge-primary {
