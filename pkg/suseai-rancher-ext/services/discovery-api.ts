@@ -15,7 +15,7 @@ export interface ScanConfig {
 
 export interface ScanResult {
   scan_id: string
-  status: 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'completed' | 'failed'
   message?: string
   startTime?: string
   endTime?: string
@@ -49,6 +49,8 @@ export interface DiscoveredServer {
     transportType?: string
     userAuthRequired?: boolean
     validation_status?: string
+    protocolVersion?: string
+    serverVersion?: string
   }
   vulnerability_score?: 'high' | 'medium' | 'low'
   security_findings?: SecurityFinding[]
@@ -60,6 +62,9 @@ export interface DiscoveredServer {
     confidence: string
   }
   last_deep_scan?: string
+  protocol_version?: string
+  server_version?: string
+  capabilities?: any
 }
 
 export interface SecurityFinding {
@@ -122,10 +127,15 @@ export class DiscoveryAPI extends BaseAPI {
     try {
       logger.info('Starting network scan', config)
 
-      const result = await this.post<{ scan_id: string; status: string; message: string }>('/api/v1/discovery/scan', config)
-      logger.info('Scan started', { scanId: result.scan_id })
+      const result = await this.post<{ jobId: string; status: string; message: string }>('/api/v1/discovery/scan', config)
+      logger.info('Scan started', { jobId: result.jobId })
 
-      return result
+      // Transform API response to match expected format
+      return {
+        scan_id: result.jobId,
+        status: result.status,
+        message: result.message
+      }
     } catch (error) {
       logger.error('Failed to start scan', error)
       throw error
@@ -150,8 +160,31 @@ export class DiscoveryAPI extends BaseAPI {
   }
 
   /**
-    * Get list of discovered servers
-    */
+   * Get a specific discovered server by address and name
+   */
+  async getDiscoveredServer(address: string, name: string): Promise<DiscoveredServer | null> {
+    try {
+      logger.info('Getting specific discovered server', { address, name });
+
+      const servers = await this.getDiscoveredServers();
+      const server = servers.find(s => s.address === address && s.name === name);
+
+      if (server) {
+        logger.info('Found discovered server', { address, name, serverId: server.id });
+        return server;
+      } else {
+        logger.warn('Discovered server not found', { address, name });
+        return null;
+      }
+    } catch (error) {
+      logger.error('Failed to get discovered server', { address, name, error });
+      throw error;
+    }
+  }
+
+  /**
+     * Get list of discovered servers
+     */
   async getDiscoveredServers(): Promise<DiscoveredServer[]> {
     try {
       logger.info('Getting discovered servers from API');
@@ -194,7 +227,9 @@ export class DiscoveryAPI extends BaseAPI {
           source: 'network-scan',
           tags: [],
           userAuthRequired: false,
-          validation_status: server.metadata?.validation_status
+          validation_status: server.metadata?.validation_status,
+          protocolVersion: server.protocol_version,
+          serverVersion: server.server_version
         },
         vulnerability_score: server.vulnerability_score as 'high' | 'medium' | 'low' | undefined,
         security_findings: [],
@@ -205,7 +240,11 @@ export class DiscoveryAPI extends BaseAPI {
           vulnerabilities: [],
           confidence: 'unknown'
         },
-        last_deep_scan: server.last_seen
+        last_deep_scan: server.last_seen,
+        // Add additional properties from raw server
+        protocol_version: server.protocol_version,
+        server_version: server.server_version,
+        capabilities: server.capabilities
       }));
 
       logger.info('Discovered servers retrieved and transformed', { count: servers.length });

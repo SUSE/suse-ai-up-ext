@@ -15,101 +15,87 @@
       </div>
     </div>
 
-    <!-- Step 1: Cluster Discovery -->
-    <div v-if="!selectedCluster" class="step cluster-discovery">
+    <!-- Step 1: Proxy Discovery -->
+    <div v-if="!selectedProxy" class="step proxy-discovery">
       <div class="step-header">
         <h2>Discover SUSE AI Universal Proxy</h2>
-        <p>Select a cluster where SUSE AI Universal Proxy is running.</p>
+        <p>Select the SUSE AI Universal Proxy instance you want to configure.</p>
       </div>
 
       <div class="step-content">
-        <div v-if="clustersLoading" class="loading-section">
+        <div v-if="proxiesLoading" class="loading-section">
           <Loading />
-          <p>Discovering clusters with SUSE AI Universal Proxy...</p>
+          <p>Discovering SUSE AI Universal Proxy instances across all accessible clusters...</p>
         </div>
 
-        <div v-else-if="clustersError" class="error-section">
+        <div v-else-if="proxiesError" class="error-section">
           <Banner color="error">
             <strong>Discovery Failed</strong>
-            <p>{{ clustersError }}</p>
-            <button class="btn btn-sm bg-primary mt-10" @click="retryClusterDiscovery">Retry Discovery</button>
+            <p>{{ proxiesError }}</p>
+            <button class="btn btn-sm bg-primary mt-10" @click="retryProxyDiscovery">Retry Discovery</button>
           </Banner>
         </div>
 
-        <div v-else-if="availableClusters.length === 0" class="no-clusters-section">
+        <div v-else-if="discoveredProxies.length === 0" class="no-proxies-section">
           <Banner color="warning">
             <strong>No SUSE AI Universal Proxy Found</strong>
-            <p>No SUSE AI Universal Proxy pods were found in any cluster. Please ensure the proxy is installed and running.</p>
+            <p>No SUSE AI Universal Proxy instances were found in any accessible cluster. Please ensure the proxy is installed and running.</p>
           </Banner>
         </div>
 
-        <div v-else class="clusters-grid">
-           <div
-             v-for="cluster in availableClusters"
-             :key="`cluster-${cluster.id}`"
-             class="cluster-card clickable-tile"
-             :class="{ selected: selectedCluster === cluster.id }"
-             @click="onClusterSelected(cluster.id)"
-           >
-            <div class="tile-header">
-              <div class="tile-logo-container">
-                <div class="tile-icon">
-                  <i class="icon icon-cluster" aria-hidden="true" />
-                </div>
-              </div>
-              <div class="tile-info">
-                <h3 class="tile-title">{{ cluster.name }}</h3>
-                <p class="tile-description">Instance of Universal Proxy found</p>
-                <div class="tile-meta">
-                  <span class="badge badge-info">{{ cluster.podsCount }} pod{{ cluster.podsCount !== 1 ? 's' : '' }}</span>
-                </div>
-              </div>
+        <div v-else class="proxy-selection">
+          <div class="proxy-dropdown">
+            <label for="proxy-select">Select Proxy Instance:</label>
+            <select id="proxy-select" v-model="selectedProxyIndex" @change="onProxySelected" class="form-control">
+              <option value="-1" disabled>Select a proxy instance...</option>
+              <option
+                v-for="(proxy, index) in discoveredProxies"
+                :key="`proxy-${index}`"
+                :value="index"
+              >
+                {{ getClusterName(proxy) }}
+              </option>
+            </select>
+          </div>
+
+          <div v-if="selectedProxyIndex >= 0 && selectedProxy" class="proxy-details">
+            <h4>Selected Proxy Details</h4>
+            <div class="detail-item">
+              <strong>Pod Name:</strong> {{ selectedProxy.metadata?.name }}
             </div>
-            <div class="tile-footer">
-              <div class="tile-actions">
-                <input
-                  type="radio"
-                  :id="`cluster-${cluster.id}`"
-                  :value="cluster.id"
-                  v-model="selectedCluster"
-                  class="radio-input"
-                />
-                <label :for="`cluster-${cluster.id}`" class="radio-label">
-                  <span class="radio-checkmark"></span>
-                  Select
-                </label>
-              </div>
+            <div class="detail-item">
+              <strong>Namespace:</strong> {{ selectedProxy.metadata?.namespace }}
+            </div>
+            <div class="detail-item">
+              <strong>Cluster:</strong> {{ getClusterName(selectedProxy) }}
+            </div>
+            <div class="detail-item">
+              <strong>IP:</strong> {{ selectedProxy.primaryIP || selectedProxy.status?.podIP || 'Unknown' }}
+            </div>
+            <div class="actions">
+              <button class="btn-primary" @click="confirmProxySelection">Configure This Proxy</button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Step 2: Pod Info & Service Selection -->
-    <div v-else-if="selectedCluster && !configurationCompleted" class="step pod-info">
+    <!-- Step 2: Proxy Info & Service Selection -->
+    <div v-else-if="selectedProxy && !configurationCompleted" class="step proxy-info">
       <div class="step-header">
-        <h2>{{ podSaved ? 'Select Services' : 'Configure SUSE AI Universal Proxy' }}</h2>
-        <p>{{ podSaved ? 'Choose which SUSE AI services to enable:' : 'Review the pod information and configure services.' }}</p>
-        <button class="btn-secondary back-btn" @click="resetClusterSelection">← Change Cluster</button>
+        <h2>{{ proxySaved ? 'Select Services' : 'Configure SUSE AI Universal Proxy' }}</h2>
+        <p>{{ proxySaved ? 'Choose which SUSE AI services to enable:' : 'Review the proxy information and configure services.' }}</p>
+        <button class="btn-secondary back-btn" @click="resetProxySelection">← Change Proxy</button>
       </div>
 
       <div class="step-content">
-        <!-- Pod Discovery Error -->
-        <div v-if="podsError" class="error-section">
-          <Banner color="error">
-            <strong>Pod Discovery Failed</strong>
-            <p>{{ podsError }}</p>
-            <button class="btn btn-sm bg-primary mt-10" @click="retryPodDiscovery">Retry Pod Discovery</button>
-          </Banner>
+        <!-- Proxy Info Card - Collapsed when services are being configured -->
+        <div v-if="!proxySaved" class="proxy-info-section">
+          <PodInfoCard :pod="selectedProxy" @save="onProxySave" />
         </div>
 
-        <!-- Pod Info Card - Collapsed when services are being configured -->
-        <div v-else-if="!podSaved && selectedPod" class="pod-info-section">
-          <PodInfoCard :pod="selectedPod" @save="onPodSave" />
-        </div>
-
-        <!-- Service Selection - Expanded when pod is saved -->
-        <div v-if="podSaved" class="service-selection">
+        <!-- Service Selection - Expanded when proxy is saved -->
+        <div v-if="proxySaved" class="service-selection">
           <div class="service-selection-header">
             <h3>Select Services</h3>
             <p>Choose which SUSE AI services to enable:</p>
@@ -142,14 +128,14 @@
 
       <div class="step-content">
         <div class="review-section">
-          <h3>Selected Cluster</h3>
+          <h3>Selected Proxy</h3>
           <div class="review-item">
             <div class="review-icon">
-              <i class="icon icon-cluster"></i>
+              <i class="icon icon-server"></i>
             </div>
             <div class="review-info">
-              <strong>{{ getSelectedClusterName() }}</strong>
-              <p>SUSE AI Universal Proxy instance found</p>
+              <strong>{{ selectedProxy?.metadata?.namespace }}/{{ selectedProxy?.metadata?.name }}</strong>
+              <p>Cluster: {{ getClusterName(selectedProxy) }}</p>
             </div>
           </div>
         </div>
@@ -183,9 +169,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue'
+import { defineComponent, ref, computed, type Ref } from 'vue'
 import { useServiceDiscovery } from '../composables/useServiceDiscovery'
 import { useStore } from 'vuex'
+import { SUSEAIProxyConfig } from '../config/suseai'
 import PodCard from './components/PodCard.vue'
 import PodInfoCard from './components/PodInfoCard.vue'
 import ServiceSelector from './components/ServiceSelector.vue'
@@ -233,14 +220,22 @@ export default defineComponent({
     const store = useStore()
 
     // State management
+    const selectedProxy = ref<DetectedPod | null>(null)
+    const selectedProxyIndex = ref(-1)
+    const discoveredProxies: Ref<DetectedPod[]> = ref([])
+    const proxiesLoading = ref(true)
+    const proxiesError = ref('')
+    const proxySaved = ref(false)
+    const selectedServices = ref<string[]>([])
+    const configurationCompleted = ref(false)
+
+    // Legacy cluster/pod state for backward compatibility
     const selectedCluster = ref('')
     const selectedPod = ref<DetectedPod | null>(null)
     const discoveredPods = ref<DetectedPod[]>([])
     const podsLoading = ref(false)
     const podsError = ref('')
     const podSaved = ref(false)
-    const selectedServices = ref<string[]>([])
-    const configurationCompleted = ref(false)
 
     // Cluster discovery state
     const clustersLoading = ref(true)
@@ -282,10 +277,15 @@ export default defineComponent({
     // Get selected services from store
     const storedSelectedServices = computed(() => store.getters.selectedServices)
 
+    // Get proxy configuration from store
+    const proxyConfig = computed<SUSEAIProxyConfig>(() => store.getters['suseai/proxyConfig'] || {})
+
     // Discover clusters with SUSE AI pods
     const discoverClustersWithPods = async () => {
       clustersLoading.value = true
+      proxiesLoading.value = true
       clustersError.value = ''
+      proxiesError.value = ''
 
       try {
         // Check cache first
@@ -312,7 +312,7 @@ export default defineComponent({
           const batchPromises = batch.map(async (cluster) => {
             try {
               console.log(`Checking cluster: ${cluster.name || cluster.id}`)
-              const pods = await discoverPodObjects(store, cluster.id)
+              const pods = await discoverPodObjects(store, cluster.id, proxyConfig.value.allowedNamespaces)
 
               if (pods.length > 0) {
                 console.log(`✅ Found ${pods.length} pods in cluster ${cluster.name || cluster.id}`)
@@ -348,12 +348,24 @@ export default defineComponent({
         availableClusters.value = clustersWithPods
         console.log(`✅ Discovery complete: ${availableClusters.value.length} clusters with SUSE AI pods`)
 
+        // Collect all discovered proxies across all clusters
+        const allProxies: DetectedPod[] = []
+        clustersWithPods.forEach(cluster => {
+          if (cluster.pods) {
+            allProxies.push(...cluster.pods)
+          }
+        })
+        discoveredProxies.value = allProxies
+        console.log(`✅ Collected ${allProxies.length} proxies across all clusters`)
+
       } catch (error: any) {
         console.error('Cluster discovery failed:', error)
         clustersError.value = error.message || 'Failed to discover clusters'
         availableClusters.value = []
       } finally {
         clustersLoading.value = false
+        proxiesLoading.value = false
+        console.log('✅ Discovery process complete, proxiesLoading set to false')
       }
     }
 
@@ -380,6 +392,36 @@ export default defineComponent({
       console.log(`Selected cluster ${clusterId} and auto-selected pod`)
     }
 
+    const onProxySelected = () => {
+      if (selectedProxyIndex.value >= 0) {
+        selectedProxy.value = discoveredProxies.value[selectedProxyIndex.value]
+        console.log('Selected proxy:', selectedProxy.value)
+      }
+    }
+
+    const confirmProxySelection = () => {
+      if (selectedProxy.value) {
+        proxySaved.value = true
+        // Initialize selected services from store or empty array
+        selectedServices.value = [...(storedSelectedServices.value || [])]
+        console.log('Proxy confirmed, showing service selection')
+      }
+    }
+
+    const getClusterName = (proxy: DetectedPod | null): string => {
+      if (!proxy) return 'Unknown'
+      // Find the cluster that contains this proxy
+      const cluster = availableClusters.value.find(c => c.pods?.some((p: DetectedPod) => p.metadata?.name === proxy.metadata?.name && p.metadata?.namespace === proxy.metadata?.namespace))
+      return cluster ? cluster.name : 'Unknown'
+    }
+
+    const getClusterId = (proxy: DetectedPod | null): string => {
+      if (!proxy) return ''
+      // Find the cluster that contains this proxy
+      const cluster = availableClusters.value.find(c => c.pods?.some((p: DetectedPod) => p.metadata?.name === proxy.metadata?.name && p.metadata?.namespace === proxy.metadata?.namespace))
+      return cluster ? cluster.id : ''
+    }
+
     const onPodSelected = (pod: DetectedPod) => {
       selectedPod.value = pod
       console.log('Selected pod:', pod)
@@ -392,6 +434,13 @@ export default defineComponent({
         console.error('Retry cluster discovery failed:', error)
         // Error is already handled in discoverClustersWithPods
       }
+    }
+
+    const onProxySave = () => {
+      proxySaved.value = true
+      // Initialize selected services from store or empty array
+      selectedServices.value = [...(storedSelectedServices.value || [])]
+      console.log('Proxy saved, showing service selection')
     }
 
     const onPodSave = () => {
@@ -414,18 +463,29 @@ export default defineComponent({
         await store.dispatch('suseai/setSelectedPod', selectedPod.value)
         await store.dispatch('suseai/setProxyInstalled', true)
 
-        // Generate service URL from pod info (always use external IP if available)
-        const externalIP = selectedPod.value!.externalIPs?.[0]
-        const primaryIP = selectedPod.value!.primaryIP || selectedPod.value!.clusterIP
+        // Generate service URL from proxy info (always use external IP if available)
+        const externalIP = selectedProxy.value!.externalIPs?.[0]
+        const primaryIP = selectedProxy.value!.primaryIP || selectedProxy.value!.clusterIP
         const ip = externalIP || primaryIP
         const serviceUrl = `http://${ip}:8911`
         await store.dispatch('suseai/setServiceUrls', [serviceUrl])
 
+        // Save selected proxy to proxy config
+        const proxyConfigData = {
+          selectedServer: {
+            clusterId: getClusterId(selectedProxy.value),
+            namespace: selectedProxy.value!.metadata?.namespace,
+            podName: selectedProxy.value!.metadata?.name,
+            serviceUrl
+          }
+        }
+        await store.dispatch('suseai/setProxyConfig', proxyConfigData)
+
         console.log('Configuration saved:', {
-          cluster: selectedCluster.value,
-          pod: selectedPod.value,
+          proxy: selectedProxy.value,
           services: selectedServices.value,
-          serviceUrl
+          serviceUrl,
+          proxyConfig: proxyConfigData
         })
 
         // Show completion page
@@ -440,12 +500,7 @@ export default defineComponent({
     const editConfiguration = () => {
       // Reset all state to restart the wizard
       configurationCompleted.value = false
-      selectedCluster.value = ''
-      selectedPod.value = null
-      discoveredPods.value = []
-      podsError.value = ''
-      podSaved.value = false
-      selectedServices.value = []
+      resetProxySelection()
     }
 
     const getSelectedClusterName = (): string => {
@@ -473,10 +528,28 @@ export default defineComponent({
       configurationCompleted.value = false
     }
 
+    const resetProxySelection = () => {
+      selectedProxy.value = null
+      selectedProxyIndex.value = -1
+      proxySaved.value = false
+      selectedServices.value = []
+      configurationCompleted.value = false
+    }
+
     const resetPodSelection = () => {
       selectedPod.value = null
       podSaved.value = false
       selectedServices.value = []
+    }
+
+    const retryProxyDiscovery = async () => {
+      try {
+        proxiesError.value = ''
+        await discoverClustersWithPods()
+      } catch (error: any) {
+        console.error('Proxy discovery retry failed:', error)
+        proxiesError.value = `Failed to discover proxies: ${error?.message || 'Unknown error'}`
+      }
     }
 
     const retryPodDiscovery = async () => {
@@ -484,7 +557,7 @@ export default defineComponent({
         podsError.value = ''
         const cluster = availableClusters.value.find(c => c.id === selectedCluster.value)
         if (cluster) {
-          const pods = await discoverPodObjects(store, selectedCluster.value)
+          const pods = await discoverPodObjects(store, selectedCluster.value, proxyConfig.value.allowedNamespaces)
           if (pods.length > 0) {
             cluster.pods = pods
             cluster.podsCount = pods.length
@@ -509,10 +582,16 @@ export default defineComponent({
     return {
       selectedCluster,
       selectedPod,
+      selectedProxy,
+      selectedProxyIndex,
       discoveredPods,
+      discoveredProxies,
       podsLoading,
+      proxiesLoading,
       podsError,
+      proxiesError,
       podSaved,
+      proxySaved,
       selectedServices,
       availableServices,
       configurationCompleted,
@@ -520,15 +599,22 @@ export default defineComponent({
       clustersError,
       availableClusters,
       onClusterSelected,
+      onProxySelected,
+      confirmProxySelection,
       onPodSelected,
+      onProxySave,
       onPodSave,
       onCompleteSetup,
       resetClusterSelection,
+      resetProxySelection,
       resetPodSelection,
       retryPodDiscovery,
+      retryProxyDiscovery,
       retryClusterDiscovery,
       editConfiguration,
       getSelectedClusterName,
+      getClusterName,
+      getClusterId,
       getServiceName,
       getServiceIconClass
     }
@@ -862,8 +948,54 @@ export default defineComponent({
   color: var(--body-text);
 }
 
+/* Proxy Selection */
+.proxy-selection {
+  max-width: 600px;
+}
+
+.proxy-dropdown {
+  margin-bottom: 24px;
+}
+
+.proxy-dropdown label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--body-text);
+}
+
+.proxy-dropdown select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--body-bg);
+  color: var(--body-text);
+}
+
+.proxy-details {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--card-bg);
+}
+
+.proxy-details h4 {
+  margin: 0 0 16px 0;
+  color: var(--body-text);
+}
+
+.detail-item {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.detail-item strong {
+  color: var(--body-text);
+}
+
 /* Pod Info Section */
-.pod-info-section {
+.pod-info-section, .proxy-info-section {
   margin-bottom: 24px;
 }
 

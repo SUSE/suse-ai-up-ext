@@ -54,10 +54,10 @@ export function useServiceDiscovery() {
   const detectedServices = ref<DetectedService[]>([]);
   const error = ref<string | null>(null);
 
-     /**
-      * Query SUSE AI pods across all namespaces
-      */
-     const querySUSEAIPods = async (store: any, clusterId: string): Promise<KubernetesPod[]> => {
+      /**
+       * Query SUSE AI pods across all namespaces (or specified namespaces)
+       */
+      const querySUSEAIPods = async (store: any, clusterId: string, allowedNamespaces?: string[]): Promise<KubernetesPod[]> => {
        try {
          console.log(`🚀 [ServiceDiscovery] Querying SUSE AI pods across all namespaces in cluster: ${clusterId}`);
          console.log(`📡 [ServiceDiscovery] API URL: /k8s/clusters/${clusterId}/api/v1/pods`);
@@ -93,20 +93,20 @@ export function useServiceDiscovery() {
         const allPods = response?.data?.items || response?.data || response?.items || [];
         console.log(`📊 [ServiceDiscovery] Extracted ${allPods.length} pods from response`);
 
-        // Filter for SUSE AI UP pods (container named 'suse-ai-up' in namespace 'suse-ai-up' and has port 8911)
+        // Filter for SUSE AI UP pods (container named 'suse-ai-up' with port 8911)
         const suseAIPods = allPods.filter((pod: any) => {
           const podName = pod.metadata?.name || '';
           const podNamespace = pod.metadata?.namespace || '';
           const hasCorrectContainer = pod.spec?.containers?.some((container: any) =>
             container.name === 'suse-ai-up' && container.ports?.some((port: any) => port.containerPort === 8911)
           );
-          const isInCorrectNamespace = podNamespace === 'suse-ai-up';
 
-          if (isInCorrectNamespace) {
-            console.log(`🔍 [ServiceDiscovery] Checking pod ${podName}: container=${hasCorrectContainer}, namespace=${isInCorrectNamespace}`);
-          }
+          // Check namespace filtering if specified
+          const isNamespaceAllowed = allowedNamespaces ? allowedNamespaces.includes(podNamespace) : true;
 
-          return hasCorrectContainer && isInCorrectNamespace;
+          console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: container=${hasCorrectContainer}, namespaceAllowed=${isNamespaceAllowed}`);
+
+          return hasCorrectContainer && isNamespaceAllowed;
         });
 
         console.log(`🎯 [ServiceDiscovery] Found ${suseAIPods.length} SUSE AI UP pods out of ${allPods.length} total pods`);
@@ -124,10 +124,10 @@ export function useServiceDiscovery() {
       }
     };
 
-   /**
-    * Query SUSE AI UP service across all namespaces
-    */
-   const querySUSEAIService = async (store: any, clusterId: string): Promise<any> => {
+    /**
+     * Query SUSE AI UP service across all namespaces (or specified namespaces)
+     */
+    const querySUSEAIService = async (store: any, clusterId: string, allowedNamespaces?: string[]): Promise<any> => {
      try {
        console.log(`🚀 [ServiceDiscovery] Querying SUSE AI UP services across all namespaces in cluster: ${clusterId}`);
        console.log(`📡 [ServiceDiscovery] API URL: /k8s/clusters/${clusterId}/v1/services`);
@@ -156,18 +156,19 @@ export function useServiceDiscovery() {
          return null;
        }
 
-       const servicesData = response?.data;
-       if (servicesData && servicesData.items) {
-         const services = servicesData.items;
-            console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for uniproxy service`);
+        const servicesData = response?.data;
+        if (servicesData && servicesData.items) {
+          const services = servicesData.items;
+             console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for uniproxy service`);
 
-             // Find services in suse-ai-up namespace with port 8911
-              const suseAIServices = services.filter((service: any) => {
-                const serviceName = service.metadata?.name;
-                const serviceNamespace = service.metadata?.namespace;
-                const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
-                return serviceNamespace === 'suse-ai-up' && hasPort8911;
-              });
+              // Find services with port 8911 (optionally filtered by namespaces)
+               const suseAIServices = services.filter((service: any) => {
+                 const serviceName = service.metadata?.name;
+                 const serviceNamespace = service.metadata?.namespace;
+                 const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
+                 const isNamespaceAllowed = allowedNamespaces ? allowedNamespaces.includes(serviceNamespace) : true;
+                 return hasPort8911 && isNamespaceAllowed;
+               });
 
          console.log(`🎯 [ServiceDiscovery] Found ${suseAIServices.length} SUSE AI UP services`);
 
@@ -414,10 +415,10 @@ export function useServiceDiscovery() {
   };
 
   /**
-    * Discover SUSE AI pods with port 8911 (returns pod objects for UI)
-    * Uses hybrid approach: tries service discovery first, then falls back to pod discovery
-    */
-  const discoverPodObjects = async (store: any, clusterId: string): Promise<DetectedPod[]> => {
+     * Discover SUSE AI pods with port 8911 (returns pod objects for UI)
+     * Uses hybrid approach: tries service discovery first, then falls back to pod discovery
+     */
+  const discoverPodObjects = async (store: any, clusterId: string, allowedNamespaces?: string[]): Promise<DetectedPod[]> => {
     isLoading.value = true;
     error.value = null;
 
@@ -434,7 +435,7 @@ export function useServiceDiscovery() {
       // First, try service discovery (like APIDiscoveryWizard)
       let detectedPods: DetectedPod[] = [];
       try {
-        const service = await querySUSEAIService(store, clusterId);
+        const service = await querySUSEAIService(store, clusterId, allowedNamespaces);
         if (service) {
           console.log(`✅ [ServiceDiscovery] Service discovery successful, creating pod object from service`);
           
@@ -510,7 +511,7 @@ export function useServiceDiscovery() {
       // If service discovery didn't find anything, try pod discovery
       if (detectedPods.length === 0) {
         console.log(`🔄 [ServiceDiscovery] Service discovery found nothing, trying pod discovery`);
-        const pods = await querySUSEAIPods(store, clusterId);
+        const pods = await querySUSEAIPods(store, clusterId, allowedNamespaces);
 
         // Ensure pods is an array
         if (!Array.isArray(pods)) {

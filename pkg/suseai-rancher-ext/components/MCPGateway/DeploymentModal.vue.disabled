@@ -11,8 +11,8 @@
             <h4>{{ server.name }}</h4>
             <p>{{ server.description }}</p>
             <div class="server-meta">
-              <span class="meta-item">Version: {{ server.version }}</span>
-              <span class="meta-item">Status: {{ server.validation_status }}</span>
+              <span class="meta-item">ID: {{ server.id }}</span>
+              <span class="meta-item">Status: {{ server.validation_status || 'Unknown' }}</span>
             </div>
           </div>
 
@@ -129,7 +129,8 @@
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from 'vue';
 // import { MCPService } from '../../services/mcp-service';
-import type { RegistryServer, DeploymentRequest, DeploymentConfig } from '../../types/mcp-types';
+import type { DeploymentRequest, DeploymentConfig } from '../../types/mcp-types';
+import type { MCPServer } from '../../services/registry-api';
 
 // Using the correct DeploymentConfig from types
 
@@ -142,7 +143,7 @@ export default defineComponent({
       required: true
     },
     server: {
-      type: Object as () => RegistryServer | null,
+      type: Object as () => MCPServer | null,
       default: null
     }
   },
@@ -180,41 +181,9 @@ export default defineComponent({
             cpu: newServer.config_template?.resource_limits?.cpu || '',
             memory: newServer.config_template?.resource_limits?.memory || ''
           }
-        };
+        }
       }
-    }, { immediate: true });
-
-    const deployServer = async () => {
-      if (!canDeploy.value || !props.server) return;
-
-      deploying.value = true;
-      error.value = '';
-
-      try {
-        const request: DeploymentRequest = {
-          serverId: props.server.id,
-          config: {
-            serverId: props.server.id,
-            config: {
-              environment: deploymentConfig.value.env_vars
-            }
-          }
-        };
-        // const result = await MCPService.deployServer(request);
-        const result = { deploymentId: 'placeholder', status: 'completed' };
-        console.log('Deployment completed:', result);
-
-        emit('deployed', result);
-        emit('close');
-
-        alert(`Server deployed successfully! Deployment ID: ${result.deploymentId}`);
-      } catch (err: any) {
-        console.error('Deployment failed:', err);
-        error.value = `Deployment failed: ${err.message}`;
-      } finally {
-        deploying.value = false;
-      }
-    };
+    });
 
     return {
       deploymentConfig,
@@ -223,8 +192,6 @@ export default defineComponent({
       canDeploy,
       deployServer
     };
-  }
-});
 </script>
 
 <style scoped>

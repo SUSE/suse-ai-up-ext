@@ -25,7 +25,7 @@ export function useDiscovery() {
       const result = await discoveryAPI.startScan(config)
       currentScan.value = {
         scan_id: result.scan_id,
-        status: 'running',
+        status: result.status === 'pending' ? 'running' : result.status,
         message: result.message
       } as ScanResult
 
@@ -48,7 +48,7 @@ export function useDiscovery() {
       const status = await discoveryAPI.getScanStatus(scanId)
       currentScan.value = status
 
-      if (status.status === 'running') {
+      if (status.status === 'running' || status.status === 'pending') {
         // Estimate progress (rough calculation)
         scanProgress.value = Math.min(scanProgress.value + 10, 90)
         // Continue polling

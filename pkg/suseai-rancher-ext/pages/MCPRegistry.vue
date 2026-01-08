@@ -186,17 +186,25 @@
                     </div>
                   </div>
 
-                   <div class="tile-actions">
-                     <button
-                       class="btn btn-sm btn-secondary"
-                       @click.stop="handleViewServer(server)"
-                       :aria-label="`View details for ${server.id}`"
-                     >
-                       <i class="icon icon-info"></i>
-                       Details
-                     </button>
+                    <div class="tile-actions">
+                      <button
+                        class="btn btn-sm btn-secondary"
+                        @click.stop="handleViewServer(server)"
+                        :aria-label="`View details for ${server.id}`"
+                      >
+                        <i class="icon icon-info"></i>
+                        Details
+                      </button>
 
-                   </div>
+                      <button
+                        class="btn btn-sm btn-primary"
+                        @click.stop="handleDeployServer(server)"
+                        :aria-label="`Deploy ${server.id} to Kubernetes`"
+                      >
+                        <i class="icon icon-plus"></i>
+                        Deploy
+                      </button>
+                    </div>
               </div>
             </div>
           </div>
@@ -204,12 +212,12 @@
         </div>
        </main>
 
-       <!-- Server Details Modal -->
-      <ServerDetailsModal
-        :show="showServerDetailsModal"
-        :server-id="selectedServerId"
-        @close="closeServerDetailsModal"
-      />
+        <!-- Server Details Modal -->
+       <ServerDetailsModal
+         :show="showServerDetailsModal"
+         :server-id="selectedServerId"
+         @close="closeServerDetailsModal"
+       />
 
 
    </div>
@@ -219,8 +227,8 @@
 import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRegistry } from '../composables/useRegistry'
+import { useAdapters } from '../composables/useAdapters'
 import type { MCPServer } from '../services/registry-api'
-import { registryAPI } from '../services/registry-api'
 import { updateApiBaseUrls, API_BASE_URLS } from '../config/api-config'
 import ServerDetailsModal from '../components/MCPRegistry/ServerDetailsModal.vue'
 
@@ -266,6 +274,12 @@ export default defineComponent({
       getAuthType,
       getCategories
     } = useRegistry()
+
+    // Use adapters composable for creating adapters
+    const {
+      createAdapter,
+      loading: adaptersLoading
+    } = useAdapters()
 
     // Local state for UI
     const searchQuery = ref('')
@@ -376,14 +390,13 @@ export default defineComponent({
       if (serviceUrl) {
         console.log('MCPRegistry initializing with stored service URL:', serviceUrl)
         updateApiBaseUrls(serviceUrl)
-        registryAPI.updateBaseURL()
+        // registryAPI.updateBaseURL() // Not needed for registryService
       }
 
       // Test connectivity and fallback if needed
       await testAndFallbackServiceUrl()
 
       console.log('MCPRegistry final API_BASE_URLS:', API_BASE_URLS)
-      console.log('MCPRegistry registryAPI baseURL:', registryAPI.getBaseURL())
       await browseServers()
     })
 
@@ -507,6 +520,100 @@ export default defineComponent({
       console.log('selectedServerId set to:', selectedServerId.value)
     }
 
+    const handleDeployServer = async (server: MCPServer) => {
+      console.log('handleDeployServer called with server:', server.name, 'id:', server.id)
+      console.log('Full server config:', (server as any).config)
+
+      try {
+        // Extract environment variables from multiple sources
+        const envVars: Record<string, string> = {}
+
+        // Source 1: config_template.env (if exists)
+        if (server.config_template?.env) {
+          Object.assign(envVars, server.config_template.env)
+        }
+
+        // Source 2: config.secrets (registry YAML structure)
+        const configSecrets = (server as any).config?.secrets
+        if (configSecrets && configSecrets.length > 0) {
+          configSecrets.forEach((secret: any) => {
+            const envName = secret.env || secret.name
+            // For now, use example values as defaults - in real deployment,
+            // user would need to provide actual values
+            if (secret.example) {
+              envVars[envName] = secret.example
+            }
+          })
+        }
+
+        // Source 3: secrets array (transformed data)
+        if (server.secrets && server.secrets.length > 0) {
+          server.secrets.forEach(secret => {
+            if (secret.value) {
+              envVars[secret.name] = secret.value
+            }
+          })
+        }
+
+        // Source 4: packages[].environmentVariables
+        if (server.packages) {
+          server.packages.forEach(pkg => {
+            if (pkg.environmentVariables) {
+              pkg.environmentVariables.forEach(env => {
+                if (env.default && !envVars[env.name]) {
+                  envVars[env.name] = env.default
+                }
+              })
+            }
+          })
+        }
+
+        // Generate unique adapter name: lowercase server name with spaces as hyphens + progressive number
+        const baseName = server.name.toLowerCase().replace(/\s+/g, '-')
+        const timestamp = Date.now()
+        const adapterName = `${baseName}-${timestamp}`
+
+        // Create adapter directly - this will deploy the server
+        const adapterData = {
+          name: adapterName,
+          mcpServerId: server.id,
+          environmentVariables: envVars,
+          authentication: {
+            type: 'none' as const,
+            required: false
+          }
+        }
+
+        console.log('Creating adapter with data:', adapterData)
+        const adapter = await createAdapter(adapterData)
+
+        if (adapter) {
+          console.log('Adapter created successfully:', adapter)
+
+          // Show success message
+          store.dispatch('growl/success', {
+            title: 'Deployment Successful',
+            message: `${server.name} has been deployed and an adapter has been created.`
+          })
+        } else {
+          // Deployment succeeded but adapter creation failed
+          store.dispatch('growl/warning', {
+            title: 'Deployment Completed',
+            message: `${server.name} was deployed successfully, but adapter creation failed.`
+          })
+        }
+
+      } catch (error: any) {
+        console.error('Deployment failed:', error)
+
+        // Show error message
+        store.dispatch('growl/error', {
+          title: 'Deployment Failed',
+          message: error.message || `Failed to deploy ${server.name}`
+        })
+      }
+    }
+
 
 
 
@@ -586,6 +693,8 @@ export default defineComponent({
 
 
 
+
+
     const toggleCardExpansion = (serverId: string) => {
       if (expandedCards.value.has(serverId)) {
         expandedCards.value.delete(serverId)
@@ -610,17 +719,18 @@ export default defineComponent({
       error,
       searchQuery,
       categoryFilter,
-       showServerDetailsModal,
-       selectedServerId,
+        showServerDetailsModal,
+        selectedServerId,
       filteredServers,
       availableCategories,
       isEnabled,
 
          // Methods
-         handleSearch,
-         handleReloadRegistry,
-         handleViewServer,
-         closeServerDetailsModal,
+          handleSearch,
+          handleReloadRegistry,
+          handleViewServer,
+          handleDeployServer,
+          closeServerDetailsModal,
          getServerIcon,
          getSourceUrl,
          getSourceBranch,

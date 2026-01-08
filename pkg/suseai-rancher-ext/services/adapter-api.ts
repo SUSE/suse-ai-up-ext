@@ -146,10 +146,8 @@ export class AdapterAPI extends BaseAPI {
   async list(): Promise<Adapter[]> {
     try {
       logger.info('Listing adapters')
-      console.log('AdapterAPI baseURL:', this.api.defaults.baseURL)
 
         const response = await this.get<any>('/api/v1/adapters')
-      console.log('Raw adapters API response:', response)
 
       // Handle different response formats
       let adapters: Adapter[]
@@ -166,7 +164,6 @@ export class AdapterAPI extends BaseAPI {
       }
 
       logger.info('Adapters listed', { count: adapters.length })
-      console.log('Processed adapters:', adapters)
 
       return adapters
     } catch (error) {

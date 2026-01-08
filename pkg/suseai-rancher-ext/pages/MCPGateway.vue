@@ -9,17 +9,22 @@
   <div v-else>
     <ExperimentalBanner />
 
-     <Dashboard
-       v-if="proxyInstalled && isEnabled"
-       :adapters="adapters"
-       :adapters-error="adaptersError || undefined"
-       :adapters-loading="adaptersLoading"
-       @scan-modal-open="openScanModal"
-       @security-modal-open="openSecurityModal"
-       @rule-modal-open="openRuleModal"
-       @sync-adapter="handleSyncAdapter"
-       @view-server-details="openServerDetailsModal"
-     />
+      <Dashboard
+        v-if="proxyInstalled && isEnabled"
+        :adapters="adapters"
+        :adapters-error="adaptersError || undefined"
+        :adapters-loading="adaptersLoading"
+        :discovered-servers="Array.from(discoveredServers)"
+        :discovery-loading="discoveryLoading"
+        :discovery-error="discoveryError || undefined"
+        :scanning="scanning"
+        :scan-progress="scanProgress"
+        @scan-modal-open="openScanModal"
+        @security-modal-open="openSecurityModal"
+        @rule-modal-open="openRuleModal"
+        @sync-adapter="handleSyncAdapter"
+        @view-server-details="openServerDetailsModal"
+      />
 
     <ProxyStatus v-if="proxyInstalled && isEnabled" />
 
@@ -31,8 +36,14 @@
       </div>
     </div>
 
-    <!-- Schedule Scan Modal -->
-    <ScheduleScanModal ref="scanModal" @scanStarted="onScanStarted" />
+     <!-- Schedule Scan Modal -->
+     <ScheduleScanModal
+       ref="scanModal"
+       :start-scan="startScan"
+       :scanning="scanning"
+       :scan-progress="scanProgress"
+       @scanStarted="onScanStarted"
+     />
 
     <!-- Server Details Modal -->
     <ServerDetailsModal
@@ -44,7 +55,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, onMounted, computed } from 'vue';
+import { defineComponent, ref, watch, onMounted, computed, nextTick } from 'vue';
 import { useStore } from 'vuex';
 import { useDiscovery } from '../composables/useDiscovery';
 import { useAdapters } from '../composables/useAdapters';
@@ -79,6 +90,7 @@ export default defineComponent({
       scanProgress,
       startScan,
       loadDiscoveredServers,
+      startPolling,
       getServerDetails,
       hasSecurityFindings,
       getSecurityRiskLevel,
@@ -93,6 +105,7 @@ export default defineComponent({
       error: adaptersError,
       loadAdapters,
       createAdapter,
+      startPolling: startAdaptersPolling,
       deleteAdapter,
       syncAdapter
     } = useAdapters();
@@ -101,6 +114,8 @@ export default defineComponent({
     const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled);
     const selectedServices = computed(() => store.state.suseai.settings.selectedServices);
     const isEnabled = computed(() => proxyInstalled.value && selectedServices.value.includes('mcp-gateway'));
+
+    // Remove intermediate ref - pass adapters directly
 
     // Test service connectivity - force use of configured IP ADDRESS, no fallback
     const testServiceUrl = async () => {
@@ -141,8 +156,22 @@ export default defineComponent({
       // Set initial API URLs
       updateApiBaseUrls(serviceUrl)
 
+      console.log('MCPGateway onMounted: Starting initialization')
+
       // Load discovered servers
       await loadDiscoveredServers()
+
+      // Load adapters
+      console.log('MCPGateway onMounted: Loading adapters')
+      await loadAdapters()
+
+      console.log('MCPGateway onMounted: Adapters loaded, starting polling')
+
+      // Start continuous polling for server updates
+      startPolling()
+
+      // Start continuous polling for adapter updates
+      startAdaptersPolling()
     });
 
     // Modal refs
@@ -235,13 +264,15 @@ export default defineComponent({
       securityModal,
       ruleModal,
 
-      // Methods
-      openScanModal,
-      openSecurityModal,
-      openRuleModal,
-      handleSyncAdapter,
-      onScanStarted,
-      loadDiscoveredServers,
+       // Methods
+       openScanModal,
+       openSecurityModal,
+       openRuleModal,
+       handleSyncAdapter,
+       onScanStarted,
+       loadDiscoveredServers,
+       startPolling,
+       startScan,
 
       // Server details modal
       showServerDetailsModal,

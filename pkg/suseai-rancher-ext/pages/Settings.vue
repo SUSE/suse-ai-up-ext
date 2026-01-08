@@ -112,6 +112,57 @@
             @retry="loadPermissions"
           />
         </div>
+
+        <!-- SUSE AI Proxy Tab -->
+        <div v-if="activeTab === 'proxy'" class="tab-pane">
+          <div class="proxy-settings">
+            <h3>SUSE AI Universal Proxy Configuration</h3>
+            <p>Configure discovery and connection settings for the SUSE AI Universal Proxy.</p>
+
+            <div class="settings-section">
+              <h4>Namespace Filtering</h4>
+              <p>Optionally restrict proxy discovery to specific namespaces. Leave empty to search all namespaces.</p>
+              <div class="form-group">
+                <label for="allowed-namespaces">Allowed Namespaces (comma-separated):</label>
+                <input
+                  id="allowed-namespaces"
+                  type="text"
+                  :value="proxyConfig.allowedNamespaces?.join(', ') || ''"
+                  @input="updateAllowedNamespaces"
+                  placeholder="e.g., kube-system, default, suse-ai-up"
+                  class="form-control"
+                />
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <h4>Current Configuration</h4>
+              <div v-if="proxyConfig.selectedServer" class="current-server">
+                <div class="server-info">
+                  <strong>Selected Proxy:</strong> {{ proxyConfig.selectedServer.namespace }}/{{ proxyConfig.selectedServer.podName }}
+                </div>
+                <div class="server-info">
+                  <strong>Cluster:</strong> {{ proxyConfig.selectedServer.clusterId }}
+                </div>
+                <div class="server-info">
+                  <strong>Service URL:</strong> {{ proxyConfig.selectedServer.serviceUrl }}
+                </div>
+              </div>
+              <div v-else class="no-server">
+                <p>No proxy server configured. Use the main dashboard to discover and configure a proxy.</p>
+              </div>
+
+              <div class="actions">
+                <button
+                  class="btn btn-secondary"
+                  @click="reRunWizard"
+                >
+                  Re-run Discovery Wizard
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     </div>
@@ -175,13 +226,14 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue';
+import { defineComponent, ref, onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useAuth } from '../composables/useAuth';
 import { useExternalUsers } from '../composables/useExternalUsers';
 import { useExternalGroups } from '../composables/useExternalGroups';
 import { usePermissions } from '../composables/usePermissions';
 import { updateApiBaseUrls } from '../config/api-config';
+import { SUSEAIProxyConfig } from '../config/suseai';
 import type { RancherUser, RancherRole, ExternalUser, ExternalGroup } from '../types/auth-types';
 import UsersTable from '../components/settings/UsersTable.vue';
 import GroupsTable from '../components/settings/GroupsTable.vue';
@@ -211,7 +263,8 @@ export default defineComponent({
     const tabs = [
       { id: 'users', label: 'Users' },
       { id: 'groups', label: 'Groups' },
-      { id: 'permissions', label: 'Permissions' }
+      { id: 'permissions', label: 'Permissions' },
+      { id: 'proxy', label: 'SUSE AI Proxy' }
     ];
 
     // Modal states - External API
@@ -285,6 +338,9 @@ export default defineComponent({
       canManageCluster,
       debugInfo
     } = useAuth();
+
+    // SUSE AI Proxy configuration
+    const proxyConfig = computed<SUSEAIProxyConfig>(() => store.getters['suseai/proxyConfig'] || {});
 
     // Load data on mount
     onMounted(async () => {
@@ -518,6 +574,29 @@ export default defineComponent({
       }
     };
 
+    // SUSE AI Proxy handlers
+    const updateAllowedNamespaces = (event: Event) => {
+      const target = event.target as HTMLInputElement;
+      const namespaces = target.value
+        .split(',')
+        .map(ns => ns.trim())
+        .filter(ns => ns.length > 0);
+
+      const newConfig: SUSEAIProxyConfig = {
+        ...proxyConfig.value,
+        allowedNamespaces: namespaces.length > 0 ? namespaces : undefined
+      };
+
+      store.dispatch('suseai/setProxyConfig', newConfig);
+    };
+
+    const reRunWizard = () => {
+      // Clear proxy config to re-run wizard
+      store.dispatch('suseai/setProxyConfig', {});
+      // Navigate to home/dashboard
+      store.dispatch('nav/replace', { name: 'c-cluster-suseai-universal-adapter' });
+    };
+
     return {
       activeTab,
       tabs,
@@ -552,39 +631,43 @@ export default defineComponent({
       handleEditPermissions,
       handleRemovePermissions,
       handleSavePermissionAssignment,
-      handleDeleteExternalUser,
-      handleDeleteExternalGroup,
-      loadExternalUsers,
-      loadExternalGroups,
-      loadPermissions,
-      // Legacy Rancher state and handlers (for backward compatibility)
-      showUserModal,
-      showRoleModal,
-      selectedUser,
-      selectedRole,
-      users,
-      roles,
-      loadingUsers,
-      loadingRoles,
-      usersError,
-      rolesError,
-      currentUser,
-      hasAdminPrivileges,
-      isAuthenticated,
-      debugInfo,
-      handleViewUser,
-      handleEditUser,
-      handleViewRole,
-      handleEditRole,
-      handleSaveUser,
-      handleSaveRole,
-      handleAddUser,
-      handleAddRole,
-      loadUsers,
-      loadRoles
-    };
-  }
-});
+       handleDeleteExternalUser,
+       handleDeleteExternalGroup,
+       loadExternalUsers,
+       loadExternalGroups,
+       loadPermissions,
+       // SUSE AI Proxy
+       proxyConfig,
+       updateAllowedNamespaces,
+       reRunWizard,
+       // Legacy Rancher state and handlers (for backward compatibility)
+       showUserModal,
+       showRoleModal,
+       selectedUser,
+       selectedRole,
+       users,
+       roles,
+       loadingUsers,
+       loadingRoles,
+       usersError,
+       rolesError,
+       currentUser,
+       hasAdminPrivileges,
+       isAuthenticated,
+       debugInfo,
+       handleViewUser,
+       handleEditUser,
+       handleViewRole,
+       handleEditRole,
+       handleSaveUser,
+       handleSaveRole,
+       handleAddUser,
+       handleAddRole,
+       loadUsers,
+       loadRoles
+     };
+   }
+ });
 </script>
 
 <style scoped>
@@ -726,5 +809,109 @@ export default defineComponent({
   font-family: monospace;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* SUSE AI Proxy Settings */
+.proxy-settings {
+  max-width: 800px;
+}
+
+.proxy-settings h3 {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.proxy-settings > p {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.settings-section {
+  margin-bottom: 32px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+}
+
+.settings-section h4 {
+  margin: 0 0 8px 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.settings-section p {
+  margin: 0 0 16px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
+}
+
+.current-server {
+  margin-bottom: 16px;
+}
+
+.server-info {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.server-info strong {
+  color: var(--text);
+}
+
+.no-server {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.actions {
+  margin-top: 16px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary {
+  background: var(--secondary-bg);
+  color: var(--secondary-text);
+  border-color: var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--secondary-hover);
 }
 </style>

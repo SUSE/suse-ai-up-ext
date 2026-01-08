@@ -3,35 +3,35 @@
      <h2>Registered MCP Adapters</h2>
     <table class="endpoints-table">
         <thead>
-          <tr>
-             <th>Name</th>
-             <th>Status</th>
-             <th>Connection Type</th>
-             <th>Created</th>
-             <th>Capabilities</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
+           <tr>
+              <th>Name</th>
+              <th>MCP Server ID</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Capabilities</th>
+             <th>Actions</th>
+           </tr>
+         </thead>
        <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="loading-row">Loading adapters...</td>
-          </tr>
-          <tr v-else-if="error">
-            <td colspan="6" class="error-row">{{ error }}</td>
-          </tr>
-          <tr v-else-if="adapters.length === 0">
-            <td colspan="6" class="empty-row">No adapters registered</td>
-          </tr>
-          <tr v-else v-for="adapter in adapters" :key="adapter.id">
-            <td>{{ adapter.name }}</td>
-              <td>
-                <span :class="getStatusClass(adapter)">
-                  {{ getStatusText(adapter) }}
-                </span>
-              </td>
-            <td>{{ adapter.connectionType || 'StreamableHttp' }}</td>
-              <td>{{ adapter.createdAt ? new Date(adapter.createdAt).toLocaleString() : 'Unknown' }}</td>
-            <td>{{ getCapabilitiesCount(adapter) }}</td>
+           <tr v-if="loading">
+             <td colspan="7" class="loading-row">Loading adapters...</td>
+           </tr>
+           <tr v-else-if="error">
+             <td colspan="7" class="error-row">{{ error }}</td>
+           </tr>
+           <tr v-else-if="adapters.length === 0">
+             <td colspan="7" class="empty-row">No adapters registered</td>
+           </tr>
+            <tr v-else v-for="adapter in adapters" :key="adapter.id">
+              <td>{{ adapter.name }}</td>
+              <td>{{ adapter.mcpServerId || 'N/A' }}</td>
+                <td>
+                  <span :class="getStatusClass(adapter)">
+                    {{ getStatusText(adapter) }}
+                  </span>
+                </td>
+                <td>{{ adapter.createdAt ? new Date(adapter.createdAt).toLocaleString() : 'N/A' }}</td>
+              <td>{{ getCapabilitiesCount(adapter) }}</td>
            <td>
               <div class="action-buttons">
                 <button class="btn btn-sm role-secondary" @click="handleViewDetails(adapter)" title="View Details">
@@ -67,7 +67,6 @@
  <script lang="ts">
 import { defineComponent, ref } from 'vue';
 import { adapterAPI, type Adapter } from '../../services/adapter-api';
-import type { AdapterResource } from '../../types/mcp-types';
 import AdapterDetailsModal from '../shared/AdapterDetailsModal.vue';
 
 export default defineComponent({
@@ -77,7 +76,7 @@ export default defineComponent({
   },
   props: {
     adapters: {
-      type: Array as () => AdapterResource[],
+      type: Array as () => Adapter[],
       default: () => []
     },
     loading: {
@@ -95,44 +94,40 @@ export default defineComponent({
   },
   emits: ['view-details', 'view-logs', 'sync-adapter', 'edit-adapter', 'delete-adapter', 'refresh-adapters'],
   setup(props, { emit }) {
-       console.log('AdaptersTable props received:', {
-         adapters: props.adapters,
-         adaptersLength: props.adapters?.length,
-         loading: props.loading
-       })
+    console.log('AdaptersTable setup - received adapters:', props.adapters?.length || 0, 'items')
 
-       const showAdapterDetailsModal = ref(false);
-       const selectedAdapter = ref<AdapterResource | null>(null);
+        const showAdapterDetailsModal = ref(false);
+        const selectedAdapter = ref<Adapter | null>(null);
 
-      const handleViewDetails = async (adapter: AdapterResource) => {
-        try {
-          // Fetch full adapter details including authentication token
-          const adapterDetails = await adapterAPI.getAdapter(adapter.name) as any;
-          selectedAdapter.value = adapterDetails || adapter;
-          showAdapterDetailsModal.value = true;
-        } catch (error) {
-          console.error('Error fetching adapter details:', error);
-          // Fallback to basic adapter info if details fetch fails
-          selectedAdapter.value = adapter;
-          showAdapterDetailsModal.value = true;
-        }
-      };
+       const handleViewDetails = async (adapter: Adapter) => {
+         try {
+           // Fetch full adapter details including authentication token
+           const adapterDetails = await adapterAPI.getAdapter(adapter.name) as any;
+           selectedAdapter.value = adapterDetails || adapter;
+           showAdapterDetailsModal.value = true;
+         } catch (error) {
+           console.error('Error fetching adapter details:', error);
+           // Fallback to basic adapter info if details fetch fails
+           selectedAdapter.value = adapter;
+           showAdapterDetailsModal.value = true;
+         }
+       };
 
-      const handleViewLogs = (adapter: AdapterResource) => {
-        emit('view-logs', adapter);
-      };
+       const handleViewLogs = (adapter: Adapter) => {
+         emit('view-logs', adapter);
+       };
 
-      const handleSyncAdapter = (adapter: AdapterResource) => {
-        emit('sync-adapter', adapter);
-      };
+       const handleSyncAdapter = (adapter: Adapter) => {
+         emit('sync-adapter', adapter);
+       };
 
-      const handleEditAdapter = (adapter: AdapterResource) => {
-        emit('edit-adapter', adapter);
-      };
+       const handleEditAdapter = (adapter: Adapter) => {
+         emit('edit-adapter', adapter);
+       };
 
-      const handleDeleteAdapter = (adapter: AdapterResource) => {
-        emit('delete-adapter', adapter);
-      };
+       const handleDeleteAdapter = (adapter: Adapter) => {
+         emit('delete-adapter', adapter);
+       };
 
         const closeAdapterDetailsModal = () => {
           showAdapterDetailsModal.value = false;

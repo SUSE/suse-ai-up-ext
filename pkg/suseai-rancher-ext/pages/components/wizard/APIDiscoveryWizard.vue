@@ -914,13 +914,17 @@ const getClusterStatusText = (cluster: any): string => {
       try {
         console.log(`Discovering SUSE AI UP service in cluster: ${cluster.name} (${cluster.id})`);
 
-        // Use the specific service endpoint: /k8s/clusters/{cluster-id}/v1/services/suse-ai-up/uniproxy-service
-        const serviceResponse = await store.dispatch('rancher/request', {
-          url: `/k8s/clusters/${cluster.id}/v1/services/suse-ai-up/uniproxy-service`,
+        // Query all services and find SUSE AI UP service with port 8911
+        const servicesResponse = await store.dispatch('rancher/request', {
+          url: `/k8s/clusters/${cluster.id}/v1/services`,
           method: 'GET'
         });
 
-        const suseAiUpService = serviceResponse.data;
+        const services = servicesResponse.data?.items || [];
+        const suseAiUpService = services.find((service: any) => {
+          const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
+          return hasPort8911;
+        });
 
         if (!suseAiUpService) {
           console.log(`SUSE AI UP service not found in cluster ${cluster.name}`);

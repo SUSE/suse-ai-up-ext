@@ -1,5 +1,6 @@
 // SUSE AI Store
 import { persistLoad, persistSave } from '../services/ui-persist';
+import { SUSEAIProxyConfig } from '../config/suseai';
 
 interface SUSEAIState {
   settings: {
@@ -10,10 +11,11 @@ interface SUSEAIState {
     selectedCluster: string;
     selectedPod: any;
   };
-
+  proxyConfig: SUSEAIProxyConfig;
 }
 
 const SETTINGS_KEY = 'suseai-settings';
+const PROXY_CONFIG_KEY = 'suseai-proxy-config';
 
 export default {
   namespaced: true,
@@ -29,13 +31,16 @@ export default {
       selectedPod: null
     });
 
+    // Load persisted proxy config
+    const persistedProxyConfig = persistLoad(PROXY_CONFIG_KEY, {});
+
     return {
       settings: {
         ...persistedSettings,
         selectedCluster: persistedSettings.selectedCluster || '',
         selectedPod: persistedSettings.selectedPod || null
       },
-
+      proxyConfig: persistedProxyConfig
     };
   },
 
@@ -65,13 +70,18 @@ export default {
        persistSave(SETTINGS_KEY, state.settings);
      },
 
-     SET_SELECTED_POD(state: SUSEAIState, pod: any) {
-       state.settings.selectedPod = pod;
-       persistSave(SETTINGS_KEY, state.settings);
-     },
+      SET_SELECTED_POD(state: SUSEAIState, pod: any) {
+        state.settings.selectedPod = pod;
+        persistSave(SETTINGS_KEY, state.settings);
+      },
+
+      SET_PROXY_CONFIG(state: SUSEAIState, config: SUSEAIProxyConfig) {
+        state.proxyConfig = config;
+        persistSave(PROXY_CONFIG_KEY, config);
+      },
 
 
-  },
+   },
 
   actions: {
     setProxyInstalled({ commit }: any, value: boolean) {
@@ -94,18 +104,23 @@ export default {
        commit('SET_SELECTED_CLUSTER', clusterId);
      },
 
-     setSelectedPod({ commit }: any, pod: any) {
-       commit('SET_SELECTED_POD', pod);
-     },
+      setSelectedPod({ commit }: any, pod: any) {
+        commit('SET_SELECTED_POD', pod);
+      },
+
+      setProxyConfig({ commit }: any, config: SUSEAIProxyConfig) {
+        commit('SET_PROXY_CONFIG', config);
+      },
 
 
-  },
+   },
 
   getters: {
     proxyInstalled: (state: SUSEAIState) => state.settings.proxyInstalled,
     selectedServices: (state: SUSEAIState) => state.settings.selectedServices,
     availableClusters: (state: SUSEAIState) => state.settings.availableClusters,
     serviceUrls: (state: SUSEAIState) => state.settings.serviceUrls,
+    proxyConfig: (state: SUSEAIState) => state.proxyConfig,
 
   }
 };

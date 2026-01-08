@@ -1,83 +1,71 @@
 <template>
   <div class="discovered-servers-section">
     <h2>Discovered MCP Servers</h2>
-
-    <div v-if="loading" class="loading-state">
-      <i class="icon icon-spinner icon-spin"></i>
-      Loading discovered servers...
-    </div>
-
-    <div v-else-if="discoveredServers.length === 0" class="empty-state">
-      <i class="icon icon-info"></i>
-      No servers discovered yet.
-    </div>
-
-    <div v-else class="servers-list">
-      <div
-        v-for="server in discoveredServers"
-        :key="server.id"
-        class="server-card"
-      >
-        <div class="server-header">
-          <h3>{{ server.name || 'Unknown Server' }}</h3>
-          <span :class="getStatusClass(server.status)" class="status-badge">
-            {{ getStatusLabel(server.status) }}
-          </span>
-        </div>
-
-        <div class="server-details">
-          <div class="detail-row">
-            <span class="label">Address:</span>
-            <span class="value">{{ server.address }}</span>
-          </div>
-
-          <div class="detail-row">
-            <span class="label">Port:</span>
-            <span class="value">{{ server.port }}</span>
-          </div>
-
-          <div class="detail-row">
-            <span class="label">Protocol:</span>
-            <span class="value">{{ server.protocol }}</span>
-          </div>
-
-          <div class="detail-row">
-            <span class="label">Connection:</span>
-            <span class="value">{{ server.connection }}</span>
-          </div>
-
-          <div class="detail-row" v-if="server.lastSeen">
-            <span class="label">Last Seen:</span>
-            <span class="value">{{ formatDate(server.lastSeen) }}</span>
-          </div>
-
-          <div class="detail-row" v-if="server.vulnerability_score">
-            <span class="label">Risk:</span>
-            <span :class="getRiskClass(server.vulnerability_score)" class="value">
+    <table class="servers-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Address</th>
+          <th>Port</th>
+          <th>Protocol</th>
+          <th>Status</th>
+          <th>Risk</th>
+          <th>Last Seen</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-if="loading">
+          <td colspan="8" class="loading-row">
+            <i class="icon icon-spinner icon-spin"></i>
+            Loading discovered servers...
+          </td>
+        </tr>
+        <tr v-else-if="discoveredServers.length === 0">
+          <td colspan="8" class="empty-row">
+            <i class="icon icon-info"></i>
+            No servers discovered yet.
+          </td>
+        </tr>
+        <tr v-else v-for="server in discoveredServers" :key="server.id">
+          <td>{{ server.name || 'Unknown Server' }}</td>
+          <td>{{ server.address }}</td>
+          <td>{{ server.port }}</td>
+          <td>{{ server.protocol }}</td>
+          <td>
+            <span :class="getStatusClass(server.status)" class="status-badge">
+              {{ getStatusLabel(server.status) }}
+            </span>
+          </td>
+          <td>
+            <span v-if="server.vulnerability_score" :class="getRiskClass(server.vulnerability_score)">
               {{ server.vulnerability_score.toUpperCase() }}
             </span>
-          </div>
-        </div>
-
-        <div class="server-actions">
-          <button
-            class="btn btn-sm btn-secondary"
-            @click="handleViewServerDetails(server)"
-          >
-            <i class="icon icon-info"></i>
-            Details
-          </button>
-
-          <button
-            class="btn btn-sm btn-primary"
-            @click="handleRegisterServer(server)"
-            :disabled="!canRegister(server)"
-          >
-            Register
-          </button>
-        </div>
-      </div>
-    </div>
+            <span v-else class="risk-unknown">UNKNOWN</span>
+          </td>
+          <td>{{ formatDate(server.lastSeen) }}</td>
+          <td>
+            <div class="action-buttons">
+              <button
+                class="btn btn-sm role-secondary"
+                @click="handleViewServerDetails(server)"
+                title="View Details"
+              >
+                <i class="icon icon-info"></i>
+              </button>
+              <button
+                class="btn btn-sm role-primary"
+                @click="handleRegisterServer(server)"
+                :disabled="!canRegister(server)"
+                title="Register Server"
+              >
+                <i class="icon icon-plus"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
@@ -189,47 +177,42 @@ export default defineComponent({
   color: var(--body-text, #111827);
 }
 
-.loading-state,
-.empty-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 40px;
+.servers-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.servers-table th {
+  background: var(--accent-bg, #f9fafb);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--body-text, #111827);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.servers-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  vertical-align: middle;
+}
+
+.loading-row,
+.empty-row {
+  text-align: center;
   color: var(--muted, #6b7280);
   font-style: italic;
 }
 
-.servers-list {
-  display: grid;
-  gap: 16px;
-}
-
-.server-card {
-  background: var(--card-bg, #ffffff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.server-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.server-header h3 {
-  margin: 0;
-  color: var(--body-text, #111827);
-  font-size: 18px;
-}
-
 .status-badge {
-  padding: 4px 12px;
+  padding: 4px 8px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
 }
@@ -247,26 +230,6 @@ export default defineComponent({
 .status-unknown {
   background: #fff3cd;
   color: #856404;
-}
-
-.server-details {
-  margin-bottom: 15px;
-}
-
-.detail-row {
-  display: flex;
-  margin-bottom: 8px;
-}
-
-.detail-row .label {
-  font-weight: 500;
-  color: var(--muted, #6b7280);
-  min-width: 100px;
-  margin-right: 10px;
-}
-
-.detail-row .value {
-  color: var(--body-text, #111827);
 }
 
 .risk-high {
@@ -288,55 +251,54 @@ export default defineComponent({
   color: var(--muted, #6b7280);
 }
 
-.server-actions {
+.action-buttons {
   display: flex;
-  gap: 10px;
-  justify-content: flex-end;
+  gap: 8px;
+  justify-content: center;
 }
 
 .btn {
-  padding: 8px 16px;
+  padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
-  text-decoration: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 4px;
   transition: all 0.2s ease;
+  min-width: 32px;
+  height: 32px;
 }
 
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 12px;
-}
-
-.btn-secondary {
+.role-secondary {
   background: #6c757d;
   color: white;
   border-color: #6c757d;
 }
 
-.btn-secondary:hover:not(:disabled) {
+.role-secondary:hover:not(:disabled) {
   background: #5a6268;
   border-color: #5a6268;
 }
 
-.btn-primary {
+.role-primary {
   background: #007bff;
   color: white;
   border-color: #007bff;
 }
 
-.btn-primary:hover:not(:disabled) {
+.role-primary:hover:not(:disabled) {
   background: #0056b3;
   border-color: #0056b3;
 }
 
-.btn:disabled {
-  opacity: 0.6;
+.role-primary:disabled {
+  background: #6c757d;
+  border-color: #6c757d;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 </style>

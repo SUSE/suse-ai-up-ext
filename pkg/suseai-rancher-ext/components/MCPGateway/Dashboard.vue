@@ -23,7 +23,6 @@
     <!-- Registered MCP Adapters Table -->
     <div class="table-section">
       <h2>Registered MCP Adapters</h2>
-      <div>Debug: adapters.length = {{ adapters?.length || 0 }}, adaptersLoading = {{ adaptersLoading }}</div>
       <div v-if="adaptersLoading" class="loading-state">
         <i class="icon icon-spinner icon-spin"></i>
         <p>Loading adapters...</p>
@@ -56,42 +55,27 @@
         <i class="icon icon-spinner icon-spin"></i>
         <p>Loading discovered servers...</p>
       </div>
-      <!-- Error State -->
-      <div v-if="discoveryError" class="error-state">
-        <i class="icon icon-error"></i>
-        <p>Error loading discovered servers: {{ discoveryError }}</p>
-        <button class="btn btn-secondary" @click="$emit('retry-discovery')">
-          Retry
-        </button>
-      </div>
-      <DiscoveredServersTable
-        :discovered-servers="servers"
-        :loading="false"
-        :registered-server-ids="[]"
-        @view-server-details="handleViewServerDetails"
-        @register-server="handleRegisterServer"
-      />
-
-      <!-- TEMP: Debug display -->
-      <div style="border: 1px solid red; padding: 10px; margin: 10px;">
-        <h3>DEBUG: Discovered Servers</h3>
-        <p>Loading: {{ discoveryLoading }}</p>
-        <p>Error: {{ discoveryError }}</p>
-        <p>Servers count: {{ discoveredServers?.length || 0 }}</p>
-        <div v-for="server in discoveredServers" :key="server.id">
-          <strong>{{ server.name }}</strong> - {{ server.address }}:{{ server.port }}
-        </div>
-        <div v-if="discoveredServers?.length === 0">
-          No servers in array
-        </div>
-      </div>
+       <!-- Show error only if there are no servers and there's an error -->
+       <div v-if="discoveryError && (!discoveredServers || discoveredServers.length === 0)" class="error-state">
+         <i class="icon icon-error"></i>
+         <p>Error loading discovered servers: {{ discoveryError }}</p>
+         <button class="btn btn-secondary" @click="$emit('retry-discovery')">
+           Retry
+         </button>
+       </div>
+       <DiscoveredServersTable
+         :discovered-servers="discoveredServers"
+         :loading="discoveryLoading"
+         :registered-server-ids="[]"
+         @view-server-details="handleViewServerDetails"
+         @register-server="handleRegisterServer"
+       />
      </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from 'vue';
-import { useDiscovery } from '../../composables/useDiscovery';
 import ScanActions from './ScanActions.vue';
 import MetricsGrid from './MetricsGrid.vue';
 import AdaptersTable from './AdaptersTable.vue';
@@ -120,32 +104,59 @@ export default defineComponent({
     adaptersLoading: {
       type: Boolean,
       default: false
+    },
+    // Discovery state props to avoid multiple composable instances
+    discoveredServers: {
+      type: Array as () => any[],
+      default: () => []
+    },
+    discoveryLoading: {
+      type: Boolean,
+      default: false
+    },
+    discoveryError: {
+      type: String,
+      default: null
+    },
+    scanning: {
+      type: Boolean,
+      default: false
+    },
+    scanProgress: {
+      type: Number,
+      default: 0
     }
   },
   setup(props, { emit }) {
 
-    // Use the composable directly instead of relying on props
-    const { discoveredServers, loading: discoveryLoading } = useDiscovery()
+    // Debug: Check what adapters prop we receive
+    console.log('Dashboard setup - adapters prop:', props.adapters?.length || 0, 'items')
 
+    // Use props for discovery state to share state with parent component
     const servers = computed(() => {
-      console.log('Dashboard computed servers:', discoveredServers.value?.length || 0)
-      return discoveredServers.value || []
+      console.log('Dashboard computed servers:', props.discoveredServers?.length || 0)
+      return props.discoveredServers || []
     })
-
-    console.log('Dashboard setup - using composable directly')
-
-
 
     // Health monitoring
     const { proxyHealth, registryHealth, discoveryHealth } = useHealthMonitoring();
 
-    // Computed properties for metrics
+    // Computed properties for metrics and data
     const discoveredCount = computed(() => servers.value.length);
-    const registeredCount = computed(() => props.adapters.length);
-    const adaptersInErrorCount = computed(() => {
-      return props.adapters.filter(adapter => adapter.status === 'error' || adapter.errorCount > 0).length;
+    const adaptersData = computed(() => {
+      const adapters = props.adapters || []
+      console.log('Dashboard computed adaptersData:', adapters.length, 'items from props.adapters with', props.adapters?.length || 0, 'items')
+      return adapters
     });
-    const loading = computed(() => discoveryLoading.value || props.adaptersLoading);
+    const registeredCount = computed(() => {
+      const count = adaptersData.value.length
+      console.log('Dashboard registeredCount:', count, 'items')
+      return count
+    });
+    const adaptersInErrorCount = computed(() => {
+      return adaptersData.value.filter(adapter => adapter.status === 'error' || adapter.errorCount > 0).length;
+    });
+    const loading = computed(() => props.discoveryLoading || props.adaptersLoading);
 
     // Mock data for now (will be updated when we implement sessions/metrics)
     const sessions = ref([]);
@@ -153,7 +164,6 @@ export default defineComponent({
     const systemMetrics = ref(null);
     const loadingMetrics = ref(false);
     const adapterPingResults = ref({});
-    const registeredServerIds = ref(new Set<string>());
 
     const handleScanStart = () => {
       emit('scan-modal-open');
@@ -208,18 +218,16 @@ export default defineComponent({
     };
 
     return {
-
       discoveredServers: servers,
-      adapters: props.adapters,
+      adapters: adaptersData,
       adapterPingResults,
-      registeredServerIds,
-       proxyHealth,
-       registryHealth,
-       discoveryHealth,
-       discoveredCount,
-       registeredCount,
-       adaptersInErrorCount,
-       loading,
+      proxyHealth,
+      registryHealth,
+      discoveryHealth,
+      discoveredCount,
+      registeredCount,
+      adaptersInErrorCount,
+      loading,
       handleScanStart,
       handleRuleManagement,
       handleViewAdapterLogs,

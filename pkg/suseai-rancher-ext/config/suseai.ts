@@ -166,5 +166,16 @@ export const FEATURE_CATEGORIES = {
 
 export type FeatureCategory = typeof FEATURE_CATEGORIES[keyof typeof FEATURE_CATEGORIES];
 
+// === SUSE AI Proxy Configuration ===
+export interface SUSEAIProxyConfig {
+  allowedNamespaces?: string[];  // Optional: limit search to these namespaces
+  selectedServer?: {
+    clusterId: string;
+    namespace: string;
+    podName: string;
+    serviceUrl: string;
+  };
+}
+
 // === Export defaults ===
 export default SUSEAI_PRODUCT;

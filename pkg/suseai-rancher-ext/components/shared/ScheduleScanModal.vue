@@ -127,13 +127,36 @@
           {{ error }}
         </div>
       </div>
-      <div class="modal-footer">
-         <button class="btn btn-secondary" @click="closeModal" :disabled="scanning && !scanCompleted">Cancel</button>
-          <button class="btn btn-primary" @click="scanCompleted ? closeModal() : scheduleScan()" :disabled="!isValid || (scanning && !scanCompleted)">
-            <span v-if="scanning && !scanCompleted" class="spinner"></span>
-            {{ scanCompleted ? 'Close' : scanning ? 'Scanning...' : 'Start' }}
+        <!-- Progress section when scanning -->
+        <div v-if="scanInProgress" class="scan-progress">
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: (props.scanProgress || 0) + '%' }"></div>
+          </div>
+          <p class="progress-text">{{ Math.round(props.scanProgress || 0) }}% complete - Scanning network...</p>
+        </div>
+
+        <div class="modal-footer">
+          <button v-if="!scanInProgress" class="btn btn-secondary" @click="closeModal">Cancel</button>
+          <button v-if="scanInProgress" class="btn btn-secondary" disabled>
+            <i class="icon icon-spinner icon-spin"></i>
+            Scanning...
           </button>
-      </div>
+          <button
+            v-if="(props.scanProgress || 0) >= 100"
+            class="btn btn-primary"
+            @click="closeModal"
+          >
+            Close
+          </button>
+          <button
+            v-else-if="!scanInProgress"
+            class="btn btn-primary"
+            @click="scheduleScan()"
+            :disabled="!isValid"
+          >
+            Start Scan
+          </button>
+        </div>
     </div>
   </div>
 </template>
@@ -151,11 +174,19 @@ const emit = defineEmits<{
   close: [];
 }>();
 
+// Props
+const props = defineProps<{
+  startScan?: (config: ScanConfig) => Promise<any>;
+  scanning?: boolean;
+  scanProgress?: number;
+}>();
+
+// No need to watch for completion - scanInProgress stays true until modal closes
+
 
 const isVisible = ref(false);
-const scanning = ref(false);
-const scanCompleted = ref(false);
 const error = ref<string>('');
+const scanInProgress = ref(false);
 
 // Exclude addresses handling
 const excludeAddressesText = ref<string>('');
@@ -184,13 +215,7 @@ const hasInvalidPorts = computed(() => {
   return (scanConfig.value.ports || []).some(port => !isValidPort(port));
 });
 
-// Watch for scan completion
-watch(scanning, (newScanning, oldScanning) => {
-  if (oldScanning && !newScanning) {
-    // Scan was running and now stopped - scan completed
-    scanCompleted.value = true;
-  }
-});
+
 
 // Port validation function
 const isValidPort = (port: string | number): boolean => {
@@ -260,8 +285,7 @@ const closeModal = () => {
 
 const reset = () => {
   error.value = '';
-  scanning.value = false;
-  scanCompleted.value = false;
+  scanInProgress.value = false;
   scanConfig.value = {
     maxConcurrent: 10,
     ports: ['8000', '3000-3010'],
@@ -300,43 +324,45 @@ const removePort = (index: number) => {
 
 
 
-    const scheduleScan = async () => {
-      scanning.value = true;
-      try {
-        error.value = '';
+     const scheduleScan = async () => {
+       scanInProgress.value = true;
+       try {
+         error.value = '';
 
-        // Prepare scan config for backend API using DiscoveryScanConfig format
-        const excludeHosts = [];
-        if (excludeAddressesText.value) {
-          excludeHosts.push(...excludeAddressesText.value.split('\n').map(addr => addr.trim()).filter(addr => addr));
-        }
-        if (scanConfig.value.excludeProxy) {
-          // Add localhost/127.0.0.1 to exclude hosts when excludeProxy is enabled
-          excludeHosts.push('localhost', '127.0.0.1', '::1');
-        }
+         // Prepare scan config for backend API using DiscoveryScanConfig format
+         const excludeHosts = [];
+         if (excludeAddressesText.value) {
+           excludeHosts.push(...excludeAddressesText.value.split('\n').map(addr => addr.trim()).filter(addr => addr));
+         }
+         if (scanConfig.value.excludeProxy) {
+           // Add localhost/127.0.0.1 to exclude hosts when excludeProxy is enabled
+           excludeHosts.push('localhost', '127.0.0.1', '::1');
+         }
 
-        const backendConfig = {
-          scanRanges: scanConfig.value.scanRanges || [],
-          ports: expandPorts(scanConfig.value.ports || []).map(p => p.toString()),
-          timeout: (parseInt(scanConfig.value.timeout?.replace('s', '') || '30', 10)).toString(),
-          maxConcurrent: scanConfig.value.maxConcurrent || 10,
-          excludeProxy: scanConfig.value.excludeProxy,
-          excludeAddresses: excludeHosts.length > 0 ? excludeHosts : undefined
-        };
+         const backendConfig = {
+           scanRanges: scanConfig.value.scanRanges || [],
+           ports: expandPorts(scanConfig.value.ports || []).map(p => p.toString()),
+           timeout: (parseInt(scanConfig.value.timeout?.replace('s', '') || '30', 10)).toString(),
+           maxConcurrent: scanConfig.value.maxConcurrent || 10,
+           excludeProxy: scanConfig.value.excludeProxy,
+           excludeAddresses: excludeHosts.length > 0 ? excludeHosts : undefined
+         };
 
-        const scanResult = await discoveryAPI.startScan(backendConfig);
+         // Use composable method if provided, otherwise fallback to direct API call
+         const scanResult = props.startScan
+           ? await props.startScan(backendConfig)
+           : await discoveryAPI.startScan(backendConfig);
 
-        logger.info('Discovery scan started', { scanId: scanResult.scan_id, config: backendConfig });
-        emit('scanStarted', scanResult);
+         logger.info('Discovery scan started', { scanId: scanResult.scan_id, config: backendConfig });
+         emit('scanStarted', scanResult);
 
-        // Modal stays open during scan - user will close it manually when complete
-      } catch (err) {
-        logger.error('Failed to start scan', err);
-        error.value = 'Failed to start scan. Please try again.';
-      } finally {
-        scanning.value = false;
-      }
-    };
+         // Modal stays open during scan - progress will be shown via props
+       } catch (err) {
+         logger.error('Failed to start scan', err);
+         error.value = 'Failed to start scan. Please try again.';
+         scanInProgress.value = false; // Reset on error
+       }
+     };
 
 // Expose methods to parent component
 defineExpose({
@@ -521,6 +547,35 @@ defineExpose({
 
 .btn-link:hover {
   color: var(--primary-hover, #1d4ed8);
+}
+
+/* Progress Section */
+.scan-progress {
+  padding: 20px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  background: var(--accent-bg, #f9fafb);
+  text-align: center;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--border, #e5e7eb);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary, #007bff);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  margin: 0;
+  color: var(--body-text, #111827);
+  font-size: 14px;
 }
 
 /* Spinner Animation */

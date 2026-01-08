@@ -9,7 +9,8 @@ annotations:
   catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
 apiVersion: v2
 appVersion: 0.1.0
-description: suseai-rancher-ext plugin
+description: SUSE AI Universal Proxy - A comprehensive MCP proxy system with discovery, registry, and plugin management
+icon: https://apps.rancher.io/logos/suse-ai-deployer.png
 name: suseai-rancher-ext
 type: application
 version: 0.1.0

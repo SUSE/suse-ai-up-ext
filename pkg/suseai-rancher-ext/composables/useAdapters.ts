@@ -9,23 +9,24 @@ export function useAdapters() {
   const adapters = ref<Adapter[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  let pollInterval: NodeJS.Timeout | null = null
 
   // Load all adapters
   const loadAdapters = async (): Promise<void> => {
     loading.value = true
     error.value = null
 
-    try {
-      logger.info('Loading adapters')
-      const adapterList = await adapterAPI.list()
-      adapters.value = adapterList
-      logger.info('Adapters loaded', { count: adapterList.length })
-    } catch (err: any) {
-      error.value = err.message || 'Failed to load adapters'
-      logger.error('Failed to load adapters', err)
-    } finally {
-      loading.value = false
-    }
+      try {
+        logger.info('Loading adapters')
+        const adapterList = await adapterAPI.list()
+        adapters.value = adapterList
+        logger.info('Adapters loaded', { count: adapterList.length })
+      } catch (err: any) {
+        error.value = err.message || 'Failed to load adapters'
+        logger.error('Failed to load adapters', err)
+      } finally {
+        loading.value = false
+      }
   }
 
   // Create new adapter
@@ -45,6 +46,26 @@ export function useAdapters() {
       return null
     } finally {
       loading.value = false
+    }
+  }
+
+  // Start polling for adapter updates
+  const startPolling = () => {
+    if (pollInterval) {
+      clearInterval(pollInterval)
+    }
+    pollInterval = setInterval(() => {
+      loadAdapters()
+    }, 30000) // Poll every 30 seconds
+    logger.info('Started polling adapters')
+  }
+
+  // Stop polling
+  const stopPolling = () => {
+    if (pollInterval) {
+      clearInterval(pollInterval)
+      pollInterval = null
+      logger.info('Stopped polling adapters')
     }
   }
 
@@ -220,6 +241,8 @@ export function useAdapters() {
     updateAdapter,
     deleteAdapter,
     syncAdapter,
+    startPolling,
+    stopPolling,
     getAdapterById,
     getAdaptersByServerId,
     isAdapterHealthy,
