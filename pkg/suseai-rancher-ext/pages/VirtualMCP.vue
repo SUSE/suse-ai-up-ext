@@ -154,6 +154,7 @@ import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { useVirtualMCP } from '../composables/useVirtualMCP';
+import { updateApiBaseUrls, API_BASE_URLS } from '../config/api-config';
 import MetricsGrid from '../components/VirtualMCP/MetricsGrid.vue';
 import MCPServersTable from '../components/VirtualMCP/MCPServersTable.vue';
 import CreateServerWizard from '../components/VirtualMCP/CreateServerWizard.vue';
@@ -188,8 +189,78 @@ const {
   loadFromStorage
 } = useVirtualMCP();
 
+// Test service connectivity and fallback to localhost if needed
+const testAndFallbackServiceUrl = async () => {
+  try {
+    console.log('VirtualMCP testing current service URL:', API_BASE_URLS.VIRTUAL_MCP)
+
+    // Test current configured URL
+    const currentUrl = `${API_BASE_URLS.VIRTUAL_MCP.replace(/\/$/, '')}/health`
+    try {
+      const response = await fetch(currentUrl, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      if (response.ok) {
+        console.log('VirtualMCP current service URL is accessible:', currentUrl)
+        return // Current URL works, no need to fallback
+      }
+    } catch (error) {
+      console.log('VirtualMCP current service URL failed, trying localhost:', error)
+    }
+
+    // Try localhost fallback
+    const localhostUrl = 'http://localhost:8911/health'
+    console.log('VirtualMCP trying localhost fallback:', localhostUrl)
+    try {
+      const response = await fetch(localhostUrl, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      if (response.ok) {
+        console.log('VirtualMCP localhost fallback successful, updating API URLs')
+            // Update API_BASE_URLS to use localhost
+            updateApiBaseUrls('http://localhost:8911')
+            // Update stored service URLs in store
+            await store.dispatch('suseai/setServiceUrls', ['http://localhost:8911'])
+            // Update API instances
+            import('../services/virtual-mcp-service').then(({ VirtualMCPService }) => {
+              VirtualMCPService.updateBaseURL()
+              console.log('VirtualMCP VirtualMCPService baseURL updated')
+            })
+            console.log('VirtualMCP API_BASE_URLS updated to localhost:', API_BASE_URLS)
+        return
+      }
+    } catch (localhostError) {
+      console.log('VirtualMCP localhost fallback also failed:', localhostError)
+    }
+
+    console.warn('VirtualMCP no accessible service URL found - keeping current configuration')
+  } catch (error) {
+    console.error('VirtualMCP error during service URL testing:', error)
+  }
+}
+
 // Load persisted data on mount
-onMounted(() => {
+onMounted(async () => {
+  // Initialize with stored service URL if available
+  const serviceUrls = store.state.suseai?.settings?.serviceUrls || []
+  const serviceUrl = serviceUrls.length > 0 ? serviceUrls[0] : undefined
+  if (serviceUrl) {
+    console.log('VirtualMCP initializing with stored service URL:', serviceUrl)
+    updateApiBaseUrls(serviceUrl)
+  }
+
+  // Test connectivity and fallback if needed
+  await testAndFallbackServiceUrl()
+
+  // Update Virtual MCP API base URL
+  import('../services/virtual-mcp-service').then(({ VirtualMCPService }) => {
+    VirtualMCPService.updateBaseURL()
+    console.log('VirtualMCP VirtualMCPService baseURL updated')
+  })
+
+  console.log('VirtualMCP final API_BASE_URLS:', API_BASE_URLS)
   loadFromStorage();
 });
 

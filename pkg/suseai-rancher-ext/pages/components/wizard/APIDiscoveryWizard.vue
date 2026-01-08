@@ -189,7 +189,7 @@
                     </span>
                   </div>
                   <div v-if="service.primaryIP" class="detail-row">
-                    <strong>Primary Endpoint:</strong> http://{{ service.primaryIP }}:8911
+                    <strong>Endpoint:</strong> http://{{ service.actualIP || service.primaryIP }}:8911
                   </div>
                 </div>
               </div>
@@ -643,6 +643,7 @@ import Loading from '@shell/components/Loading';
 import { useAuth } from '../../../composables/useAuth';
 import { useClusterDiscovery } from '../../../composables/useClusterDiscovery';
 import type { ServiceInstance } from '../../../types/service-discovery';
+import { updateApiBaseUrls } from '../../../config/api-config';
 
 interface Props {
   onComplete?: (config: { clusters: any[]; services: string[] }) => void;
@@ -927,10 +928,51 @@ const getClusterStatusText = (cluster: any): string => {
         }
 
         // Extract service information
-        const loadBalancerIP = suseAiUpService.status?.loadBalancer?.ingress?.[0]?.ip;
+        const loadBalancerIP = suseAiUpService.status?.loadBalancer?.ingress?.[0]?.ip ||
+                              suseAiUpService.status?.loadBalancer?.ingress?.[0]?.hostname;
         const clusterIP = suseAiUpService.spec?.clusterIP;
         const externalIPs = suseAiUpService.spec?.externalIPs || [];
         const ports = suseAiUpService.spec?.ports?.map((port: any) => `${port.port}/${port.protocol}`).join(', ') || '8911';
+
+        // For LoadBalancer services, the external IP might be in different places
+        let actualLoadBalancerIP = loadBalancerIP;
+        if (!actualLoadBalancerIP && suseAiUpService.spec?.type === 'LoadBalancer') {
+          // Check various places where external IP might be stored
+          const externalIP = suseAiUpService.status?.loadBalancer?.ingress?.[0]?.ip ||
+                            suseAiUpService.status?.loadBalancer?.ingress?.[0]?.hostname ||
+                            externalIPs[0] ||
+                            suseAiUpService.metadata?.annotations?.['external-ip'];
+
+          // For LoadBalancer services, the external IP is often in the ingress field
+          // But sometimes it's directly in the service status
+          if (!externalIP && suseAiUpService.status?.loadBalancer?.ingress?.length > 0) {
+            actualLoadBalancerIP = suseAiUpService.status.loadBalancer.ingress[0].ip ||
+                                  suseAiUpService.status.loadBalancer.ingress[0].hostname;
+          }
+
+          // Try to parse publicEndpoints annotation if it exists (Rancher specific)
+          if (!actualLoadBalancerIP && suseAiUpService.metadata?.annotations?.['field.cattle.io/publicEndpoints']) {
+            try {
+              const publicEndpoints = JSON.parse(suseAiUpService.metadata.annotations['field.cattle.io/publicEndpoints']);
+              if (Array.isArray(publicEndpoints) && publicEndpoints.length > 0) {
+                actualLoadBalancerIP = publicEndpoints[0].addresses?.[0] || publicEndpoints[0].address;
+              }
+            } catch (e) {
+              console.warn('Failed to parse publicEndpoints annotation:', e);
+            }
+          }
+
+          if (!actualLoadBalancerIP) {
+            actualLoadBalancerIP = externalIP;
+          }
+        }
+
+        console.log('🔍 [APIDiscoveryWizard] IP extraction:', {
+          loadBalancerIP,
+          externalIPs,
+          actualLoadBalancerIP,
+          serviceType: suseAiUpService.spec?.type
+        });
 
         // Extract public IP from Rancher annotations
         let publicIP = '';
@@ -947,21 +989,55 @@ const getClusterStatusText = (cluster: any): string => {
         }
 
         // Determine primary IP for health check (prefer public IP from annotations, fallback to service IPs)
-        const primaryIP = publicIP || loadBalancerIP || clusterIP || externalIPs[0];
+        const primaryIP = publicIP || actualLoadBalancerIP || clusterIP || externalIPs[0];
 
-        // Perform health check if we have an IP
+        // Perform health check with fallback to localhost
         let healthStatus = 'unknown';
+        let actualIP = primaryIP;
+
+        // First try primaryIP if available
         if (primaryIP) {
           try {
+            console.log(`🔍 [APIDiscoveryWizard] Trying primary IP: ${primaryIP}:8911`);
             const healthResponse = await fetch(`http://${primaryIP}:8911/health`, {
               method: 'GET',
               mode: 'cors',
               headers: {
                 'Content-Type': 'application/json'
-              }
+              },
+              signal: AbortSignal.timeout(5000)
             });
-            healthStatus = healthResponse.ok ? 'healthy' : 'unhealthy';
+            if (healthResponse.ok) {
+              healthStatus = 'healthy';
+            } else {
+              healthStatus = 'unhealthy';
+            }
           } catch (error) {
+            console.log(`⚠️ [APIDiscoveryWizard] Primary IP ${primaryIP} failed, trying localhost`);
+            healthStatus = 'unreachable';
+          }
+        }
+
+        // If primary IP failed or wasn't available, try localhost
+        if (healthStatus === 'unknown' || healthStatus === 'unreachable') {
+          try {
+            console.log(`🔍 [APIDiscoveryWizard] Trying localhost:8911`);
+            const localhostResponse = await fetch('http://localhost:8911/health', {
+              method: 'GET',
+              mode: 'cors',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              signal: AbortSignal.timeout(5000)
+            });
+            if (localhostResponse.ok) {
+              healthStatus = 'healthy';
+              actualIP = 'localhost';
+            } else {
+              healthStatus = 'unhealthy';
+            }
+          } catch (localhostError) {
+            console.log(`❌ [APIDiscoveryWizard] Localhost also failed`);
             healthStatus = 'unreachable';
           }
         }
@@ -971,14 +1047,12 @@ const getClusterStatusText = (cluster: any): string => {
           clusterName: cluster.name,
           namespace: suseAiUpService.metadata?.namespace || 'default',
           serviceName: suseAiUpService.metadata?.name,
-          loadBalancerIP,
+          loadBalancerIP: actualLoadBalancerIP,
           clusterIP,
-          externalIPs,
-          publicIP,
-          ports,
           primaryIP,
+          actualIP, // The IP that actually responded to health check
           healthStatus,
-          service: suseAiUpService
+          serviceUrl: actualIP ? `http://${actualIP}:8911` : null
         };
 
         discoveredServices.value.push(serviceInfo);
@@ -1085,8 +1159,15 @@ const retryScan = async () => {
     // Store discovered proxy service URLs
     if (discoveredServices.value.length > 0) {
       const proxyUrls = discoveredServices.value
-        .map(service => service.primaryIP ? `http://${service.primaryIP}:8911` : null)
+        .map(service => service.actualIP ? `http://${service.actualIP}:8911` : null)
         .filter(url => url !== null) as string[];
+
+      // Update API_BASE_URLS immediately with the discovered service URL
+      if (proxyUrls.length > 0) {
+        updateApiBaseUrls(proxyUrls[0]);
+        console.log('Updated API_BASE_URLS with discovered service URL:', proxyUrls[0]);
+      }
+
       store.dispatch('suseai/setServiceUrls', proxyUrls);
       console.log('Stored proxy service URLs:', proxyUrls);
     }
@@ -1239,8 +1320,14 @@ const retryScan = async () => {
           clusterLoadingError.value = '';
         }
 
-       // Auto-select all accessible clusters initially
-       selectedClusters.value = [...accessibleClusters.value];
+        // Auto-select all accessible clusters initially
+        selectedClusters.value = [...accessibleClusters.value];
+
+        // Automatically run service discovery to register loadbalancer IPs
+        if (selectedClusters.value.length > 0) {
+          console.log('APIDiscoveryWizard: Auto-running service discovery to register loadbalancer IPs');
+          await performServiceDiscovery();
+        }
 
        console.log(`🚀 [Wizard] Initialized with ${accessibleClusters.value.length} clusters:`,
          accessibleClusters.value.map(c => ({

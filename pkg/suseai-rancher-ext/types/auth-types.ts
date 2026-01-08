@@ -99,3 +99,70 @@ export interface UserPermissions {
   cluster: Record<string, Permission[]>;
   project: Record<string, Permission[]>;
 }
+
+// External API models (from MCP Gateway service)
+export interface ExternalUser {
+  id: string;
+  name: string;
+  email: string;
+  groups: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalGroup {
+  id: string;
+  name: string;
+  description: string;
+  members: string[];
+  permissions: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RouteAssignment {
+  id: string;
+  serverId: string; // Links to adapter/MCP server
+  userIds: string[];
+  groupIds: string[];
+  permissions: 'read' | 'write' | 'admin';
+  autoSpawn: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Request types for external API
+export interface CreateUserRequest {
+  id: string;
+  name: string;
+  email: string;
+  groups?: string[];
+}
+
+export interface UpdateUserRequest {
+  name?: string;
+  email?: string;
+  groups?: string[];
+}
+
+export interface CreateUserResponse {
+  createdAt: string;
+  user: ExternalUser;
+}
+
+export interface CreateGroupRequest {
+  id: string;
+  name: string;
+  description: string;
+  permissions?: string[];
+}
+
+export interface UpdateGroupRequest {
+  name?: string;
+  description?: string;
+  permissions?: string[];
+}
+
+export interface AddUserToGroupRequest {
+  userId: string;
+}

@@ -43,13 +43,19 @@
                 {{ sortDirection === 'asc' ? '↑' : '↓' }}
               </span>
             </th>
+            <th v-if="isExternal" @click="sortBy('email')" class="sortable">
+              Email
+              <span v-if="sortField === 'email'" class="sort-indicator">
+                {{ sortDirection === 'asc' ? '↑' : '↓' }}
+              </span>
+            </th>
             <th @click="sortBy('displayName')" class="sortable">
               Display Name
               <span v-if="sortField === 'displayName'" class="sort-indicator">
                 {{ sortDirection === 'asc' ? '↑' : '↓' }}
               </span>
             </th>
-            <th>Provider</th>
+            <th v-if="!isExternal">Provider</th>
             <th @click="sortBy('enabled')" class="sortable">
               Status
               <span v-if="sortField === 'enabled'" class="sort-indicator">
@@ -72,18 +78,19 @@
             class="user-row"
             @click="handleRowClick(user)"
           >
-            <td>{{ user.username }}</td>
-            <td>{{ user.displayName || user.username }}</td>
-            <td>{{ getAuthProvider(user) }}</td>
-            <td>
+            <td>{{ getUserUsername(user) }}</td>
+            <td v-if="$props.isExternal">{{ getUserEmail(user) }}</td>
+            <td>{{ getUserDisplayName(user) }}</td>
+            <td v-if="!$props.isExternal">{{ getAuthProvider(user as any) }}</td>
+            <td v-if="!$props.isExternal">
               <span
                 class="status-badge"
-                :class="{ 'status-enabled': user.enabled, 'status-disabled': !user.enabled }"
+                :class="{ 'status-enabled': (user as any).enabled, 'status-disabled': !(user as any).enabled }"
               >
-                {{ user.enabled ? 'Enabled' : 'Disabled' }}
+                {{ (user as any).enabled ? 'Enabled' : 'Disabled' }}
               </span>
             </td>
-            <td>{{ formatLastLogin(user.lastLogin) }}</td>
+            <td v-if="!$props.isExternal">{{ formatLastLogin((user as any).lastLogin) }}</td>
             <td class="actions-cell">
               <button
                 class="btn btn-sm btn-outline"
@@ -99,6 +106,14 @@
                 title="Edit User"
               >
                 Edit
+              </button>
+              <button
+                v-if="canManageUsers"
+                class="btn btn-sm btn-outline remove-btn"
+                @click.stop="$emit('delete-user', user.id)"
+                title="Delete User"
+              >
+                Delete
               </button>
             </td>
           </tr>
@@ -131,13 +146,13 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from 'vue';
-import type { RancherUser } from '../../types/auth-types';
+import type { RancherUser, ExternalUser } from '../../types/auth-types';
 
 export default defineComponent({
   name: 'UsersTable',
   props: {
     users: {
-      type: Array as () => readonly RancherUser[],
+      type: Array as () => readonly (RancherUser | ExternalUser)[],
       default: () => []
     },
     loading: {
@@ -151,12 +166,16 @@ export default defineComponent({
     canManageUsers: {
       type: Boolean,
       default: false
+    },
+    isExternal: {
+      type: Boolean,
+      default: false
     }
   },
-  emits: ['view-user', 'edit-user', 'add-user', 'retry'],
+  emits: ['view-user', 'edit-user', 'add-user', 'delete-user', 'retry'],
   setup(props, { emit }) {
     const searchQuery = ref('');
-    const sortField = ref<'username' | 'displayName' | 'enabled' | 'lastLogin'>('username');
+    const sortField = ref<'username' | 'email' | 'displayName' | 'enabled' | 'lastLogin'>('username');
     const sortDirection = ref<'asc' | 'desc'>('asc');
     const currentPage = ref(1);
     const pageSize = ref(10);
@@ -169,23 +188,33 @@ export default defineComponent({
       if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
         filtered = filtered.filter(user =>
-          user.username.toLowerCase().includes(query) ||
-          (user.displayName && user.displayName.toLowerCase().includes(query))
+          getUserUsername(user).toLowerCase().includes(query) ||
+          (getUserDisplayName(user) && getUserDisplayName(user).toLowerCase().includes(query)) ||
+          (props.isExternal && getUserEmail(user) && getUserEmail(user).toLowerCase().includes(query))
         );
       }
 
       // Apply sorting
-      filtered.sort((a: RancherUser, b: RancherUser) => {
-        let aValue: any = a[sortField.value];
-        let bValue: any = b[sortField.value];
+      filtered.sort((a: RancherUser | ExternalUser, b: RancherUser | ExternalUser) => {
+        let aValue: any;
+        let bValue: any;
 
-        // Handle special cases
-        if (sortField.value === 'lastLogin') {
-          aValue = aValue ? new Date(aValue).getTime() : 0;
-          bValue = bValue ? new Date(bValue).getTime() : 0;
+        // Handle different user types
+        if (sortField.value === 'username') {
+          aValue = getUserUsername(a);
+          bValue = getUserUsername(b);
         } else if (sortField.value === 'displayName') {
-          aValue = aValue || a.username;
-          bValue = bValue || b.username;
+          aValue = getUserDisplayName(a);
+          bValue = getUserDisplayName(b);
+        } else if (sortField.value === 'enabled') {
+          aValue = props.isExternal ? true : (a as RancherUser).enabled;
+          bValue = props.isExternal ? true : (b as RancherUser).enabled;
+        } else if (sortField.value === 'lastLogin') {
+          aValue = props.isExternal ? 0 : ((a as RancherUser).lastLogin ? new Date((a as RancherUser).lastLogin!).getTime() : 0);
+          bValue = props.isExternal ? 0 : ((b as RancherUser).lastLogin ? new Date((b as RancherUser).lastLogin!).getTime() : 0);
+        } else {
+          aValue = '';
+          bValue = '';
         }
 
         if (aValue < bValue) return sortDirection.value === 'asc' ? -1 : 1;
@@ -252,8 +281,24 @@ export default defineComponent({
       return date.toLocaleDateString();
     };
 
-    const handleRowClick = (user: RancherUser) => {
+    const handleRowClick = (user: RancherUser | ExternalUser) => {
       emit('view-user', user.id);
+    };
+
+    // Helper methods for different user types
+    const getUserUsername = (user: RancherUser | ExternalUser): string => {
+      return 'username' in user ? user.username : user.name;
+    };
+
+    const getUserDisplayName = (user: RancherUser | ExternalUser): string => {
+      if ('displayName' in user) {
+        return user.displayName || user.username;
+      }
+      return user.name;
+    };
+
+    const getUserEmail = (user: RancherUser | ExternalUser): string => {
+      return 'email' in user ? user.email : '';
     };
 
     return {
@@ -268,7 +313,10 @@ export default defineComponent({
       sortBy,
       getAuthProvider,
       formatLastLogin,
-      handleRowClick
+      handleRowClick,
+      getUserUsername,
+      getUserDisplayName,
+      getUserEmail
     };
   }
 });
@@ -472,5 +520,14 @@ export default defineComponent({
 .btn-secondary {
   background: var(--secondary);
   color: var(--secondary-text);
+}
+
+.remove-btn {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.remove-btn:hover {
+  background: var(--error-bg);
 }
 </style>

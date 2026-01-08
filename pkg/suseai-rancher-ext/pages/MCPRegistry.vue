@@ -93,9 +93,21 @@
                     <div class="tile-info">
                       <div class="tile-meta">
                         <h3 class="tile-title">{{ server.name }}</h3>
-                        <p class="tile-description">{{ server.description }}</p>
+                         <p class="tile-description">{{ server.description }}</p>
 
-                        <!-- Connection Info -->
+                         <!-- Source Info -->
+                         <div v-if="getSourceUrl(server) || server.project_url" class="tile-source-info">
+                           <a v-if="getSourceUrl(server)" :href="getSourceUrl(server)" target="_blank" rel="noopener noreferrer" class="source-item">
+                             <i class="icon icon-external-link"></i>
+                             Source{{ getSourceBranch(server) ? ` (${getSourceBranch(server)})` : '' }}
+                           </a>
+                           <a v-if="server.project_url" :href="server.project_url" target="_blank" rel="noopener noreferrer" class="source-item">
+                             <i class="icon icon-external-link"></i>
+                             Project
+                           </a>
+                         </div>
+
+                         <!-- Connection Info -->
                         <div v-if="server.protocol || server.address || server.port" class="tile-connection">
                           <div class="connection-details">
                             <span v-if="server.protocol" class="connection-protocol">{{ server.protocol }}</span>
@@ -174,36 +186,32 @@
                     </div>
                   </div>
 
-                  <div class="tile-actions">
-                    <button
-                      class="btn btn-sm btn-secondary"
-                      @click.stop="handleViewServer(server)"
-                      :aria-label="`View details for ${server.id}`"
-                    >
-                      <i class="icon icon-info"></i>
-                      Details
-                    </button>
-                    <button
-                      class="btn btn-sm btn-primary"
-                      @click.stop="handleCreateAdapter(server)"
-                      :aria-label="`Create adapter for ${server.id}`"
-                    >
-                      Create Adapter
-                    </button>
-                  </div>
+                   <div class="tile-actions">
+                     <button
+                       class="btn btn-sm btn-secondary"
+                       @click.stop="handleViewServer(server)"
+                       :aria-label="`View details for ${server.id}`"
+                     >
+                       <i class="icon icon-info"></i>
+                       Details
+                     </button>
+
+                   </div>
               </div>
             </div>
           </div>
+         </div>
         </div>
-      </div>
-      </main>
+       </main>
 
-      <!-- Server Details Modal -->
+       <!-- Server Details Modal -->
       <ServerDetailsModal
         :show="showServerDetailsModal"
         :server-id="selectedServerId"
         @close="closeServerDetailsModal"
       />
+
+
    </div>
 </template>
 
@@ -212,6 +220,8 @@ import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRegistry } from '../composables/useRegistry'
 import type { MCPServer } from '../services/registry-api'
+import { registryAPI } from '../services/registry-api'
+import { updateApiBaseUrls, API_BASE_URLS } from '../config/api-config'
 import ServerDetailsModal from '../components/MCPRegistry/ServerDetailsModal.vue'
 
 // Generic MCP icon SVG (official logo with currentColor for theming)
@@ -306,8 +316,74 @@ export default defineComponent({
       }
     }
 
+    // Test service connectivity and fallback to localhost if needed
+    const testAndFallbackServiceUrl = async () => {
+      try {
+        console.log('MCPRegistry testing current service URL:', API_BASE_URLS.REGISTRY)
+
+        // Test current configured URL
+        const currentUrl = `${API_BASE_URLS.REGISTRY.replace(/\/$/, '')}/health`
+        try {
+          const response = await fetch(currentUrl, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000)
+          })
+          if (response.ok) {
+            console.log('MCPRegistry current service URL is accessible:', currentUrl)
+            return // Current URL works, no need to fallback
+          }
+        } catch (error) {
+          console.log('MCPRegistry current service URL failed, trying localhost:', error)
+        }
+
+        // Try localhost fallback
+        const localhostUrl = 'http://localhost:8911/health'
+        console.log('MCPRegistry trying localhost fallback:', localhostUrl)
+        try {
+          const response = await fetch(localhostUrl, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000)
+          })
+          if (response.ok) {
+            console.log('MCPRegistry localhost fallback successful, updating API URLs')
+            // Update API_BASE_URLS to use localhost
+            updateApiBaseUrls('http://localhost:8911')
+            // Update stored service URLs in store
+            await store.dispatch('suseai/setServiceUrls', ['http://localhost:8911'])
+            // Update API instances
+            import('../services/registry-api').then(({ registryAPI }) => {
+              registryAPI.updateBaseURL()
+              console.log('MCPRegistry registryAPI baseURL updated to:', registryAPI.getBaseURL())
+            })
+            console.log('MCPRegistry API_BASE_URLS updated to localhost:', API_BASE_URLS)
+            return
+          }
+        } catch (localhostError) {
+          console.log('MCPRegistry localhost fallback also failed:', localhostError)
+        }
+
+        console.warn('MCPRegistry no accessible service URL found - keeping current configuration')
+      } catch (error) {
+        console.error('MCPRegistry error during service URL testing:', error)
+      }
+    }
+
     // Load initial data
     onMounted(async () => {
+      // Initialize with stored service URL if available
+      const serviceUrls = store.state.suseai?.settings?.serviceUrls || []
+      const serviceUrl = serviceUrls.length > 0 ? serviceUrls[0] : undefined
+      if (serviceUrl) {
+        console.log('MCPRegistry initializing with stored service URL:', serviceUrl)
+        updateApiBaseUrls(serviceUrl)
+        registryAPI.updateBaseURL()
+      }
+
+      // Test connectivity and fallback if needed
+      await testAndFallbackServiceUrl()
+
+      console.log('MCPRegistry final API_BASE_URLS:', API_BASE_URLS)
+      console.log('MCPRegistry registryAPI baseURL:', registryAPI.getBaseURL())
       await browseServers()
     })
 
@@ -383,11 +459,38 @@ export default defineComponent({
        }
 
        console.log('Using generic MCP icon as fallback')
-      // Use generic MCP icon as fallback
-      return genericMCPIcon
-    }
+       // Use generic MCP icon as fallback
+       return genericMCPIcon
+     }
 
-    // Event handlers
+      // Get source URL for display
+      const getSourceUrl = (server: MCPServer): string => {
+        // Check for source.project from YAML (highest priority)
+        if ((server as any).source?.project) {
+          return (server as any).source.project
+        }
+        // Check for source.url as alternative
+        if ((server as any).source?.url) {
+          return (server as any).source.url
+        }
+        // Prefer repository URL if available
+        if ((server as any).repository?.url) {
+          return (server as any).repository.url
+        }
+        // Fall back to _meta.source
+        if (server._meta?.source) {
+          return server._meta.source
+        }
+        // Last resort: source_url
+        return server.source_url || ''
+      }
+
+      // Get source branch for display
+      const getSourceBranch = (server: MCPServer): string => {
+        return (server as any).source?.branch || (server as any).repository?.branch || ''
+      }
+
+     // Event handlers
     const handleSearch = async () => {
       await browseServers({ q: searchQuery.value, category: categoryFilter.value })
     }
@@ -404,15 +507,84 @@ export default defineComponent({
       console.log('selectedServerId set to:', selectedServerId.value)
     }
 
-    const handleCreateAdapter = (server: MCPServer) => {
-      // TODO: Implement adapter creation flow
-      console.log('Create adapter for server:', server.name)
+
+
+
+
+    // Adapter status methods
+    const getAdapterStatusClass = (adapter: any): string => {
+      // Check if adapter has error status or error count
+      const status = adapter.status || adapter.state
+      const errorCount = adapter.errorCount || adapter.error_count
+      if (status === 'error' || status === 'failed' || (errorCount && errorCount > 0)) {
+        return 'status-error'
+      }
+      // Assume running if no error status
+      return 'status-running'
+    }
+
+    const getAdapterStatusText = (adapter: any): string => {
+      const status = adapter.status || adapter.state
+      const errorCount = adapter.errorCount || adapter.error_count
+      if (status === 'error' || status === 'failed' || (errorCount && errorCount > 0)) {
+        return 'Error'
+      }
+      return 'Running'
+    }
+
+    // Download client configuration
+    const downloadClientConfig = (adapter: any) => {
+      try {
+        // Extract only the mcpClientConfig section (try different field names)
+        const clientConfig = adapter.mcpClientConfig || adapter.mcp_client_config || {}
+
+        // Create the mcp.json content
+        const jsonContent = JSON.stringify(clientConfig, null, 2)
+
+        // Create and download the file
+        const blob = new Blob([jsonContent], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'mcp.json'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        URL.revokeObjectURL(url)
+
+        // Show success message
+        store.dispatch('growl/success', {
+          title: 'Download Complete',
+          message: `MCP client configuration for "${adapter.name}" has been downloaded.`
+        })
+      } catch (error) {
+        console.error('Failed to download client config:', error)
+        store.dispatch('growl/error', {
+          title: 'Download Failed',
+          message: 'Failed to download MCP client configuration.'
+        })
+      }
+    }
+
+    // Format date for display
+    const formatDate = (dateString: string): string => {
+      if (!dateString) return 'Unknown'
+      try {
+        const date = new Date(dateString)
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      } catch {
+        return dateString
+      }
     }
 
     const closeServerDetailsModal = () => {
       showServerDetailsModal.value = false
       selectedServerId.value = ''
     }
+
+
 
     const toggleCardExpansion = (serverId: string) => {
       if (expandedCards.value.has(serverId)) {
@@ -438,25 +610,26 @@ export default defineComponent({
       error,
       searchQuery,
       categoryFilter,
-      showServerDetailsModal,
-      selectedServerId,
+       showServerDetailsModal,
+       selectedServerId,
       filteredServers,
       availableCategories,
       isEnabled,
 
-        // Methods
-        handleSearch,
-        handleReloadRegistry,
-        handleViewServer,
-        handleCreateAdapter,
-        closeServerDetailsModal,
-        getServerIcon,
-        toggleCardExpansion,
-        isSuseServer,
-        isCertifiedServer,
-        isCardExpanded,
-        getValidationBadgeClass,
-        formatTimestamp,
+         // Methods
+         handleSearch,
+         handleReloadRegistry,
+         handleViewServer,
+         closeServerDetailsModal,
+         getServerIcon,
+         getSourceUrl,
+         getSourceBranch,
+         toggleCardExpansion,
+         isSuseServer,
+         isCertifiedServer,
+         isCardExpanded,
+         getValidationBadgeClass,
+         formatTimestamp,
 
       // Composables
       requiresAuth,
@@ -758,14 +931,51 @@ export default defineComponent({
   font-size: 11px;
 }
 
+.tile-source-info {
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.source-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--primary, #007bff);
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--primary-bg, #cce5ff);
+  transition: all 0.2s ease;
+}
+
+.source-item:hover {
+  background: var(--primary, #007bff);
+  color: white;
+  text-decoration: none;
+}
+
+.source-link {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.source-link:hover {
+  text-decoration: none;
+}
+
 .tile-category {
+  margin-top: 8px;
   margin-bottom: 8px;
 }
 
 .category-label {
   font-size: 12px;
-  color: var(--muted, #666);
-  background: var(--light-bg, #f8f9fa);
+  color: white;
+  background: #6c757d;
   padding: 2px 6px;
   border-radius: 3px;
   font-weight: 500;
@@ -831,8 +1041,8 @@ export default defineComponent({
 }
 
 .badge-warning {
-  background: var(--warning-bg, #fff3cd);
-  color: var(--warning-text, #856404);
+  background: #fd7e14;
+  color: white;
 }
 
 .badge-info {
@@ -841,8 +1051,8 @@ export default defineComponent({
 }
 
 .badge-secondary {
-  background: var(--secondary-bg, #e9ecef);
-  color: var(--secondary-text, #495057);
+  background: #6c757d;
+  color: white;
 }
 
 .badge-light {
@@ -851,13 +1061,13 @@ export default defineComponent({
 }
 
 .badge-success {
-  background: var(--success-bg, #d4edda);
-  color: var(--success-text, #155724);
+  background: #28a745;
+  color: white;
 }
 
 .badge-danger {
-  background: var(--danger-bg, #f8d7da);
-  color: var(--danger-text, #721c24);
+  background: #dc3545;
+  color: white;
 }
 
 .badge-primary {
@@ -1007,6 +1217,7 @@ export default defineComponent({
   border-top: 1px solid var(--border-light, #f8f9fa);
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .tile-expanded {

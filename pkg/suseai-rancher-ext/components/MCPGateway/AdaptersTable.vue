@@ -2,38 +2,36 @@
   <div class="endpoints-section">
      <h2>Registered MCP Adapters</h2>
     <table class="endpoints-table">
-       <thead>
-         <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Protocol</th>
-            <th>Original Endpoint</th>
-            <th>Errors</th>
-           <th>Last Active</th>
-           <th>Actions</th>
-         </tr>
-       </thead>
+        <thead>
+          <tr>
+             <th>Name</th>
+             <th>Status</th>
+             <th>Connection Type</th>
+             <th>Created</th>
+             <th>Capabilities</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
        <tbody>
-         <tr v-if="loading">
-           <td colspan="7" class="loading-row">Loading adapters...</td>
-         </tr>
-         <tr v-else-if="error">
-           <td colspan="7" class="error-row">{{ error }}</td>
-         </tr>
-         <tr v-else-if="adapters.length === 0">
-           <td colspan="7" class="empty-row">No adapters registered</td>
-         </tr>
-         <tr v-else v-for="adapter in adapters" :key="adapter.id">
-           <td>{{ adapter.name }}</td>
-             <td>
-               <span :class="getStatusClass(adapter)">
-                 {{ getStatusText(adapter) }}
-               </span>
-             </td>
-           <td>{{ adapter.protocol || 'MCP' }}</td>
-             <td>{{ adapter.originalServer?.host || '-' }}</td>
-           <td>{{ adapter.errorCount || 0 }}</td>
-           <td>{{ adapter.lastActive ? new Date(adapter.lastActive).toLocaleString() : 'Never' }}</td>
+          <tr v-if="loading">
+            <td colspan="6" class="loading-row">Loading adapters...</td>
+          </tr>
+          <tr v-else-if="error">
+            <td colspan="6" class="error-row">{{ error }}</td>
+          </tr>
+          <tr v-else-if="adapters.length === 0">
+            <td colspan="6" class="empty-row">No adapters registered</td>
+          </tr>
+          <tr v-else v-for="adapter in adapters" :key="adapter.id">
+            <td>{{ adapter.name }}</td>
+              <td>
+                <span :class="getStatusClass(adapter)">
+                  {{ getStatusText(adapter) }}
+                </span>
+              </td>
+            <td>{{ adapter.connectionType || 'StreamableHttp' }}</td>
+              <td>{{ adapter.createdAt ? new Date(adapter.createdAt).toLocaleString() : 'Unknown' }}</td>
+            <td>{{ getCapabilitiesCount(adapter) }}</td>
            <td>
               <div class="action-buttons">
                 <button class="btn btn-sm role-secondary" @click="handleViewDetails(adapter)" title="View Details">
@@ -97,6 +95,12 @@ export default defineComponent({
   },
   emits: ['view-details', 'view-logs', 'sync-adapter', 'edit-adapter', 'delete-adapter', 'refresh-adapters'],
   setup(props, { emit }) {
+       console.log('AdaptersTable props received:', {
+         adapters: props.adapters,
+         adaptersLength: props.adapters?.length,
+         loading: props.loading
+       })
+
        const showAdapterDetailsModal = ref(false);
        const selectedAdapter = ref<AdapterResource | null>(null);
 
@@ -135,28 +139,38 @@ export default defineComponent({
           selectedAdapter.value = null;
         };
 
-       const getStatusClass = (adapter: AdapterResource) => {
-         const isAvailable = props.pingResults[adapter.name];
-         return isAvailable ? 'status-active badge badge-success' : 'status-inactive badge badge-secondary';
-       };
-
-       const getStatusText = (adapter: AdapterResource) => {
-         const isAvailable = props.pingResults[adapter.name];
-         return isAvailable ? 'Available' : 'Checking...';
-       };
-
-        return {
-          showAdapterDetailsModal,
-          selectedAdapter,
-          handleViewDetails,
-          handleViewLogs,
-          handleSyncAdapter,
-          handleEditAdapter,
-          handleDeleteAdapter,
-          closeAdapterDetailsModal,
-          getStatusClass,
-          getStatusText
+        const getStatusClass = (adapter: any) => {
+          const status = adapter.status || 'unknown';
+          return status === 'ready' ? 'status-active badge badge-success' : 'status-inactive badge badge-secondary';
         };
+
+        const getStatusText = (adapter: any) => {
+          const status = adapter.status || 'unknown';
+          return status === 'ready' ? 'Ready' : status.charAt(0).toUpperCase() + status.slice(1);
+        };
+
+        const getCapabilitiesCount = (adapter: any) => {
+          const caps = adapter.capabilities;
+          if (!caps) return '0';
+          const tools = caps.tools?.length || 0;
+          const resources = caps.resources?.length || 0;
+          const prompts = caps.prompts?.length || 0;
+          return `${tools} tools, ${resources} resources, ${prompts} prompts`;
+        };
+
+         return {
+           showAdapterDetailsModal,
+           selectedAdapter,
+           handleViewDetails,
+           handleViewLogs,
+           handleSyncAdapter,
+           handleEditAdapter,
+           handleDeleteAdapter,
+           closeAdapterDetailsModal,
+           getStatusClass,
+           getStatusText,
+           getCapabilitiesCount
+         };
    }
  });
 </script>

@@ -189,16 +189,16 @@ export function useAdapters() {
 
   // Get authentication type label
   const getAuthTypeLabel = (adapter: Adapter): string => {
-    if (!adapter.authentication.required) {
+    if (!adapter.authentication?.required) {
       return 'None'
     }
 
-    return adapter.authentication.type.charAt(0).toUpperCase() + adapter.authentication.type.slice(1)
+    return (adapter.authentication?.type || 'none').charAt(0).toUpperCase() + (adapter.authentication?.type || 'none').slice(1)
   }
 
   // Get capabilities summary
   const getCapabilitiesSummary = (adapter: Adapter) => {
-    const caps = adapter.capabilities
+    const caps = adapter.capabilities || { tools: [], resources: [], prompts: [], lastRefreshed: '' }
     return {
       tools: caps.tools?.length || 0,
       resources: caps.resources?.length || 0,
@@ -209,9 +209,9 @@ export function useAdapters() {
 
   return {
     // State
-    adapters: readonly(adapters),
-    loading: readonly(loading),
-    error: readonly(error),
+    adapters,
+    loading,
+    error,
 
     // Methods
     loadAdapters,

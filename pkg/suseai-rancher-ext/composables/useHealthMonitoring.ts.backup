@@ -134,7 +134,7 @@ export function useHealthMonitoring() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(`http://${proxyHost}:8912/health`, {
+      const response = await fetch(`http://${proxyHost}:8911/health`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal

@@ -6,9 +6,8 @@
     <MetricsGrid
       :discovered-count="discoveredCount"
       :registered-count="registeredCount"
+      :adapters-in-error-count="adaptersInErrorCount"
       :proxy-health="proxyHealth"
-      :registry-health="registryHealth"
-      :discovery-health="discoveryHealth"
       :loading="loading"
     />
 
@@ -21,94 +20,83 @@
       @rule-management-open="handleRuleManagement"
     />
 
-    <div class="tabs-container">
-      <div class="tab-nav">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          :class="['tab-button', { active: activeTab === tab.id }]"
-          @click="activeTab = tab.id"
-        >
-          {{ tab.label }}
+    <!-- Registered MCP Adapters Table -->
+    <div class="table-section">
+      <h2>Registered MCP Adapters</h2>
+      <div>Debug: adapters.length = {{ adapters?.length || 0 }}, adaptersLoading = {{ adaptersLoading }}</div>
+      <div v-if="adaptersLoading" class="loading-state">
+        <i class="icon icon-spinner icon-spin"></i>
+        <p>Loading adapters...</p>
+      </div>
+      <!-- Error State -->
+      <div v-else-if="adaptersError" class="error-state">
+        <i class="icon icon-error"></i>
+        <p>Error loading adapters: {{ adaptersError }}</p>
+      </div>
+      <div v-else-if="!adapters || adapters.length === 0" class="empty-state">
+        <p>No adapters found</p>
+      </div>
+      <AdaptersTable
+        v-else
+        :adapters="adapters"
+        :loading="adaptersLoading"
+        :ping-results="adapterPingResults"
+        @view-logs="handleViewAdapterLogs"
+        @sync-adapter="handleSyncAdapter"
+        @edit-adapter="handleEditAdapter"
+        @delete-adapter="handleDeleteAdapter"
+        @refresh-adapters="handleRefreshAdapters"
+      />
+    </div>
+
+    <!-- Discovered MCP Servers Table -->
+    <div class="table-section" :key="discoveredServers?.length || 0">
+      <h2>Discovered MCP Servers</h2>
+      <div v-if="discoveryLoading" class="loading-state">
+        <i class="icon icon-spinner icon-spin"></i>
+        <p>Loading discovered servers...</p>
+      </div>
+      <!-- Error State -->
+      <div v-if="discoveryError" class="error-state">
+        <i class="icon icon-error"></i>
+        <p>Error loading discovered servers: {{ discoveryError }}</p>
+        <button class="btn btn-secondary" @click="$emit('retry-discovery')">
+          Retry
         </button>
       </div>
+      <DiscoveredServersTable
+        :discovered-servers="servers"
+        :loading="false"
+        :registered-server-ids="[]"
+        @view-server-details="handleViewServerDetails"
+        @register-server="handleRegisterServer"
+      />
 
-      <div class="tab-content">
-        <!-- Overview Tab -->
-        <div v-if="activeTab === 'overview'" class="tab-pane">
-           <AdaptersTable
-              :adapters="adapters"
-              :loading="adaptersLoading"
-              :ping-results="adapterPingResults"
-              @view-logs="handleViewAdapterLogs"
-              @sync-adapter="handleSyncAdapter"
-              @edit-adapter="handleEditAdapter"
-              @delete-adapter="handleDeleteAdapter"
-              @refresh-adapters="handleRefreshAdapters"
-           />
-
-           <DiscoveredServersTable
-             :discovered-servers="discoveredServers"
-             :loading="discoveryLoading"
-             :registered-server-ids="registeredServerIds"
-             @view-server-details="handleViewServerDetails"
-             @register-server="handleRegisterServer"
-           />
+      <!-- TEMP: Debug display -->
+      <div style="border: 1px solid red; padding: 10px; margin: 10px;">
+        <h3>DEBUG: Discovered Servers</h3>
+        <p>Loading: {{ discoveryLoading }}</p>
+        <p>Error: {{ discoveryError }}</p>
+        <p>Servers count: {{ discoveredServers?.length || 0 }}</p>
+        <div v-for="server in discoveredServers" :key="server.id">
+          <strong>{{ server.name }}</strong> - {{ server.address }}:{{ server.port }}
         </div>
-
-        <!-- Adapter Details Tab -->
-        <div v-if="activeTab === 'adapters'" class="tab-pane">
-          <div v-if="adapters.length === 0" class="no-data">
-            <p>No adapters available</p>
-          </div>
-          <div v-else>
-            <div class="adapter-selector">
-              <label>Select Adapter:</label>
-              <select v-model="selectedAdapterName">
-                <option v-for="adapter in adapters" :key="adapter.name" :value="adapter.name">
-                  {{ adapter.name }}
-                </option>
-              </select>
-            </div>
-            <AdapterDetails
-              v-if="selectedAdapter"
-              :adapter="selectedAdapter"
-              @edit-adapter="handleEditAdapter"
-            />
-          </div>
-        </div>
-
-        <!-- Session Manager Tab -->
-        <div v-if="activeTab === 'sessions'" class="tab-pane">
-          <SessionManager
-            :adapters="adapters"
-            @create-session="handleCreateSession"
-            @terminate-session="handleTerminateSession"
-            @view-session-details="handleViewSessionDetails"
-          />
-        </div>
-
-        <!-- Real-time Metrics Tab -->
-        <div v-if="activeTab === 'metrics'" class="tab-pane">
-          <RealTimeMetrics
-            :adapters="adapters"
-            @refresh-metrics="handleRefreshMetrics"
-          />
+        <div v-if="discoveredServers?.length === 0">
+          No servers in array
         </div>
       </div>
-    </div>
+     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue';
+import { defineComponent, ref, computed, watch } from 'vue';
+import { useDiscovery } from '../../composables/useDiscovery';
 import ScanActions from './ScanActions.vue';
 import MetricsGrid from './MetricsGrid.vue';
 import AdaptersTable from './AdaptersTable.vue';
 import DiscoveredServersTable from './DiscoveredServersTable.vue';
-import AdapterDetails from './AdapterDetails.vue';
-import SessionManager from './SessionManager.vue';
-import RealTimeMetrics from './RealTimeMetrics.vue';
+
 import { useHealthMonitoring } from '../../composables/useHealthMonitoring';
 
 export default defineComponent({
@@ -117,60 +105,47 @@ export default defineComponent({
     ScanActions,
     MetricsGrid,
     AdaptersTable,
-    DiscoveredServersTable,
-    AdapterDetails,
-    SessionManager,
-    RealTimeMetrics
+    DiscoveredServersTable
   },
-  emits: ['scan-modal-open', 'security-modal-open', 'rule-modal-open', 'sync-adapter'],
+  emits: ['scan-modal-open', 'security-modal-open', 'rule-modal-open', 'sync-adapter', 'view-server-details'],
   props: {
-    discoveredServers: {
-      type: Array as () => any[],
-      default: () => []
-    },
     adapters: {
       type: Array as () => any[],
       default: () => []
     },
-    discoveryLoading: {
-      type: Boolean,
-      default: false
+    adaptersError: {
+      type: String,
+      default: null
     },
     adaptersLoading: {
       type: Boolean,
       default: false
-    },
-    scanning: {
-      type: Boolean,
-      default: false
-    },
-    scanProgress: {
-      type: Number,
-      default: 0
     }
   },
   setup(props, { emit }) {
-    const activeTab = ref('overview');
-    const selectedAdapterName = ref('');
 
-    const tabs = [
-      { id: 'overview', label: 'Overview' },
-      { id: 'adapters', label: 'Adapter Details' },
-      { id: 'sessions', label: 'Session Manager' },
-      { id: 'metrics', label: 'Real-time Metrics' }
-    ];
+    // Use the composable directly instead of relying on props
+    const { discoveredServers, loading: discoveryLoading } = useDiscovery()
 
-    const selectedAdapter = computed(() => {
-      return props.adapters.find(adapter => adapter.name === selectedAdapterName.value) || null;
-    });
+    const servers = computed(() => {
+      console.log('Dashboard computed servers:', discoveredServers.value?.length || 0)
+      return discoveredServers.value || []
+    })
+
+    console.log('Dashboard setup - using composable directly')
+
+
 
     // Health monitoring
     const { proxyHealth, registryHealth, discoveryHealth } = useHealthMonitoring();
 
     // Computed properties for metrics
-    const discoveredCount = computed(() => props.discoveredServers.length);
+    const discoveredCount = computed(() => servers.value.length);
     const registeredCount = computed(() => props.adapters.length);
-    const loading = computed(() => props.discoveryLoading || props.adaptersLoading);
+    const adaptersInErrorCount = computed(() => {
+      return props.adapters.filter(adapter => adapter.status === 'error' || adapter.errorCount > 0).length;
+    });
+    const loading = computed(() => discoveryLoading.value || props.adaptersLoading);
 
     // Mock data for now (will be updated when we implement sessions/metrics)
     const sessions = ref([]);
@@ -205,7 +180,7 @@ export default defineComponent({
     };
 
     const handleViewServerDetails = (server: any) => {
-      emit('security-modal-open');
+      emit('view-server-details', server);
     };
 
     const handleRefreshAdapters = () => {
@@ -233,22 +208,18 @@ export default defineComponent({
     };
 
     return {
-      activeTab,
-      tabs,
-      selectedAdapterName,
-      selectedAdapter,
-      discoveredServers: props.discoveredServers,
+
+      discoveredServers: servers,
       adapters: props.adapters,
-      scanning: props.scanning,
-      scanProgress: props.scanProgress,
       adapterPingResults,
       registeredServerIds,
-      proxyHealth,
-      registryHealth,
-      discoveryHealth,
-      discoveredCount,
-      registeredCount,
-      loading,
+       proxyHealth,
+       registryHealth,
+       discoveryHealth,
+       discoveredCount,
+       registeredCount,
+       adaptersInErrorCount,
+       loading,
       handleScanStart,
       handleRuleManagement,
       handleViewAdapterLogs,
@@ -272,54 +243,35 @@ export default defineComponent({
   padding: 24px;
 }
 
-.tabs-container {
-  margin-top: 24px;
+/* Table Sections */
+.table-section {
+  margin-top: 32px;
 }
 
-.tab-nav {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
-}
-
-.tab-button {
-  background: none;
-  border: none;
-  padding: 12px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--input-label);
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.tab-button:hover {
-  color: var(--primary);
-  background-color: var(--muted);
-}
-
-.tab-button.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
+.table-section h2 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
   font-weight: 600;
+  color: var(--body-text, #1a1a1a);
 }
 
-.tab-content {
-  min-height: 400px;
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted, #666);
 }
 
-.tab-pane {
-  animation: fadeIn 0.3s ease-in;
+.loading-state i,
+.empty-state i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.empty-state {
+  border: 2px dashed var(--border, #e1e5e9);
+  border-radius: 8px;
+  background: var(--accent-bg, #f8f9fa);
 }
 </style>

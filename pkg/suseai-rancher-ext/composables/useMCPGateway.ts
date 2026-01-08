@@ -2,6 +2,7 @@ import { computed, ref, getCurrentInstance, onMounted, onUnmounted, nextTick, wa
 import { useStore } from 'vuex';
 import { logger } from '../utils/logger';
 import { MCPService, apiClient, updateApiBaseUrl, type ServiceDiscoveredServer, type DiscoveredServer } from '../services/mcp-service';
+import { API_BASE_URLS } from '../config/api-config';
 import type { SecurityFinding } from '../services/security-engine';
 import { tokenService } from '../services/token-service';
 import type {
@@ -275,12 +276,55 @@ export function useMCPGateway() {
 
     checkingService.value = true;
     try {
+      // Try localhost first (common case for local development/testing)
+      try {
+        const localhostResponse = await fetch('http://localhost:8911/health', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(3000)
+        });
+        if (localhostResponse.ok) {
+          serviceFound.value = true;
+          serviceUrl.value = 'http://localhost:8911';
+          updateApiBaseUrl('http://localhost:8911');
+          stopServiceChecking();
+          logger.info('Existing SUSE AI Universal Proxy service found at localhost:8911');
+          checkingService.value = false;
+          return;
+        }
+      } catch (localhostError) {
+        logger.info('Localhost check failed, trying configured URLs');
+      }
+
+      // Try configured service URLs from API_BASE_URLS
+      try {
+        const currentUrl = new URL(API_BASE_URLS.MCP_GATEWAY);
+        if (currentUrl.hostname !== 'localhost' && currentUrl.hostname !== '127.0.0.1') {
+          const configuredResponse = await fetch(`${API_BASE_URLS.MCP_GATEWAY}/health`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(3000)
+          });
+          if (configuredResponse.ok) {
+            serviceFound.value = true;
+            serviceUrl.value = API_BASE_URLS.MCP_GATEWAY;
+            stopServiceChecking();
+            logger.info(`Existing SUSE AI Universal Proxy service found at ${API_BASE_URLS.MCP_GATEWAY}`);
+            checkingService.value = false;
+            return;
+          }
+        }
+      } catch (configuredError) {
+        logger.info('Configured URL check failed');
+      }
+
+      // As last resort, try MCPService.ping() with current configuration
       const isResponding = await MCPService.ping();
       if (isResponding) {
         serviceFound.value = true;
-        serviceUrl.value = 'http://localhost:8911';
+        serviceUrl.value = API_BASE_URLS.MCP_GATEWAY;
         stopServiceChecking();
-        logger.info('Existing SUSE AI Universal Proxy service found');
+        logger.info(`Existing SUSE AI Universal Proxy service found at ${API_BASE_URLS.MCP_GATEWAY}`);
       } else {
         logger.info('No existing SUSE AI Universal Proxy service found, will continue checking...');
       }

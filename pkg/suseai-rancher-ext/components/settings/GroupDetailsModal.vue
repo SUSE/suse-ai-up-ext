@@ -2,16 +2,16 @@
   <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h2>{{ isEditing ? 'Edit Role' : 'Role Details' }}</h2>
+        <h2>{{ isEditing ? 'Edit Group' : 'Group Details' }}</h2>
         <button class="close-btn" @click="$emit('close')" aria-label="Close modal">
           ×
         </button>
       </div>
 
       <div class="modal-body">
-        <form v-if="isEditing && formData" @submit.prevent="handleSave" class="role-form">
+        <form v-if="isEditing && formData" @submit.prevent="handleSave" class="group-form">
           <div class="form-group">
-            <label for="name">Role Name *</label>
+            <label for="name">Group Name *</label>
             <input
               id="name"
               v-model="formData.name"
@@ -23,124 +23,96 @@
           </div>
 
           <div class="form-group">
-            <label for="displayName">Display Name</label>
-            <input
-              id="displayName"
-              v-model="formData.displayName"
-              type="text"
-              class="form-input"
-            />
-          </div>
-
-          <div class="form-group">
             <label for="description">Description</label>
             <textarea
               id="description"
               v-model="formData.description"
               rows="3"
               class="form-input"
-              placeholder="Optional description for this role"
+              placeholder="Optional description for this group"
             ></textarea>
-          </div>
-
-          <div class="form-group">
-            <label for="type">Role Type</label>
-            <select
-              id="type"
-              v-model="formData.type"
-              class="form-select"
-              :disabled="!canEditType"
-            >
-              <option value="global">Global</option>
-              <option value="cluster">Cluster</option>
-              <option value="project">Project</option>
-              <option value="namespaced">Namespaced</option>
-            </select>
           </div>
         </form>
 
-        <div v-else class="role-details">
+        <div v-else class="group-details">
           <div class="detail-section">
             <h3>Basic Information</h3>
             <div class="detail-grid">
               <div class="detail-item">
                 <label>Name:</label>
-                <span>{{ role?.name }}</span>
-              </div>
-              <div class="detail-item">
-                <label>Display Name:</label>
-                <span>{{ role?.displayName || role?.name }}</span>
-              </div>
-              <div class="detail-item">
-                <label>Type:</label>
-                <span class="type-badge" :class="`type-${role?.type}`">
-                  {{ formatRoleType(role?.type) }}
-                </span>
+                <span>{{ group?.name }}</span>
               </div>
               <div class="detail-item">
                 <label>Created:</label>
-                <span>{{ formatDate(role?.created) }}</span>
+                <span>{{ formatDate(group?.createdAt) }}</span>
               </div>
             </div>
           </div>
 
-          <div v-if="role?.description" class="detail-section">
+          <div v-if="group?.description" class="detail-section">
             <h3>Description</h3>
-            <p>{{ role.description }}</p>
+            <p>{{ group.description }}</p>
           </div>
 
           <div class="detail-section">
-            <h3>Permissions (Rules)</h3>
-            <div v-if="role?.rules?.length" class="rules-list">
-              <div
-                v-for="(rule, index) in role.rules"
-                :key="index"
-                class="rule-item"
-              >
-                <div class="rule-header">
-                  <strong>Rule {{ index + 1 }}</strong>
-                </div>
-                <div class="rule-details">
-                  <div class="rule-row">
-                    <span class="rule-label">Verbs:</span>
-                    <span class="rule-value">{{ rule.verbs?.join(', ') || 'None' }}</span>
-                  </div>
-                  <div class="rule-row">
-                    <span class="rule-label">API Groups:</span>
-                    <span class="rule-value">{{ rule.apiGroups?.join(', ') || 'None' }}</span>
-                  </div>
-                  <div v-if="rule.resources?.length" class="rule-row">
-                    <span class="rule-label">Resources:</span>
-                    <span class="rule-value">{{ rule.resources.join(', ') }}</span>
-                  </div>
-                  <div v-if="rule.resourceNames?.length" class="rule-row">
-                    <span class="rule-label">Resource Names:</span>
-                    <span class="rule-value">{{ rule.resourceNames.join(', ') }}</span>
-                  </div>
-                  <div v-if="rule.nonResourceURLs?.length" class="rule-row">
-                    <span class="rule-label">Non-Resource URLs:</span>
-                    <span class="rule-value">{{ rule.nonResourceURLs.join(', ') }}</span>
-                  </div>
+            <h3>Members</h3>
+            <div class="members-section">
+              <div v-if="groupMembers.length > 0" class="members-list">
+                <div
+                  v-for="member in groupMembers"
+                  :key="member.id"
+                  class="member-item"
+                >
+                  <span class="member-name">{{ member.name }}</span>
+                  <span class="member-email">{{ member.email }}</span>
+                  <button
+                    v-if="canEditGroup && group"
+                    class="btn btn-sm btn-outline remove-btn"
+                    @click="$emit('remove-member', group.id, member.id)"
+                    title="Remove member"
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
+              <div v-else class="no-members">
+                <p>No members in this group</p>
+              </div>
+
+              <div v-if="canEditGroup" class="add-member-section">
+                <select v-model="selectedUserId" class="form-select">
+                  <option value="">Select user to add...</option>
+                  <option
+                    v-for="user in availableUsers"
+                    :key="user.id"
+                    :value="user.id"
+                  >
+                    {{ user.name }} ({{ user.email }})
+                  </option>
+                </select>
+                <button
+                  class="btn btn-sm btn-primary"
+                  :disabled="!selectedUserId"
+                  @click="handleAddMember"
+                >
+                  Add Member
+                </button>
+              </div>
             </div>
-            <p v-else class="no-data">No rules defined for this role</p>
           </div>
 
-          <div v-if="assignedUsers?.length" class="detail-section">
-            <h3>Assigned Users</h3>
-            <div class="assigned-users">
+          <div class="detail-section">
+            <h3>Permissions</h3>
+            <div v-if="group?.permissions?.length" class="permissions-list">
               <div
-                v-for="user in assignedUsers.slice(0, 10)"
-                :key="user.id"
-                class="assigned-user"
+                v-for="permission in group.permissions"
+                :key="permission"
+                class="permission-item"
               >
-                {{ user.displayName || user.username }}
-              </div>
-              <div v-if="assignedUsers.length > 10" class="more-users">
-                ... and {{ assignedUsers.length - 10 }} more users
+                {{ permission }}
               </div>
             </div>
+            <p v-else class="no-data">No permissions assigned to this group</p>
           </div>
         </div>
       </div>
@@ -159,12 +131,12 @@
           Save Changes
         </button>
         <button
-          v-else-if="canEditRole"
+          v-else-if="canEditGroup"
           type="button"
           class="btn btn-outline"
           @click="startEditing"
         >
-          Edit Role
+          Edit Group
         </button>
       </div>
     </div>
@@ -173,38 +145,40 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from 'vue';
-import type { RancherRole, RancherUser } from '../../types/auth-types';
+import type { ExternalGroup, ExternalUser } from '../../types/auth-types';
 
 export default defineComponent({
-  name: 'RoleDetailsModal',
+  name: 'GroupDetailsModal',
   props: {
-    role: {
-      type: Object as () => RancherRole | null,
+    group: {
+      type: Object as () => ExternalGroup | null,
       default: null
+    },
+    allUsers: {
+      type: Array as () => readonly ExternalUser[],
+      default: () => []
     },
     show: {
       type: Boolean,
       default: false
     },
-    canEditRole: {
+    canEditGroup: {
       type: Boolean,
       default: false
-    },
-    assignedUsers: {
-      type: Array as () => RancherUser[],
-      default: () => []
     }
   },
-  emits: ['close', 'save'],
+  emits: ['close', 'save', 'add-member', 'remove-member'],
   setup(props, { emit }) {
     const isEditing = ref(false);
-    const formData = ref<RancherRole | null>(null);
+    const formData = ref<ExternalGroup | null>(null);
+    const selectedUserId = ref('');
 
-    // Watch for role changes to reset form
-    watch(() => props.role, (newRole) => {
-      if (newRole) {
-        formData.value = { ...newRole };
+    // Watch for group changes to reset form
+    watch(() => props.group, (newGroup) => {
+      if (newGroup) {
+        formData.value = { ...newGroup };
         isEditing.value = false;
+        selectedUserId.value = '';
       }
     }, { immediate: true });
 
@@ -214,13 +188,18 @@ export default defineComponent({
     });
 
     const canEditName = computed(() => {
-      // Allow editing name for new roles, but not for existing ones
-      return !props.role?.id;
+      // Allow editing name for new groups, but not for existing ones
+      return !props.group?.id;
     });
 
-    const canEditType = computed(() => {
-      // Allow editing type for new roles, but not for existing ones
-      return !props.role?.id;
+    const groupMembers = computed(() => {
+      if (!props.group?.members || props.group.members.length === 0) return [];
+      return props.allUsers.filter(user => props.group!.members.includes(user.id));
+    });
+
+    const availableUsers = computed(() => {
+      if (!props.group?.members) return props.allUsers;
+      return props.allUsers.filter(user => !props.group!.members.includes(user.id));
     });
 
     // Methods
@@ -240,6 +219,13 @@ export default defineComponent({
       }
     };
 
+    const handleAddMember = () => {
+      if (!selectedUserId.value || !props.group) return;
+
+      emit('add-member', props.group.id, selectedUserId.value);
+      selectedUserId.value = '';
+    };
+
     const formatDate = (dateString?: string): string => {
       if (!dateString) return 'Unknown';
 
@@ -247,23 +233,19 @@ export default defineComponent({
       return date.toLocaleString();
     };
 
-    const formatRoleType = (type?: string): string => {
-      if (!type) return 'Unknown';
-
-      return type.charAt(0).toUpperCase() + type.slice(1);
-    };
-
     return {
       isEditing,
       formData,
+      selectedUserId,
       isFormValid,
       canEditName,
-      canEditType,
+      groupMembers,
+      availableUsers,
       startEditing,
       handleSave,
       handleOverlayClick,
-      formatDate,
-      formatRoleType
+      handleAddMember,
+      formatDate
     };
   }
 });
@@ -343,7 +325,7 @@ export default defineComponent({
   gap: 10px;
 }
 
-.role-details {
+.group-details {
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -378,97 +360,84 @@ export default defineComponent({
   color: var(--text);
 }
 
-.type-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.type-global {
-  background: var(--primary-bg);
-  color: var(--primary);
-}
-
-.type-cluster {
-  background: var(--warning-bg);
-  color: var(--warning);
-}
-
-.type-project {
-  background: var(--success-bg);
-  color: var(--success);
-}
-
-.type-namespaced {
-  background: var(--info-bg);
-  color: var(--info);
-}
-
-.rules-list {
+.members-section {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.rule-item {
+.members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.member-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
   background: var(--input-bg);
   border-radius: 6px;
-  padding: 16px;
   border: 1px solid var(--border);
 }
 
-.rule-header {
-  margin-bottom: 12px;
-  color: var(--text);
-}
-
-.rule-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.rule-row {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.rule-label {
+.member-name {
   font-weight: 500;
+  color: var(--text);
+  flex: 1;
+}
+
+.member-email {
   color: var(--text-muted);
   font-size: 14px;
-  min-width: 120px;
-  flex-shrink: 0;
+  flex: 1;
 }
 
-.rule-value {
-  color: var(--text);
-  font-family: monospace;
-  font-size: 14px;
-  word-break: break-word;
-}
-
-.assigned-users {
+.remove-btn {
+  color: var(--error);
+  border-color: var(--error);
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
 }
 
-.assigned-user {
-  background: var(--input-bg);
-  padding: 8px 12px;
-  border-radius: 4px;
-  color: var(--text);
-  font-size: 14px;
+.remove-btn:hover {
+  background: var(--error-bg);
 }
 
-.more-users {
+.no-members {
   color: var(--text-muted);
   font-style: italic;
-  padding: 4px 12px;
+  text-align: center;
+  padding: 20px;
+}
+
+.add-member-section {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  background: var(--hover-bg);
+  border-radius: 6px;
+}
+
+.permissions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.permission-item {
+  padding: 8px 12px;
+  background: var(--input-bg);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--text);
 }
 
 .no-data {
@@ -477,7 +446,7 @@ export default defineComponent({
   margin: 0;
 }
 
-.role-form {
+.group-form {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -559,5 +528,10 @@ export default defineComponent({
 
 .btn-outline:hover {
   background: var(--hover-bg);
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 </style>

@@ -20,6 +20,11 @@ const apiClient = axios.create({
 });
 
 export class VirtualMCPService {
+  // Update baseURL dynamically
+  static updateBaseURL() {
+    apiClient.defaults.baseURL = API_BASE_URLS.VIRTUAL_MCP
+  }
+
   // MCP Server Management
   static async getMCPServers(limit = 10, offset = 0): Promise<MCPListResponse> {
     try {

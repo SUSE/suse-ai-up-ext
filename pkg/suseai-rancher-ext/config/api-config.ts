@@ -9,7 +9,7 @@ import { reactive, ref } from 'vue';
 export const getApiBaseUrls = (serviceUrl?: string, useHttps: boolean = false) => {
   const protocol = useHttps ? 'https' : 'http';
   const mcpPort = useHttps ? 38911 : 8911;
-  const discoveryPort = useHttps ? 38912 : 8912;
+  const discoveryPort = useHttps ? 38911 : 8911;
   const proxyPort = useHttps ? 38911 : 8911;
 
   if (serviceUrl) {
@@ -22,19 +22,22 @@ export const getApiBaseUrls = (serviceUrl?: string, useHttps: boolean = false) =
       PROXY: `${protocol}://${ip}:${proxyPort}`,
       REGISTRY: `http://${ip}:8911`,
       PLUGINS: `http://${ip}:8914`,
-      VIRTUAL_MCP: `http://${ip}:8912/api/v1`,
+      VIRTUAL_MCP: `http://${ip}:8911/api/v1`,
       SMART_AGENTS: `http://${ip}:8910`,
       RANCHER: window.location.origin
     };
   }
+
+  // Use current hostname as default instead of hardcoded IP
+  const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
   return {
-    MCP_GATEWAY: `${protocol}://192.168.64.17:${mcpPort}`,
-    DISCOVERY: `${protocol}://192.168.64.17:${discoveryPort}`,
-    PROXY: `${protocol}://192.168.64.17:${proxyPort}`,
-    REGISTRY: 'http://192.168.64.17:8911',
-    PLUGINS: 'http://192.168.64.17:8914',
-    VIRTUAL_MCP: 'http://localhost:8912/api/v1',
-    SMART_AGENTS: 'http://localhost:8910',
+    MCP_GATEWAY: `${protocol}://${currentHost}:${mcpPort}`,
+    DISCOVERY: `${protocol}://${currentHost}:${discoveryPort}`,
+    PROXY: `${protocol}://${currentHost}:${proxyPort}`,
+    REGISTRY: `http://${currentHost}:8911`,
+    PLUGINS: `http://${currentHost}:8914`,
+    VIRTUAL_MCP: `http://${currentHost}:8911/api/v1`,
+    SMART_AGENTS: `http://${currentHost}:8910`,
     RANCHER: window.location.origin
   };
 };
@@ -92,14 +95,14 @@ export const MCP_ENDPOINTS = {
   ADAPTER_WEBSOCKET: (name: string) => `/api/v1/adapters/${name}/ws`,
 
   // Network Discovery
-  DISCOVERY_SCAN: '/api/v1/scan',
+   DISCOVERY_SCAN: '/api/v1/discovery/scan',
   DISCOVERY_SERVERS: '/api/v1/servers',
   DISCOVERY_SERVER_DETAILS: (id: string) => `/api/v1/servers/${id}`,
   DISCOVERY_REGISTER: '/api/v1/registry/upload',
 
   // Legacy endpoints (for backward compatibility)
-  SCAN_START: '/api/v1/scan',
-  SCAN_STATUS: (scanId: string) => `/api/v1/scan/${scanId}`,
+   SCAN_START: '/api/v1/discovery/scan',
+   SCAN_STATUS: (scanId: string) => `/api/v1/discovery/scan/${scanId}`,
   SERVERS: '/api/v1/servers',
   REGISTER_SERVER: '/api/v1/registry/upload',
 

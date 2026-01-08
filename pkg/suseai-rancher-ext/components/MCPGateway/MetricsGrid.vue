@@ -6,8 +6,13 @@
       <span class="metric-value" v-else>...</span>
     </div>
     <div class="metric-card">
-      <h3>Registered MCP</h3>
+      <h3>Registered Adapters</h3>
       <span class="metric-value" v-if="!loading">{{ registeredCount }}</span>
+      <span class="metric-value" v-else>...</span>
+    </div>
+    <div class="metric-card">
+      <h3>Adapters in Error</h3>
+      <span class="metric-value" v-if="!loading">{{ adaptersInErrorCount }}</span>
       <span class="metric-value" v-else>...</span>
     </div>
     <div class="metric-card">
@@ -18,26 +23,6 @@
       </div>
       <div class="last-checked" v-if="proxyHealth?.status?.timestamp">
         {{ formatTimestamp(proxyHealth.status.timestamp) }}
-      </div>
-    </div>
-    <div class="metric-card">
-      <h3>Registry Health</h3>
-      <div class="health-badge" :class="registryHealth?.status?.status || 'unknown'">
-        <i class="icon" :class="getHealthIcon(registryHealth?.status?.status)"></i>
-        <span class="health-text">{{ getHealthText(registryHealth?.status?.status) }}</span>
-      </div>
-      <div class="last-checked" v-if="registryHealth?.status?.timestamp">
-        {{ formatTimestamp(registryHealth.status.timestamp) }}
-      </div>
-    </div>
-    <div class="metric-card">
-      <h3>Discovery Health</h3>
-      <div class="health-badge" :class="discoveryHealth?.status?.status || 'unknown'">
-        <i class="icon" :class="getHealthIcon(discoveryHealth?.status?.status)"></i>
-        <span class="health-text">{{ getHealthText(discoveryHealth?.status?.status) }}</span>
-      </div>
-      <div class="last-checked" v-if="discoveryHealth?.status?.timestamp">
-        {{ formatTimestamp(discoveryHealth.status.timestamp) }}
       </div>
     </div>
   </div>
@@ -58,15 +43,11 @@ export default defineComponent({
       type: Number,
       required: true
     },
+    adaptersInErrorCount: {
+      type: Number,
+      required: true
+    },
     proxyHealth: {
-      type: Object as () => ServiceHealth,
-      default: null
-    },
-    registryHealth: {
-      type: Object as () => ServiceHealth,
-      default: null
-    },
-    discoveryHealth: {
       type: Object as () => ServiceHealth,
       default: null
     },

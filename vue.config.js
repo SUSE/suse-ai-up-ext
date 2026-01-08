@@ -15,7 +15,7 @@ module.exports = config(__dirname, {
         }
       },
       '/api/virtual-mcp': {
-        target: 'http://localhost:8912',
+        target: 'http://localhost:8911',
         changeOrigin: true,
         pathRewrite: {
           '^/api/virtual-mcp': '/api/v1'

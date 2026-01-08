@@ -86,6 +86,11 @@ export class RegistryAPI extends BaseAPI {
     return null
   }
 
+  // Update baseURL dynamically
+  updateBaseURL() {
+    this.api.defaults.baseURL = API_BASE_URLS.REGISTRY
+  }
+
   /**
    * Browse MCP servers from registry
    */

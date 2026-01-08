@@ -51,51 +51,108 @@
       </header>
 
     <div class="main-content">
-      <div class="tabs-container">
-        <div class="tab-nav">
-          <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            :class="['tab-button', { active: activeTab === tab.id }]"
-            @click="activeTab = tab.id"
-          >
-            {{ tab.label }}
-          </button>
+    <div class="tabs-container">
+      <div class="tab-nav">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          :class="['tab-button', { active: activeTab === tab.id }]"
+          @click="activeTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <div class="tab-content">
+        <!-- Users Tab -->
+        <div v-if="activeTab === 'users'" class="tab-pane">
+          <UsersTable
+            :users="externalUsers"
+            :loading="loadingExternalUsers"
+            :error="externalUsersError || undefined"
+            :can-manage-users="hasAdminPrivileges"
+            :is-external="true"
+            @view-user="handleViewExternalUser"
+            @edit-user="handleEditExternalUser"
+            @add-user="handleAddExternalUser"
+            @delete-user="handleDeleteExternalUser"
+            @retry="loadExternalUsers"
+          />
         </div>
 
-        <div class="tab-content">
-          <!-- Users Tab -->
-          <div v-if="activeTab === 'users'" class="tab-pane">
-            <UsersTable
-              :users="users"
-              :loading="loadingUsers"
-              :error="usersError || undefined"
-              :can-manage-users="hasAdminPrivileges"
-              @view-user="handleViewUser"
-              @edit-user="handleEditUser"
-              @add-user="handleAddUser"
-              @retry="loadUsers"
-            />
-          </div>
+        <!-- Groups Tab -->
+        <div v-if="activeTab === 'groups'" class="tab-pane">
+          <GroupsTable
+            :groups="externalGroups"
+            :all-users="externalUsers"
+            :loading="loadingExternalGroups"
+            :error="externalGroupsError || undefined"
+            :can-manage-groups="hasAdminPrivileges"
+            @view-group="handleViewExternalGroup"
+            @edit-group="handleEditExternalGroup"
+            @add-group="handleAddExternalGroup"
+            @manage-members="handleManageGroupMembers"
+            @delete-group="handleDeleteExternalGroup"
+            @retry="loadExternalGroups"
+          />
+        </div>
 
-          <!-- Roles Tab -->
-          <div v-if="activeTab === 'roles'" class="tab-pane">
-            <RolesTable
-              :roles="roles"
-              :loading="loadingRoles"
-              :error="rolesError || undefined"
-              :can-manage-roles="hasAdminPrivileges"
-              @view-role="handleViewRole"
-              @edit-role="handleEditRole"
-              @add-role="handleAddRole"
-              @retry="loadRoles"
-            />
-          </div>
+        <!-- Permissions Tab -->
+        <div v-if="activeTab === 'permissions'" class="tab-pane">
+          <PermissionsTable
+            :assignments="permissionAssignments"
+            :all-users="externalUsers"
+            :all-groups="externalGroups"
+            :loading="loadingPermissions"
+            :error="permissionsError || undefined"
+            :can-manage-permissions="hasAdminPrivileges"
+            @assign-permissions="handleAssignPermissions"
+            @edit-permissions="handleEditPermissions"
+            @remove-permissions="handleRemovePermissions"
+            @retry="loadPermissions"
+          />
         </div>
       </div>
     </div>
+    </div>
 
-      <!-- User Details Modal -->
+      <!-- External User Details Modal -->
+      <UserDetailsModal
+        v-if="showExternalUserModal"
+        :user="selectedExternalUser"
+        :show="showExternalUserModal"
+        :can-edit-user="hasAdminPrivileges"
+        :is-external="true"
+        @close="showExternalUserModal = false"
+        @save="handleSaveExternalUser"
+      />
+
+      <!-- External Group Details Modal -->
+      <GroupDetailsModal
+        v-if="showExternalGroupModal"
+        :group="selectedExternalGroup"
+        :all-users="externalUsers"
+        :show="showExternalGroupModal"
+        :can-edit-group="hasAdminPrivileges"
+        @close="showExternalGroupModal = false"
+        @save="handleSaveExternalGroup"
+        @add-member="handleAddGroupMember"
+        @remove-member="handleRemoveGroupMember"
+      />
+
+      <!-- Permission Assignment Modal -->
+      <PermissionAssignmentModal
+        v-if="showPermissionModal"
+        :assignment="selectedPermissionAssignment"
+        :all-users="externalUsers"
+        :all-groups="externalGroups"
+        :show="showPermissionModal"
+        :can-manage-permissions="hasAdminPrivileges"
+        @close="showPermissionModal = false"
+        @save="handleSavePermissionAssignment"
+      />
+
+      <!-- Legacy Rancher Auth Modals (for backward compatibility) -->
       <UserDetailsModal
         v-if="showUserModal"
         :user="selectedUser"
@@ -105,7 +162,6 @@
         @save="handleSaveUser"
       />
 
-      <!-- Role Details Modal -->
       <RoleDetailsModal
         v-if="showRoleModal"
         :role="selectedRole"
@@ -122,18 +178,30 @@
 import { defineComponent, ref, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { useAuth } from '../composables/useAuth';
-import type { RancherUser, RancherRole } from '../types/auth-types';
+import { useExternalUsers } from '../composables/useExternalUsers';
+import { useExternalGroups } from '../composables/useExternalGroups';
+import { usePermissions } from '../composables/usePermissions';
+import { updateApiBaseUrls } from '../config/api-config';
+import type { RancherUser, RancherRole, ExternalUser, ExternalGroup } from '../types/auth-types';
 import UsersTable from '../components/settings/UsersTable.vue';
-import RolesTable from '../components/settings/RolesTable.vue';
+import GroupsTable from '../components/settings/GroupsTable.vue';
+import PermissionsTable from '../components/settings/PermissionsTable.vue';
 import UserDetailsModal from '../components/settings/UserDetailsModal.vue';
+import GroupDetailsModal from '../components/settings/GroupDetailsModal.vue';
+import PermissionAssignmentModal from '../components/settings/PermissionAssignmentModal.vue';
+import RolesTable from '../components/settings/RolesTable.vue';
 import RoleDetailsModal from '../components/settings/RoleDetailsModal.vue';
 
 export default defineComponent({
   name: 'Settings',
   components: {
     UsersTable,
-    RolesTable,
+    GroupsTable,
+    PermissionsTable,
     UserDetailsModal,
+    GroupDetailsModal,
+    PermissionAssignmentModal,
+    RolesTable,
     RoleDetailsModal
   },
   setup() {
@@ -142,16 +210,60 @@ export default defineComponent({
 
     const tabs = [
       { id: 'users', label: 'Users' },
-      { id: 'roles', label: 'Roles' }
+      { id: 'groups', label: 'Groups' },
+      { id: 'permissions', label: 'Permissions' }
     ];
 
-    // Modal states
+    // Modal states - External API
+    const showExternalUserModal = ref(false);
+    const showExternalGroupModal = ref(false);
+    const showPermissionModal = ref(false);
+    const selectedExternalUser = ref<ExternalUser | null>(null);
+    const selectedExternalGroup = ref<ExternalGroup | null>(null);
+    const selectedPermissionAssignment = ref<any>(null);
+
+    // Modal states - Legacy Rancher (for backward compatibility)
     const showUserModal = ref(false);
     const showRoleModal = ref(false);
     const selectedUser = ref<RancherUser | null>(null);
     const selectedRole = ref<RancherRole | null>(null);
 
-    // Auth composable
+    // External API composables
+    const {
+      users: externalUsers,
+      loading: loadingExternalUsers,
+      error: externalUsersError,
+      loadUsers: loadExternalUsers,
+      createUser: createExternalUser,
+      getUser: getExternalUser,
+      updateUser: updateExternalUser,
+      deleteUser: deleteExternalUser
+    } = useExternalUsers();
+
+    const {
+      groups: externalGroups,
+      loading: loadingExternalGroups,
+      error: externalGroupsError,
+      loadGroups: loadExternalGroups,
+      createGroup: createExternalGroup,
+      getGroup: getExternalGroup,
+      updateGroup: updateExternalGroup,
+      deleteGroup: deleteExternalGroup,
+      addUserToGroup: addUserToExternalGroup,
+      removeUserFromGroup: removeUserFromExternalGroup
+    } = useExternalGroups();
+
+    const {
+      assignments: permissionAssignments,
+      loading: loadingPermissions,
+      error: permissionsError,
+      loadAssignments: loadPermissions,
+      assignPermissions: assignAdapterPermissions,
+      updatePermissions: updateAdapterPermissions,
+      removePermissions: removeAdapterPermissions
+    } = usePermissions();
+
+    // Legacy Rancher auth composable (for backward compatibility)
     const {
       users,
       roles,
@@ -176,8 +288,22 @@ export default defineComponent({
 
     // Load data on mount
     onMounted(async () => {
+      // Initialize API URLs with service URL from store
+      const serviceUrls = store.state.suseai?.settings?.serviceUrls || []
+      const serviceUrl = serviceUrls.length > 0 ? serviceUrls[0] : undefined
+      console.log('Settings serviceUrls from store:', serviceUrls)
+      console.log('Settings serviceUrl to use:', serviceUrl)
+
+      // Set initial API URLs
+      updateApiBaseUrls(serviceUrl)
+
       if (hasAdminPrivileges.value) {
         await Promise.all([
+          // Load external API data
+          loadExternalUsers(),
+          loadExternalGroups(),
+          loadPermissions(),
+          // Load legacy Rancher data (for backward compatibility)
           loadUsers(),
           loadRoles(),
           loadClusterAccess()
@@ -248,9 +374,190 @@ export default defineComponent({
       alert('Role creation functionality would be implemented here');
     };
 
+    // External API handlers
+    const handleViewExternalUser = async (userId: string) => {
+      try {
+        const user = await getExternalUser(userId);
+        selectedExternalUser.value = user;
+        showExternalUserModal.value = true;
+      } catch (error) {
+        console.error('Failed to load external user details:', error);
+      }
+    };
+
+    const handleEditExternalUser = (userId: string) => {
+      handleViewExternalUser(userId);
+    };
+
+    const handleAddExternalUser = () => {
+      selectedExternalUser.value = null;
+      showExternalUserModal.value = true;
+    };
+
+    const handleSaveExternalUser = async (userData: ExternalUser) => {
+      try {
+        if (userData.id) {
+          await updateExternalUser(userData.id, userData);
+        } else {
+          await createExternalUser(userData);
+        }
+        showExternalUserModal.value = false;
+        await loadExternalUsers();
+      } catch (error) {
+        console.error('Failed to save external user:', error);
+      }
+    };
+
+    const handleViewExternalGroup = async (groupId: string) => {
+      try {
+        const group = await getExternalGroup(groupId);
+        selectedExternalGroup.value = group;
+        showExternalGroupModal.value = true;
+      } catch (error) {
+        console.error('Failed to load external group details:', error);
+      }
+    };
+
+    const handleEditExternalGroup = (groupId: string) => {
+      handleViewExternalGroup(groupId);
+    };
+
+    const handleAddExternalGroup = () => {
+      selectedExternalGroup.value = null;
+      showExternalGroupModal.value = true;
+    };
+
+    const handleManageGroupMembers = (groupId: string) => {
+      handleViewExternalGroup(groupId);
+    };
+
+    const handleSaveExternalGroup = async (groupData: ExternalGroup) => {
+      try {
+        if (groupData.id) {
+          await updateExternalGroup(groupData.id, groupData);
+        } else {
+          await createExternalGroup(groupData);
+        }
+        showExternalGroupModal.value = false;
+        await loadExternalGroups();
+      } catch (error) {
+        console.error('Failed to save external group:', error);
+      }
+    };
+
+    const handleAddGroupMember = async (groupId: string, userId: string) => {
+      try {
+        await addUserToExternalGroup(groupId, userId);
+        await loadExternalGroups();
+      } catch (error) {
+        console.error('Failed to add user to group:', error);
+      }
+    };
+
+    const handleRemoveGroupMember = async (groupId: string, userId: string) => {
+      try {
+        await removeUserFromExternalGroup(groupId, userId);
+        await loadExternalGroups();
+      } catch (error) {
+        console.error('Failed to remove user from group:', error);
+      }
+    };
+
+    const handleAssignPermissions = () => {
+      selectedPermissionAssignment.value = null;
+      showPermissionModal.value = true;
+    };
+
+    const handleEditPermissions = (assignment: any) => {
+      selectedPermissionAssignment.value = assignment;
+      showPermissionModal.value = true;
+    };
+
+    const handleRemovePermissions = async (assignmentId: string) => {
+      try {
+        await removeAdapterPermissions(assignmentId);
+        await loadPermissions();
+      } catch (error) {
+        console.error('Failed to remove permissions:', error);
+      }
+    };
+
+    const handleSavePermissionAssignment = async (assignment: any) => {
+      try {
+        if (assignment.id) {
+          await updateAdapterPermissions(assignment.id, assignment.permissions);
+        } else {
+          await assignAdapterPermissions(assignment);
+        }
+        showPermissionModal.value = false;
+        await loadPermissions();
+      } catch (error) {
+        console.error('Failed to save permission assignment:', error);
+      }
+    };
+
+    const handleDeleteExternalUser = async (userId: string) => {
+      if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+        try {
+          await deleteExternalUser(userId);
+          await loadExternalUsers();
+        } catch (error) {
+          console.error('Failed to delete external user:', error);
+        }
+      }
+    };
+
+    const handleDeleteExternalGroup = async (groupId: string) => {
+      if (confirm('Are you sure you want to delete this group? This action cannot be undone.')) {
+        try {
+          await deleteExternalGroup(groupId);
+          await loadExternalGroups();
+        } catch (error) {
+          console.error('Failed to delete external group:', error);
+        }
+      }
+    };
+
     return {
       activeTab,
       tabs,
+      // External API state and handlers
+      showExternalUserModal,
+      showExternalGroupModal,
+      showPermissionModal,
+      selectedExternalUser,
+      selectedExternalGroup,
+      selectedPermissionAssignment,
+      externalUsers,
+      externalGroups,
+      permissionAssignments,
+      loadingExternalUsers,
+      loadingExternalGroups,
+      loadingPermissions,
+      externalUsersError,
+      externalGroupsError,
+      permissionsError,
+      handleViewExternalUser,
+      handleEditExternalUser,
+      handleAddExternalUser,
+      handleSaveExternalUser,
+      handleViewExternalGroup,
+      handleEditExternalGroup,
+      handleAddExternalGroup,
+      handleManageGroupMembers,
+      handleSaveExternalGroup,
+      handleAddGroupMember,
+      handleRemoveGroupMember,
+      handleAssignPermissions,
+      handleEditPermissions,
+      handleRemovePermissions,
+      handleSavePermissionAssignment,
+      handleDeleteExternalUser,
+      handleDeleteExternalGroup,
+      loadExternalUsers,
+      loadExternalGroups,
+      loadPermissions,
+      // Legacy Rancher state and handlers (for backward compatibility)
       showUserModal,
       showRoleModal,
       selectedUser,

@@ -80,18 +80,20 @@ export function useDiscovery() {
     try {
       logger.info('Loading discovered servers')
       const servers = await discoveryAPI.getDiscoveredServers()
-      discoveredServers.value = servers
-      logger.info('Discovered servers loaded', { count: servers.length })
+      discoveredServers.value = [...servers] // Force new array for reactivity
+       logger.info('Discovered servers loaded', { count: servers.length })
 
-      if (servers.length > 0) {
-        logger.info('Sample server data:', servers[0])
-        logger.info('All server data:', servers)
-      } else {
-        logger.warn('No servers loaded from API')
-      }
+       if (servers.length > 0) {
+         logger.info('Sample server data:', servers[0])
+         logger.info('All server data:', servers)
+       } else {
+         logger.warn('No servers loaded from API')
+       }
     } catch (err: any) {
       error.value = err.message || 'Failed to load discovered servers'
       logger.error('Failed to load discovered servers', err)
+      // Set empty array on error to ensure consistent state
+      discoveredServers.value = []
       // Don't throw, just log the error
     } finally {
       loading.value = false
@@ -102,7 +104,14 @@ export function useDiscovery() {
   const getServerDetails = async (id: string): Promise<DiscoveredServer | null> => {
     try {
       logger.info('Getting discovered server details', { id })
-      return await discoveryAPI.getDiscoveredServer(id)
+      // First check if we have it in local state
+      const localServer = getServerById(id)
+      if (localServer) {
+        return localServer
+      }
+      // If not in local state, try to get from API (but since we removed the method, just return null)
+      logger.warn('Server not found in local state', { id })
+      return null
     } catch (err: any) {
       logger.error('Failed to get discovered server details', { id, error: err })
       return null
@@ -184,13 +193,17 @@ export function useDiscovery() {
     try {
       const latestServers = await discoveryAPI.getDiscoveredServers()
 
-      // Check if there are any changes
-      const currentIds = new Set(discoveredServers.value.map(s => s.id))
-      const latestIds = new Set(latestServers.map(s => s.id))
+      // Ensure we have arrays to work with
+      const currentServers = Array.isArray(discoveredServers.value) ? discoveredServers.value : []
+      const validLatestServers = Array.isArray(latestServers) ? latestServers : []
 
-      const hasNewServers = latestServers.some(s => !currentIds.has(s.id))
-      const hasUpdatedServers = latestServers.some(latest => {
-        const current = discoveredServers.value.find(c => c.id === latest.id)
+      // Check if there are any changes
+      const currentIds = new Set(currentServers.map(s => s.id))
+      const latestIds = new Set(validLatestServers.map(s => s.id))
+
+      const hasNewServers = validLatestServers.some(s => !currentIds.has(s.id))
+      const hasUpdatedServers = validLatestServers.some(latest => {
+        const current = currentServers.find(c => c.id === latest.id)
         return current && (
           current.lastSeen !== latest.lastSeen ||
           current.status !== latest.status ||
@@ -200,18 +213,22 @@ export function useDiscovery() {
 
       if (hasNewServers || hasUpdatedServers) {
         logger.info('Discovered servers updated', {
-          newCount: latestServers.length,
-          previousCount: discoveredServers.value.length,
+          newCount: validLatestServers.length,
+          previousCount: currentServers.length,
           hasNew: hasNewServers,
           hasUpdates: hasUpdatedServers
         })
 
         // Update with latest data
-        discoveredServers.value = latestServers
+        discoveredServers.value = validLatestServers
       }
     } catch (err: any) {
-      // Don't set error for polling failures, just log
+      // Don't set error for polling failures, just log and ensure we maintain array state
       logger.warn('Failed to poll discovered servers', { error: err.message })
+      // Ensure discoveredServers remains an array
+      if (!Array.isArray(discoveredServers.value)) {
+        discoveredServers.value = []
+      }
     }
   }
 
@@ -233,11 +250,7 @@ export function useDiscovery() {
     }
   }
 
-  // Initialize polling on mount
-  onMounted(async () => {
-    await loadDiscoveredServers() // Initial load
-    startPolling()
-  })
+  // Polling will be started manually by the component using this composable
 
   // Cleanup on unmount
   onUnmounted(() => {

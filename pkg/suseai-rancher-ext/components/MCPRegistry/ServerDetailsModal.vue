@@ -231,20 +231,56 @@
              </div>
            </div>
 
-           <!-- Links -->
-           <div v-if="serverData.source_url || serverData.project_url" class="detail-section">
-             <h4>Links</h4>
-             <div class="links-list">
-               <a v-if="serverData.source_url" :href="serverData.source_url" target="_blank" class="link-item">
-                 Source Code
-                 <i class="icon icon-external-link"></i>
-               </a>
-               <a v-if="serverData.project_url" :href="serverData.project_url" target="_blank" class="link-item">
-                 Project Page
-                 <i class="icon icon-external-link"></i>
-               </a>
-             </div>
-           </div>
+ 
+
+           <!-- Source Information -->
+            <div v-if="serverData._meta?.source || (serverData as any).repository || serverData.source_url || serverData.project_url" class="detail-section">
+              <h4>Source Information</h4>
+              <div class="source-details">
+                <!-- Repository -->
+                <div v-if="(serverData as any).repository?.url" class="source-item">
+                  <div class="source-label">Repository:</div>
+                  <a :href="(serverData as any).repository.url" target="_blank" rel="noopener noreferrer" class="source-link">
+                    {{ (serverData as any).repository.url }}
+                    <i class="icon icon-external-link"></i>
+                  </a>
+                </div>
+                <!-- Branch -->
+                <div v-if="(serverData as any).repository?.branch" class="source-item">
+                  <div class="source-label">Branch:</div>
+                  <div class="source-value">{{ (serverData as any).repository.branch }}</div>
+                </div>
+                <!-- Commit -->
+                <div v-if="(serverData as any).repository?.commit" class="source-item">
+                  <div class="source-label">Commit:</div>
+                  <div class="source-value">{{ (serverData as any).repository.commit }}</div>
+                </div>
+                <!-- Source from meta -->
+                <div v-if="serverData._meta?.source && !(serverData as any).repository?.url" class="source-item">
+                  <div class="source-label">Source:</div>
+                  <a :href="serverData._meta.source" target="_blank" rel="noopener noreferrer" class="source-link">
+                    {{ serverData._meta.source }}
+                    <i class="icon icon-external-link"></i>
+                  </a>
+                </div>
+                <!-- Source URL fallback -->
+                <div v-if="serverData.source_url && !serverData._meta?.source && !(serverData as any).repository?.url" class="source-item">
+                  <div class="source-label">Source Code:</div>
+                  <a :href="serverData.source_url" target="_blank" rel="noopener noreferrer" class="source-link">
+                    View Source
+                    <i class="icon icon-external-link"></i>
+                  </a>
+                </div>
+                <!-- Project URL -->
+                <div v-if="serverData.project_url" class="source-item">
+                  <div class="source-label">Project:</div>
+                  <a :href="serverData.project_url" target="_blank" rel="noopener noreferrer" class="source-link">
+                    View Project
+                    <i class="icon icon-external-link"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
         </div>
       </div>
     </div>
@@ -268,7 +304,7 @@ export default defineComponent({
     }
   },
   emits: ['close'],
-  setup(props) {
+  setup(props, { emit }) {
     const serverData = ref<any>(null)
     const loading = ref(false)
     const error = ref<string | null>(null)
@@ -316,6 +352,8 @@ export default defineComponent({
       }
       return String(config)
     }
+
+
 
     const fetchServerDetails = async () => {
       if (!props.serverId) return
@@ -895,6 +933,8 @@ export default defineComponent({
   color: var(--body-text);
 }
 
+
+
 /* Documentation */
 .doc-link {
   display: inline-flex;
@@ -977,6 +1017,52 @@ export default defineComponent({
   color: white;
   text-decoration: none;
   border-color: var(--primary, #007bff);
+}
+
+.source-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light, #f0f0f0);
+}
+
+.source-item:last-child {
+  border-bottom: none;
+}
+
+.source-label {
+  font-weight: 600;
+  color: var(--body-text, #333);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.source-value {
+  color: var(--body-text, #333);
+  font-family: monospace;
+  background: var(--accent-bg, #f8f9fa);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.source-link {
+  color: var(--primary, #007bff);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.source-link:hover {
+  text-decoration: underline;
 }
 
 .btn {

@@ -9,20 +9,17 @@
   <div v-else>
     <ExperimentalBanner />
 
-    <Dashboard
-      v-if="proxyInstalled && isEnabled"
-      :discovered-servers="discoveredServers as any[]"
-      :adapters="adapters as any[]"
-      :discovery-loading="discoveryLoading"
-      :adapters-loading="adaptersLoading"
-      :scanning="scanning"
-      :scan-progress="scanProgress"
-      @scan-modal-open="openScanModal"
-      @security-modal-open="openSecurityModal"
-      @rule-modal-open="openRuleModal"
-      @sync-adapter="handleSyncAdapter"
-      @view-server-details="openServerDetailsModal"
-    />
+     <Dashboard
+       v-if="proxyInstalled && isEnabled"
+       :adapters="adapters"
+       :adapters-error="adaptersError || undefined"
+       :adapters-loading="adaptersLoading"
+       @scan-modal-open="openScanModal"
+       @security-modal-open="openSecurityModal"
+       @rule-modal-open="openRuleModal"
+       @sync-adapter="handleSyncAdapter"
+       @view-server-details="openServerDetailsModal"
+     />
 
     <ProxyStatus v-if="proxyInstalled && isEnabled" />
 
@@ -51,6 +48,7 @@ import { defineComponent, ref, watch, onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useDiscovery } from '../composables/useDiscovery';
 import { useAdapters } from '../composables/useAdapters';
+import { updateApiBaseUrls, API_BASE_URLS } from '../config/api-config';
 import { ExperimentalBanner, Dashboard, ProxyStatus, ServerDetailsModal } from '../components/MCPGateway';
 import FeatureFlag from '../components/shared/FeatureFlag.vue';
 import ScheduleScanModal from '../components/shared/ScheduleScanModal.vue';
@@ -72,10 +70,10 @@ export default defineComponent({
   setup() {
     const store = useStore();
 
-    // Use new composables
     const {
       discoveredServers,
       loading: discoveryLoading,
+      error: discoveryError,
       scanning,
       currentScan,
       scanProgress,
@@ -87,9 +85,12 @@ export default defineComponent({
       getVulnerabilityScore
     } = useDiscovery();
 
+
+
     const {
       adapters,
       loading: adaptersLoading,
+      error: adaptersError,
       loadAdapters,
       createAdapter,
       deleteAdapter,
@@ -101,11 +102,47 @@ export default defineComponent({
     const selectedServices = computed(() => store.state.suseai.settings.selectedServices);
     const isEnabled = computed(() => proxyInstalled.value && selectedServices.value.includes('mcp-gateway'));
 
+    // Test service connectivity - force use of configured IP ADDRESS, no fallback
+    const testServiceUrl = async () => {
+      try {
+        console.log('MCPGateway testing configured service URL:', API_BASE_URLS.MCP_GATEWAY)
+
+        // Test current configured URL
+        const currentUrl = `${API_BASE_URLS.MCP_GATEWAY}/health`
+        try {
+          const response = await fetch(currentUrl, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000)
+          })
+          if (response.ok) {
+            console.log('MCPGateway configured service URL is accessible:', currentUrl)
+            return // Current URL works
+          } else {
+            console.warn('MCPGateway configured service URL returned non-OK status:', response.status)
+          }
+        } catch (error) {
+          console.error('MCPGateway configured service URL failed:', error)
+        }
+
+        console.warn('MCPGateway configured service URL is not accessible - will use it anyway as requested')
+      } catch (error) {
+        console.error('MCPGateway error during service URL testing:', error)
+      }
+    }
+
     // Load data on mount
     onMounted(async () => {
-      if (proxyInstalled.value) {
-        await loadAdapters()
-      }
+      // Initialize API URLs with service URL from store
+      const serviceUrls = store.state.suseai?.settings?.serviceUrls || []
+      const serviceUrl = serviceUrls.length > 0 ? serviceUrls[0] : undefined
+      console.log('MCPGateway serviceUrls from store:', serviceUrls)
+      console.log('MCPGateway serviceUrl to use:', serviceUrl)
+
+      // Set initial API URLs
+      updateApiBaseUrls(serviceUrl)
+
+      // Load discovered servers
+      await loadDiscoveredServers()
     });
 
     // Modal refs
@@ -183,6 +220,7 @@ export default defineComponent({
       // Discovery data
       discoveredServers,
       discoveryLoading,
+      discoveryError,
       scanning,
       currentScan,
       scanProgress,
@@ -190,6 +228,7 @@ export default defineComponent({
       // Adapters data
       adapters,
       adaptersLoading,
+      adaptersError,
 
       // Modal refs
       scanModal,
@@ -202,13 +241,14 @@ export default defineComponent({
       openRuleModal,
       handleSyncAdapter,
       onScanStarted,
+      loadDiscoveredServers,
 
       // Server details modal
       showServerDetailsModal,
       selectedServer,
       openServerDetailsModal,
       closeServerDetailsModal
-    }
+    };
   }
 });
 </script>

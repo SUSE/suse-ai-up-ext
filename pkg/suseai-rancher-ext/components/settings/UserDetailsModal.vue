@@ -11,10 +11,10 @@
       <div class="modal-body">
         <form v-if="isEditing && formData" @submit.prevent="handleSave" class="user-form">
           <div class="form-group">
-            <label for="username">Username *</label>
+            <label for="username">{{ $props.isExternal ? 'Name' : 'Username' }} *</label>
             <input
               id="username"
-              v-model="formData.username"
+              v-model="formUsername"
               type="text"
               required
               :disabled="!canEditUsername"
@@ -22,31 +22,41 @@
             />
           </div>
 
-          <div class="form-group">
+          <div v-if="$props.isExternal" class="form-group">
+            <label for="email">Email</label>
+            <input
+              id="email"
+              v-model="formEmail"
+              type="email"
+              class="form-input"
+            />
+          </div>
+
+          <div v-if="!props.isExternal" class="form-group">
             <label for="displayName">Display Name</label>
             <input
               id="displayName"
-              v-model="formData.displayName"
+              v-model="formDisplayName"
               type="text"
               class="form-input"
             />
           </div>
 
-          <div class="form-group">
+          <div v-if="!props.isExternal" class="form-group">
             <label for="description">Description</label>
             <textarea
               id="description"
-              v-model="formData.description"
+              v-model="formDescription"
               rows="3"
               class="form-input"
               placeholder="Optional description for this user"
             ></textarea>
           </div>
 
-          <div class="form-group">
+          <div v-if="!props.isExternal" class="form-group">
             <label class="checkbox-label">
               <input
-                v-model="formData.enabled"
+                v-model="formEnabled"
                 type="checkbox"
                 class="form-checkbox"
               />
@@ -60,30 +70,34 @@
             <h3>Basic Information</h3>
             <div class="detail-grid">
               <div class="detail-item">
-                <label>Username:</label>
-                <span>{{ user?.username }}</span>
+                <label>{{ props.isExternal ? 'Name:' : 'Username:' }}</label>
+                <span>{{ getUserField('username') }}</span>
               </div>
-              <div class="detail-item">
+              <div v-if="props.isExternal" class="detail-item">
+                <label>Email:</label>
+                <span>{{ getUserField('email') }}</span>
+              </div>
+              <div v-if="!props.isExternal" class="detail-item">
                 <label>Display Name:</label>
-                <span>{{ user?.displayName || user?.username }}</span>
+                <span>{{ getUserField('displayName') }}</span>
               </div>
-              <div class="detail-item">
+              <div v-if="!props.isExternal" class="detail-item">
                 <label>Status:</label>
-                <span class="status-badge" :class="{ 'enabled': user?.enabled, 'disabled': !user?.enabled }">
-                  {{ user?.enabled ? 'Enabled' : 'Disabled' }}
+                <span class="status-badge" :class="{ 'enabled': getUserField('enabled'), 'disabled': !getUserField('enabled') }">
+                  {{ getUserField('enabled') ? 'Enabled' : 'Disabled' }}
                 </span>
               </div>
               <div class="detail-item">
                 <label>Created:</label>
-                <span>{{ formatDate(user?.created) }}</span>
+                <span>{{ formatDate(getUserField('created')) }}</span>
               </div>
-              <div class="detail-item">
+              <div v-if="!props.isExternal" class="detail-item">
                 <label>Last Login:</label>
-                <span>{{ user?.lastLogin ? formatDate(user?.lastLogin) : 'Never' }}</span>
+                <span>{{ getUserField('lastLogin') ? formatDate(getUserField('lastLogin')) : 'Never' }}</span>
               </div>
-              <div class="detail-item">
+              <div v-if="!props.isExternal" class="detail-item">
                 <label>Auth Provider:</label>
-                <span>{{ getAuthProvider(user) }}</span>
+                <span>{{ getAuthProvider(user as any) }}</span>
               </div>
             </div>
           </div>
@@ -93,11 +107,11 @@
             <p>{{ user.description }}</p>
           </div>
 
-          <div class="detail-section">
+          <div v-if="!isExternal" class="detail-section">
             <h3>Principal IDs</h3>
-            <div v-if="user?.principalIds?.length" class="principal-ids">
+            <div v-if="getUserField('principalIds')?.length" class="principal-ids">
               <div
-                v-for="principalId in user.principalIds"
+                v-for="principalId in getUserField('principalIds')"
                 :key="principalId"
                 class="principal-id"
               >
@@ -107,7 +121,7 @@
             <p v-else class="no-data">No principal IDs available</p>
           </div>
 
-          <div v-if="userPermissions" class="detail-section">
+          <div v-if="!props.isExternal && userPermissions" class="detail-section">
             <h3>Permissions</h3>
             <div class="permissions-summary">
               <div v-if="userPermissions.global.length > 0" class="permission-group">
@@ -130,6 +144,32 @@
                 <p>{{ Object.keys(userPermissions.project).length }} projects</p>
               </div>
             </div>
+          </div>
+          <div v-if="isExternal" class="detail-section">
+            <h3>Groups</h3>
+            <div v-if="getUserField('groups')?.length" class="groups-list">
+              <div
+                v-for="groupId in getUserField('groups')"
+                :key="groupId"
+                class="group-item"
+              >
+                {{ groupId }}
+              </div>
+            </div>
+            <p v-else class="no-data">No groups assigned</p>
+          </div>
+          <div v-if="isExternal" class="detail-section">
+            <h3>Groups</h3>
+            <div v-if="getUserField('groups')?.length" class="groups-list">
+              <div
+                v-for="groupId in getUserField('groups')"
+                :key="groupId"
+                class="group-item"
+              >
+                {{ groupId }}
+              </div>
+            </div>
+            <p v-else class="no-data">No groups assigned</p>
           </div>
         </div>
       </div>
@@ -162,13 +202,13 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from 'vue';
-import type { RancherUser, UserPermissions } from '../../types/auth-types';
+import type { RancherUser, ExternalUser, UserPermissions } from '../../types/auth-types';
 
 export default defineComponent({
   name: 'UserDetailsModal',
   props: {
     user: {
-      type: Object as () => RancherUser | null,
+      type: Object as () => RancherUser | ExternalUser | null,
       default: null
     },
     show: {
@@ -182,29 +222,102 @@ export default defineComponent({
     userPermissions: {
       type: Object as () => UserPermissions | null,
       default: null
+    },
+    isExternal: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['close', 'save'],
   setup(props, { emit }) {
     const isEditing = ref(false);
-    const formData = ref<RancherUser | null>(null);
+    const formData = ref<RancherUser | ExternalUser | null>(null);
 
     // Watch for user changes to reset form
     watch(() => props.user, (newUser) => {
       if (newUser) {
-        formData.value = { ...newUser };
+        // Create a mutable copy of the user data
+        formData.value = JSON.parse(JSON.stringify(newUser));
         isEditing.value = false;
       }
     }, { immediate: true });
 
     // Computed properties
     const isFormValid = computed(() => {
-      return formData.value?.username?.trim();
+      if (!formData.value) return false;
+
+      if (props.isExternal) {
+        const externalData = formData.value as ExternalUser;
+        return externalData.name?.trim();
+      } else {
+        const rancherData = formData.value as RancherUser;
+        return rancherData.username?.trim();
+      }
     });
 
     const canEditUsername = computed(() => {
       // Allow editing username for new users, but not for existing ones
       return !props.user?.id;
+    });
+
+    // Form field computed properties for v-model
+    const formUsername = computed({
+      get: () => {
+        if (!formData.value) return '';
+        return props.isExternal ? (formData.value as any).name : (formData.value as any).username;
+      },
+      set: (value: string) => {
+        if (!formData.value) return;
+        if (props.isExternal) {
+          (formData.value as any).name = value;
+        } else {
+          (formData.value as any).username = value;
+        }
+      }
+    });
+
+    const formEmail = computed({
+      get: () => {
+        if (!formData.value || !props.isExternal) return '';
+        return (formData.value as ExternalUser).email;
+      },
+      set: (value: string) => {
+        if (!formData.value || !props.isExternal) return;
+        (formData.value as ExternalUser).email = value;
+      }
+    });
+
+    const formDisplayName = computed({
+      get: () => {
+        if (!formData.value || props.isExternal) return '';
+        return (formData.value as any).displayName || '';
+      },
+      set: (value: string) => {
+        if (!formData.value || props.isExternal) return;
+        (formData.value as any).displayName = value;
+      }
+    });
+
+    const formDescription = computed({
+      get: () => {
+        if (!formData.value || props.isExternal) return '';
+        return (formData.value as any).description || '';
+      },
+      set: (value: string) => {
+        if (!formData.value || props.isExternal) return;
+        (formData.value as any).description = value;
+      }
+    });
+
+    const formEnabled = computed({
+      get: () => {
+        if (!formData.value || props.isExternal) return true;
+        return (formData.value as any).enabled || false;
+      },
+      set: (value: boolean) => {
+        if (!formData.value || props.isExternal) return;
+        (formData.value as any).enabled = value;
+      }
     });
 
     // Methods
@@ -246,16 +359,74 @@ export default defineComponent({
       return 'Local';
     };
 
+    // Helper methods for different user types
+    const getUserField = (field: string): any => {
+      if (!props.user) return '';
+
+      if (props.isExternal) {
+        const externalUser = props.user as ExternalUser;
+        switch (field) {
+          case 'username': return externalUser.name;
+          case 'email': return externalUser.email;
+          case 'created': return externalUser.createdAt;
+          default: return '';
+        }
+      } else {
+        const rancherUser = props.user as RancherUser;
+        return rancherUser[field as keyof RancherUser] || '';
+      }
+    };
+
+    const getFormField = (field: string): any => {
+      if (!formData.value) return '';
+
+      if (props.isExternal) {
+        const externalForm = formData.value as ExternalUser;
+        switch (field) {
+          case 'username': return externalForm.name;
+          case 'email': return externalForm.email;
+          default: return '';
+        }
+      } else {
+        const rancherForm = formData.value as RancherUser;
+        return rancherForm[field as keyof RancherUser] || '';
+      }
+    };
+
+    const setFormField = (field: string, value: any): void => {
+      if (!formData.value) return;
+
+      if (props.isExternal) {
+        const externalForm = formData.value as ExternalUser;
+        switch (field) {
+          case 'username': externalForm.name = value; break;
+          case 'email': externalForm.email = value; break;
+        }
+      } else {
+        const rancherForm = formData.value as RancherUser;
+        (rancherForm as any)[field] = value;
+      }
+    };
+
     return {
       isEditing,
       formData,
       isFormValid,
       canEditUsername,
+      formUsername,
+      formEmail,
+      formDisplayName,
+      formDescription,
+      formEnabled,
       startEditing,
       handleSave,
       handleOverlayClick,
       formatDate,
-      getAuthProvider
+      getAuthProvider,
+      getUserField,
+      getFormField,
+      setFormField,
+      props
     };
   }
 });
@@ -268,24 +439,23 @@ export default defineComponent({
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  backdrop-filter: blur(2px);
 }
 
 .modal-content {
-  background: var(--card-bg);
-  border-radius: 8px;
-  box-shadow: var(--card-shadow);
-  max-width: 600px;
-  width: 100%;
-  max-height: 90vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  background: var(--body-bg, white);
+  border-radius: var(--border-radius, 8px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  max-width: 90vw;
+  width: 800px;
+  max-height: 80vh;
+  overflow-y: auto;
+  border: 1px solid var(--border, #e0e0e0);
 }
 
 .modal-header {

@@ -13,6 +13,7 @@ export interface KubernetesPod {
   };
   spec: {
     containers: Array<{
+      name?: string;
       ports?: Array<{
         containerPort: number;
         protocol: string;
@@ -92,20 +93,20 @@ export function useServiceDiscovery() {
         const allPods = response?.data?.items || response?.data || response?.items || [];
         console.log(`📊 [ServiceDiscovery] Extracted ${allPods.length} pods from response`);
 
-        // Filter for SUSE AI UP pods (name starts with 'uniproxy' in namespace 'suse-ai-up' and has port 8911)
+        // Filter for SUSE AI UP pods (container named 'suse-ai-up' in namespace 'suse-ai-up' and has port 8911)
         const suseAIPods = allPods.filter((pod: any) => {
           const podName = pod.metadata?.name || '';
           const podNamespace = pod.metadata?.namespace || '';
-          const hasCorrectPort = pod.spec?.containers?.some((container: any) =>
-            container.ports?.some((port: any) => port.containerPort === 8911)
+          const hasCorrectContainer = pod.spec?.containers?.some((container: any) =>
+            container.name === 'suse-ai-up' && container.ports?.some((port: any) => port.containerPort === 8911)
           );
-          const isSuseAIPod = podName.startsWith('uniproxy') && podNamespace === 'suse-ai-up';
+          const isInCorrectNamespace = podNamespace === 'suse-ai-up';
 
-          if (isSuseAIPod) {
-            console.log(`🔍 [ServiceDiscovery] Checking pod ${podName}: port=${hasCorrectPort}, name=${isSuseAIPod}`);
+          if (isInCorrectNamespace) {
+            console.log(`🔍 [ServiceDiscovery] Checking pod ${podName}: container=${hasCorrectContainer}, namespace=${isInCorrectNamespace}`);
           }
 
-          return hasCorrectPort && isSuseAIPod;
+          return hasCorrectContainer && isInCorrectNamespace;
         });
 
         console.log(`🎯 [ServiceDiscovery] Found ${suseAIPods.length} SUSE AI UP pods out of ${allPods.length} total pods`);
@@ -160,48 +161,54 @@ export function useServiceDiscovery() {
          const services = servicesData.items;
             console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for uniproxy service`);
 
-            // Find services named 'uniproxy' with port 8911
-             const suseAIServices = services.filter((service: any) => {
-               const serviceName = service.metadata?.name;
-               const serviceNamespace = service.metadata?.namespace;
-               const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
-               return serviceName === 'uniproxy' && serviceNamespace === 'suse-ai-up' && hasPort8911;
-             });
+             // Find services in suse-ai-up namespace with port 8911
+              const suseAIServices = services.filter((service: any) => {
+                const serviceName = service.metadata?.name;
+                const serviceNamespace = service.metadata?.namespace;
+                const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
+                return serviceNamespace === 'suse-ai-up' && hasPort8911;
+              });
 
          console.log(`🎯 [ServiceDiscovery] Found ${suseAIServices.length} SUSE AI UP services`);
 
-         // Return the first healthy service
-         for (const service of suseAIServices) {
-           const serviceName = service.metadata?.name;
-           const serviceNamespace = service.metadata?.namespace;
-           console.log(`🔍 [ServiceDiscovery] Checking service: ${serviceNamespace}/${serviceName}`);
+          // Return the first healthy service
+          for (const service of suseAIServices) {
+            const serviceName = service.metadata?.name;
+            const serviceNamespace = service.metadata?.namespace;
+            console.log(`🔍 [ServiceDiscovery] Checking service: ${serviceNamespace}/${serviceName}`);
 
-           // Get the service IP
-           const serviceIP = service.spec?.clusterIP;
-           if (!serviceIP || serviceIP === 'None') {
-             console.warn(`⚠️ [ServiceDiscovery] Service ${serviceNamespace}/${serviceName} found but no cluster IP available`);
-             continue;
-           }
+            // Extract loadbalancer/external IP for health check
+            const loadBalancerIP = service.status?.loadBalancer?.ingress?.[0]?.ip;
+            const externalIPs = service.spec?.externalIPs || [];
+            const clusterIP = service.spec?.clusterIP;
 
-           // Perform health check
-           let isHealthy = false;
-           try {
-              const healthResponse = await fetch(`http://${serviceIP}:8911/health`, {
-               method: 'GET',
-               mode: 'cors',
-               headers: { 'Content-Type': 'application/json' }
-             });
-             isHealthy = healthResponse.ok;
-             console.log(`🏥 [ServiceDiscovery] Service health check for ${serviceNamespace}/${serviceName} (${serviceIP}): ${isHealthy ? 'PASS' : 'FAIL'}`);
-           } catch (error) {
-             console.warn(`⚠️ [ServiceDiscovery] Service health check failed for ${serviceNamespace}/${serviceName} (${serviceIP}):`, error);
-           }
+            // Try loadbalancer IP first, then external IPs, then cluster IP
+            const checkIP = loadBalancerIP || externalIPs[0] || clusterIP;
 
-           if (isHealthy) {
-             console.log(`✅ [ServiceDiscovery] Found healthy SUSE AI UP service: ${serviceNamespace}/${serviceName}`);
-             return service;
-           }
-         }
+            if (!checkIP || checkIP === 'None') {
+              console.warn(`⚠️ [ServiceDiscovery] Service ${serviceNamespace}/${serviceName} found but no accessible IP available`);
+              continue;
+            }
+
+            // Perform health check
+            let isHealthy = false;
+            try {
+               const healthResponse = await fetch(`http://${checkIP}:8911/health`, {
+                method: 'GET',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              isHealthy = healthResponse.ok;
+              console.log(`🏥 [ServiceDiscovery] Service health check for ${serviceNamespace}/${serviceName} (${checkIP}): ${isHealthy ? 'PASS' : 'FAIL'}`);
+            } catch (error) {
+              console.warn(`⚠️ [ServiceDiscovery] Service health check failed for ${serviceNamespace}/${serviceName} (${checkIP}):`, error);
+            }
+
+            if (isHealthy) {
+              console.log(`✅ [ServiceDiscovery] Found healthy SUSE AI UP service: ${serviceNamespace}/${serviceName} at ${checkIP}`);
+              return service;
+            }
+          }
 
          console.log(`ℹ️ [ServiceDiscovery] No healthy SUSE AI UP services found`);
        }
@@ -340,20 +347,20 @@ export function useServiceDiscovery() {
           throw new Error('Invalid response format from Kubernetes API');
         }
 
-         console.log(`✅ [ServiceDiscovery] Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`);
-         logger.info(`Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`)
-           const suseAIPods = pods.filter(pod => {
-            const hasCorrectPort = pod.spec?.containers?.some(container =>
-              container.ports?.some((port: any) => port.containerPort === 8911)
-            );
-            const podName = pod.metadata?.name || 'unknown';
-            const podNamespace = pod.metadata?.namespace || 'unknown';
-            const isSuseAIPod = podName.startsWith('uniproxy') && podNamespace === 'suse-ai-up';
+          console.log(`✅ [ServiceDiscovery] Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`);
+          logger.info(`Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`)
+            const suseAIPods = pods.filter(pod => {
+             const hasCorrectContainer = pod.spec?.containers?.some(container =>
+               container.name === 'suse-ai-up' && container.ports?.some((port: any) => port.containerPort === 8911)
+             );
+             const podName = pod.metadata?.name || '';
+             const podNamespace = pod.metadata?.namespace || '';
+             const isInCorrectNamespace = podNamespace === 'suse-ai-up';
 
-           console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: port=${hasCorrectPort}, name=${isSuseAIPod}`);
+            console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: container=${hasCorrectContainer}, namespace=${isInCorrectNamespace}`);
 
-           return hasCorrectPort && isSuseAIPod;
-         });
+            return hasCorrectContainer && isInCorrectNamespace;
+          });
 
        logger.info(`Found ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`)
 
@@ -583,31 +590,55 @@ export function useServiceDiscovery() {
     }
   };
 
-  /**
-     * Check service health by trying to connect to /health endpoint
-     */
-   const checkServiceHealth = async (url: string): Promise<boolean> => {
-     try {
-       const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`;
-       console.log(`🔍 [ServiceDiscovery] Checking health at: ${healthUrl}`);
+   /**
+      * Check service health by trying to connect to /health endpoint
+      */
+    const checkServiceHealth = async (url: string): Promise<boolean> => {
+      try {
+        const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`;
+        console.log(`🔍 [ServiceDiscovery] Checking health at: ${healthUrl}`);
 
-       const controller = new AbortController();
-       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-       const response = await fetch(healthUrl, {
-         method: 'GET',
-         mode: 'no-cors', // Allow cross-origin requests
-         signal: controller.signal
-       });
+        const response = await fetch(healthUrl, {
+          method: 'GET',
+          mode: 'cors', // Allow cross-origin requests
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal
+        });
 
-       clearTimeout(timeoutId);
-       console.log(`✅ [ServiceDiscovery] Health check response:`, response);
-       return true; // If we get any response, consider it healthy
-     } catch (error) {
-       console.warn(`⚠️ [ServiceDiscovery] Health check failed for ${url}:`, error);
-       return false;
-     }
-   };
+        clearTimeout(timeoutId);
+        console.log(`✅ [ServiceDiscovery] Health check response:`, response);
+        return true; // If we get any response, consider it healthy
+      } catch (error) {
+        console.warn(`⚠️ [ServiceDiscovery] Health check failed for ${url}:`, error);
+        return false;
+      }
+    };
+
+   /**
+      * Check service health with loadbalancer IP fallback to localhost
+      * First tries the provided loadbalancer IP, then falls back to localhost:8911
+      */
+    const checkServiceHealthWithFallback = async (loadbalancerIP?: string): Promise<{ healthy: boolean; url: string }> => {
+      // First try loadbalancer IP if provided
+      if (loadbalancerIP) {
+        const lbUrl = `http://${loadbalancerIP}:8911`;
+        console.log(`🔍 [ServiceDiscovery] Trying loadbalancer IP: ${lbUrl}`);
+        const isHealthy = await checkServiceHealth(lbUrl);
+        if (isHealthy) {
+          return { healthy: true, url: lbUrl };
+        }
+        console.log(`⚠️ [ServiceDiscovery] Loadbalancer IP ${loadbalancerIP} failed, trying localhost`);
+      }
+
+      // Fallback to localhost
+      const localhostUrl = 'http://localhost:8911';
+      console.log(`🔍 [ServiceDiscovery] Trying localhost: ${localhostUrl}`);
+      const isHealthy = await checkServiceHealth(localhostUrl);
+      return { healthy: isHealthy, url: localhostUrl };
+    };
 
   /**
      * Check if any services were detected
@@ -636,13 +667,14 @@ export function useServiceDiscovery() {
       return detectedServices.value[0];
     });
 
-    return {
-      isLoading: readonly(isLoading),
-      detectedServices: readonly(detectedServices),
-      error: readonly(error),
-      discoverPods,
-      discoverPodObjects,
-      hasDetectedServices,
-      getPrimaryService
-    };
+     return {
+       isLoading: readonly(isLoading),
+       detectedServices: readonly(detectedServices),
+       error: readonly(error),
+       discoverPods,
+       discoverPodObjects,
+       hasDetectedServices,
+       getPrimaryService,
+       checkServiceHealthWithFallback
+     };
 }

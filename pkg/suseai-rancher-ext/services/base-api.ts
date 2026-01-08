@@ -8,6 +8,7 @@ export interface APIConfig {
   baseURL: string
   timeout: number
   retries: number
+  dynamicBaseURL?: () => string
 }
 
 export interface AuthHeaders {
@@ -30,14 +31,17 @@ export class BaseAPI {
   constructor(config: APIConfig) {
     this.config = config
     this.api = axios.create({
-      baseURL: config.baseURL,
+      baseURL: config.baseURL || undefined, // Allow empty baseURL to be set dynamically
       timeout: config.timeout,
       headers: {
         'Content-Type': 'application/json',
       },
     })
+  }
 
-    this.setupInterceptors()
+  // Get current baseURL
+  getBaseURL(): string | undefined {
+    return this.api.defaults.baseURL
   }
 
   private setupInterceptors() {
@@ -115,12 +119,20 @@ export class BaseAPI {
     config?: AxiosRequestConfig
   ): Promise<T> {
     try {
-      const response: AxiosResponse<T> = await this.api.request({
+      // Merge config with dynamic baseURL if needed
+      const requestConfig = {
         method,
         url,
         data,
         ...config
-      })
+      }
+
+      // Use dynamic baseURL if available and no baseURL set
+      if (!requestConfig.baseURL && this.config.dynamicBaseURL) {
+        requestConfig.baseURL = this.config.dynamicBaseURL()
+      }
+
+      const response: AxiosResponse<T> = await this.api.request(requestConfig)
       return response.data
     } catch (error) {
       // Error already handled by interceptor
