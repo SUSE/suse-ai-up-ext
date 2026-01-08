@@ -3,7 +3,6 @@ entries:
   suseai-rancher-ext:
   - annotations:
       catalog.cattle.io/certified: rancher
-      catalog.cattle.io/display-name: SUSE AI Universal Proxy
       catalog.cattle.io/namespace: cattle-ui-plugin-system
       catalog.cattle.io/os: linux
       catalog.cattle.io/permits-os: linux, windows
@@ -13,19 +12,12 @@ entries:
       catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
     apiVersion: v2
     appVersion: 0.1.0
-    created: "2026-01-08T13:04:26.2788+01:00"
-    description: SUSE AI Universal Proxy - A comprehensive MCP proxy system with discovery,
-      registry, and more
-    digest: c78998b28bb4f1acf9b805a4b4e7945d492814a73f78dc9dd2dcd1f7695b68c0
-    icon: https://apps.rancher.io/logos/suse-ai-deployer.png
-    maintainers:
-    - name: SUSE LLC
-      url: https://www.suse.com/
-    - email: ai@suse.com
-      name: SUSE AI Team
+    created: "2026-01-08T13:12:29.349447+01:00"
+    description: suseai-rancher-ext plugin
+    digest: df1a047bfaa1a6abbf4f03b5760ac837c676447a36020a9d03c5142f3626c309
     name: suseai-rancher-ext
     type: application
     urls:
     - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.0.tgz
     version: 0.1.0
-generated: "2026-01-08T13:04:26.278256+01:00"
+generated: "2026-01-08T13:12:29.349017+01:00"
