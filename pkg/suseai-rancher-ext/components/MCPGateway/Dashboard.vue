@@ -40,12 +40,37 @@
         :adapters="adapters"
         :loading="adaptersLoading"
         :ping-results="adapterPingResults"
-        @view-logs="handleViewAdapterLogs"
-        @sync-adapter="handleSyncAdapter"
-        @edit-adapter="handleEditAdapter"
+        @view-details="handleViewAdapterDetails"
         @delete-adapter="handleDeleteAdapter"
-        @refresh-adapters="handleRefreshAdapters"
       />
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click="cancelDelete">
+      <div class="modal-content delete-modal" @click.stop>
+        <div class="modal-header">
+          <h3 class="text-warning">
+            <i class="icon icon-warning"></i>
+            Delete Adapter
+          </h3>
+        </div>
+        <div class="modal-body">
+          <div class="delete-warning">
+            <p><strong>Warning:</strong> This action cannot be undone.</p>
+            <p>Are you sure you want to delete the adapter <strong>{{ adapterToDelete?.name }}</strong>?</p>
+            <p class="text-muted">This will permanently remove the adapter and all its associated data.</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="cancelDelete" :disabled="deleteLoading">
+            Cancel
+          </button>
+          <button class="btn btn-danger" @click="confirmDelete" :disabled="deleteLoading">
+            <i v-if="deleteLoading" class="icon icon-spinner icon-spin"></i>
+            {{ deleteLoading ? 'Deleting...' : 'Delete Adapter' }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Discovered MCP Servers Table -->
@@ -82,6 +107,7 @@ import AdaptersTable from './AdaptersTable.vue';
 import DiscoveredServersTable from './DiscoveredServersTable.vue';
 
 import { useHealthMonitoring } from '../../composables/useHealthMonitoring';
+import { useAdapters } from '../../composables/useAdapters';
 
 export default defineComponent({
   name: 'Dashboard',
@@ -141,6 +167,9 @@ export default defineComponent({
     // Health monitoring
     const { proxyHealth, registryHealth, discoveryHealth } = useHealthMonitoring();
 
+    // Adapters management
+    const { deleteAdapter } = useAdapters();
+
     // Computed properties for metrics and data
     const discoveredCount = computed(() => servers.value.length);
     const adaptersData = computed(() => {
@@ -165,6 +194,11 @@ export default defineComponent({
     const loadingMetrics = ref(false);
     const adapterPingResults = ref({});
 
+    // Delete functionality
+    const showDeleteModal = ref(false);
+    const adapterToDelete = ref<any>(null);
+    const deleteLoading = ref(false);
+
     const handleScanStart = () => {
       emit('scan-modal-open');
     };
@@ -173,49 +207,51 @@ export default defineComponent({
       emit('rule-modal-open');
     };
 
-    const handleViewAdapterLogs = (adapter: any) => {
-      console.log('View adapter logs:', adapter.name);
-    };
-
-    const handleSyncAdapter = (adapter: any) => {
-      console.log('Sync adapter:', adapter.name);
-    };
-
-    const handleEditAdapter = (adapter: any) => {
-      console.log('Edit adapter:', adapter.name);
+    const handleViewAdapterDetails = (adapter: any) => {
+      console.log('View adapter details:', adapter.name);
+      // TODO: Implement adapter details modal
     };
 
     const handleDeleteAdapter = (adapter: any) => {
-      console.log('Delete adapter:', adapter.name);
+      adapterToDelete.value = adapter;
+      showDeleteModal.value = true;
+    };
+
+    const cancelDelete = () => {
+      adapterToDelete.value = null;
+      showDeleteModal.value = false;
+      deleteLoading.value = false;
+    };
+
+    const confirmDelete = async () => {
+      if (!adapterToDelete.value) return;
+
+      deleteLoading.value = true;
+      try {
+        const success = await deleteAdapter(adapterToDelete.value.id || adapterToDelete.value.name);
+        if (success) {
+          console.log('Adapter deleted successfully:', adapterToDelete.value.name);
+          // The adapter will be automatically removed from the list by the composable
+        } else {
+          console.error('Failed to delete adapter:', adapterToDelete.value.name);
+        }
+      } catch (error) {
+        console.error('Error deleting adapter:', error);
+      } finally {
+        deleteLoading.value = false;
+        cancelDelete();
+      }
     };
 
     const handleViewServerDetails = (server: any) => {
       emit('view-server-details', server);
     };
 
-    const handleRefreshAdapters = () => {
-      console.log('Refresh adapters');
-    };
-
     const handleRegisterServer = (server: any) => {
       console.log('Register server:', server.name);
     };
 
-    const handleCreateSession = (adapter: any) => {
-      console.log('Create session for adapter:', adapter.name);
-    };
 
-    const handleTerminateSession = (session: any) => {
-      console.log('Terminate session:', session.id);
-    };
-
-    const handleViewSessionDetails = (session: any) => {
-      console.log('View session details:', session.id);
-    };
-
-    const handleRefreshMetrics = () => {
-      console.log('Refresh metrics');
-    };
 
     return {
       discoveredServers: servers,
@@ -230,17 +266,15 @@ export default defineComponent({
       loading,
       handleScanStart,
       handleRuleManagement,
-      handleViewAdapterLogs,
-      handleSyncAdapter,
-      handleEditAdapter,
+      handleViewAdapterDetails,
       handleDeleteAdapter,
+      cancelDelete,
+      confirmDelete,
+      showDeleteModal,
+      adapterToDelete,
+      deleteLoading,
       handleViewServerDetails,
-      handleRefreshAdapters,
-      handleRegisterServer,
-      handleCreateSession,
-      handleTerminateSession,
-      handleViewSessionDetails,
-      handleRefreshMetrics
+      handleRegisterServer
     };
   }
 });
@@ -281,5 +315,112 @@ export default defineComponent({
   border: 2px dashed var(--border, #e1e5e9);
   border-radius: 8px;
   background: var(--accent-bg, #f8f9fa);
+}
+
+/* Delete Confirmation Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--body-bg, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  width: 90%;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--body-text, #111827);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-header h3 i {
+  color: var(--warning, #f59e0b);
+}
+
+.modal-body {
+  padding: 16px 24px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  background: var(--accent-bg, #f9fafb);
+}
+
+.delete-modal {
+  max-width: 450px;
+}
+
+.delete-warning {
+  text-align: center;
+}
+
+.delete-warning p {
+  margin: 12px 0;
+  line-height: 1.5;
+}
+
+.delete-warning p:first-child {
+  font-weight: 600;
+  color: var(--error, #dc2626);
+}
+
+.text-warning {
+  color: var(--warning, #f59e0b) !important;
+}
+
+.text-muted {
+  color: var(--muted, #6b7280);
+}
+
+.btn-danger {
+  background: var(--error, #dc2626);
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--error-hover, #b91c1c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.2);
 }
 </style>

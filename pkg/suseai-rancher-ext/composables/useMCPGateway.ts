@@ -84,22 +84,14 @@ export function useMCPGateway() {
   const scanCompletedCallbacks = ref<(() => void)[]>([]);
   const scanFailedCallbacks = ref<((error: string) => void)[]>([]);
 
-  // Session Management
-  const sessions = ref<Record<string, SessionInfo[]>>({});
-  const selectedAdapterSessions = ref<SessionInfo[]>([]);
-  const loadingSessions = ref(false);
-  const sessionMetrics = ref<Record<string, SessionMetrics>>({});
+
 
   // Token Management
   const adapterTokens = ref<Record<string, any>>({});
   const loadingTokens = ref(false);
   const tokenValidation = ref<Record<string, TokenValidationResult>>({});
 
-  // Metrics and Monitoring
-  const adapterMetrics = ref<Record<string, AdapterMetrics>>({});
-  const systemMetrics = ref<SystemMetrics | null>(null);
-  const loadingMetrics = ref(false);
-  const metricsPollInterval = ref<number | null>(null);
+
 
   // MCP Server Ping Status
   const adapterPingResults = ref<Record<string, boolean>>({});
@@ -507,69 +499,50 @@ export function useMCPGateway() {
 
   const registerServer = async (server: DiscoveredServer) => {
     try {
-      const adapterName = server.name ? sanitizeAdapterName(server.name) : `adapter-${server.id}`;
+      // First register the discovered server using the discovery register endpoint
+      const registrationResult = await MCPService.registerDiscoveredServer(server.id);
 
-      // Create adapter data from discovered server with authentication required
-      const adapterData: AdapterData = {
-        name: adapterName,
-        imageName: 'mcp/adapter',
-        imageVersion: '1.0.0',
-        description: `Adapter for ${server.name || server.address}`,
-        connectionType: 'RemoteHttp', // Always use RemoteHttp for remote HTTP-based MCP servers
-        protocol: 'MCP',
-        replicaCount: 1,
-        useWorkloadIdentity: false,
-        originalServer: server as any,
-        remoteUrl: server.address,
-        authentication: {
-          required: true,
-          type: 'bearer',
-          bearerToken: {
-            dynamic: true // Use dynamic token management
-          }
-        }
-      };
+      // The registration should return an adapter, but if not, we might need to create one separately
+      if (registrationResult && registrationResult.name) {
+        // Refresh adapters list
+        await fetchAdapters();
 
-      // Create the adapter directly - MCP Gateway will generate token automatically
-      const result = await MCPService.createAdapter(adapterData);
+        // Fetch token for the new adapter
+        await fetchAdapterToken(registrationResult.name);
 
-      // Refresh adapters list to get the complete adapter data and retrieve the correct name
-      await fetchAdapters();
-
-      // Find the newly created adapter in the refreshed list using the expected name
-      const createdAdapter = adapters.value.find(a => a.name === adapterName);
-      if (createdAdapter) {
-        // Fetch the token using the name from the adapters list
-        await fetchAdapterToken(createdAdapter.name);
-        // Ping the newly registered server to check availability
+        // Ping to check availability
         await pingAllAdapters();
-        // Mark server as registered for risk badge correlation
+
+        // Mark server as registered
         registeredServerIds.value.add(server.id);
-      } else {
-        logger.error('Created adapter not found in refreshed list', {
-          expectedName: adapterName,
-          createResult: result,
-          availableAdapters: adapters.value.map(a => ({ name: a.name, status: a.status }))
+
+        logger.info('Server registered successfully', {
+          serverId: server.id,
+          adapterName: registrationResult.name
         });
-        // Try to use the name from the create result as fallback
+      } else {
+        logger.warn('Registration did not return adapter, falling back to direct creation');
+
+        // Fallback: create adapter directly if registration didn't work
+        const adapterName = server.name ? sanitizeAdapterName(server.name) : `adapter-${server.id}`;
+        const adapterData: any = {
+          name: adapterName,
+          mcpServerId: server.id,
+          description: `Adapter for ${server.name || server.address}`,
+          authentication: {
+            required: true,
+            type: 'bearer'
+          }
+        };
+
+        const result = await MCPService.createAdapter(adapterData);
+        await fetchAdapters();
         if (result && result.name) {
-          logger.info('Attempting to fetch token using create result name', { name: result.name });
           await fetchAdapterToken(result.name);
-          // Ping the newly registered server to check availability
           await pingAllAdapters();
-          // Mark server as registered for risk badge correlation
           registeredServerIds.value.add(server.id);
         }
       }
-
-      logger.info('Server registered successfully', {
-        data: {
-          serverId: server.id,
-          adapterId: result.name,
-          adapterName: result.name,
-          serverName: server.name || server.address
-        }
-      });
 
     } catch (err) {
       logger.error('Failed to register server', err);
@@ -902,52 +875,7 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
     stopServiceChecking();
   });
 
-  // Session Management Functions
-  const fetchSessions = async (adapterName: string) => {
-    try {
-      loadingSessions.value = true;
-      const sessionList = await MCPService.listSessions(adapterName);
-      sessions.value[adapterName] = sessionList.sessions;
-      selectedAdapterSessions.value = sessionList.sessions;
-    } catch (err) {
-      logger.error('Failed to fetch sessions', err);
-      sessions.value[adapterName] = [];
-      selectedAdapterSessions.value = [];
-    } finally {
-      loadingSessions.value = false;
-    }
-  };
 
-  const createSession = async (adapterName: string, clientInfo?: { name: string; version: string }) => {
-    try {
-      const response = await MCPService.createSession(adapterName, { clientInfo });
-      await fetchSessions(adapterName); // Refresh sessions list
-      return response;
-    } catch (err) {
-      logger.error('Failed to create session', err);
-      throw err;
-    }
-  };
-
-  const deleteSession = async (adapterName: string, sessionId: string) => {
-    try {
-      await MCPService.deleteSession(adapterName, sessionId);
-      await fetchSessions(adapterName); // Refresh sessions list
-    } catch (err) {
-      logger.error('Failed to delete session', err);
-      throw err;
-    }
-  };
-
-  const deleteAllSessions = async (adapterName: string) => {
-    try {
-      await MCPService.deleteAllSessions(adapterName);
-      await fetchSessions(adapterName); // Refresh sessions list
-    } catch (err) {
-      logger.error('Failed to delete all sessions', err);
-      throw err;
-    }
-  };
 
   // Token Management Functions
   const fetchAdapterToken = async (adapterName: string) => {
@@ -999,56 +927,14 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
     }
   };
 
-  // Metrics Management Functions
-  const fetchAdapterMetrics = async (adapterName: string) => {
+  // Adapter Health Check
+  const checkAdapterHealth = async (adapterName: string, userId?: string) => {
     try {
-      loadingMetrics.value = true;
-      const metrics = await MCPService.getAdapterMetrics(adapterName);
-      adapterMetrics.value[adapterName] = metrics;
-      return metrics;
+      const result = await MCPService.checkAdapterHealth(adapterName, userId);
+      return result;
     } catch (err) {
-      logger.error('Failed to fetch adapter metrics', err);
+      logger.error('Failed to check adapter health', err);
       throw err;
-    } finally {
-      loadingMetrics.value = false;
-    }
-  };
-
-  const fetchSystemMetrics = async () => {
-    try {
-      const metrics = await MCPService.getSystemMetrics();
-      systemMetrics.value = metrics;
-      return metrics;
-    } catch (err) {
-      logger.error('Failed to fetch system metrics', err);
-      throw err;
-    }
-  };
-
-  const startMetricsPolling = (intervalMs: number = 30000) => {
-    if (metricsPollInterval.value) {
-      clearInterval(metricsPollInterval.value as any);
-    }
-    
-    metricsPollInterval.value = setInterval(async () => {
-      try {
-        await fetchSystemMetrics();
-        // Fetch metrics for all active adapters
-        for (const adapter of adapters.value) {
-          if (adapter.status === 'running') {
-            await fetchAdapterMetrics(adapter.name);
-          }
-        }
-      } catch (err) {
-        logger.error('Error in metrics polling', err);
-      }
-    }, intervalMs) as any;
-  };
-
-  const stopMetricsPolling = () => {
-    if (metricsPollInterval.value) {
-      clearInterval(metricsPollInterval.value);
-      metricsPollInterval.value = null;
     }
   };
 
@@ -1103,19 +989,11 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
       
       case 'session_created':
       case 'session_ended':
-        // Refresh sessions for the adapter
-        if (event.data.adapterName) {
-          fetchSessions(event.data.adapterName);
-        }
+        // Note: Session management removed as endpoints don't exist
         break;
       
       case 'metrics':
-        // Update metrics
-        if (event.data.adapterName) {
-          adapterMetrics.value[event.data.adapterName] = event.data;
-        } else {
-          systemMetrics.value = event.data;
-        }
+        // Note: Metrics handling removed as endpoints don't exist
         break;
       
       case 'error':
@@ -1219,16 +1097,6 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
     startServiceChecking,
     stopServiceChecking,
 
-    // Session Management
-    sessions,
-    selectedAdapterSessions,
-    loadingSessions,
-    sessionMetrics,
-    fetchSessions,
-    createSession,
-    deleteSession,
-    deleteAllSessions,
-
     // Token Management
     adapterTokens,
     loadingTokens,
@@ -1238,14 +1106,8 @@ MCP servers SHOULD bind session IDs to user-specific information. When storing o
     validateAdapterToken,
     generateClientToken,
 
-    // Metrics and Monitoring
-    adapterMetrics,
-    systemMetrics,
-    loadingMetrics,
-    fetchAdapterMetrics,
-    fetchSystemMetrics,
-    startMetricsPolling,
-    stopMetricsPolling,
+    // Adapter Health
+    checkAdapterHealth,
 
     // Real-time Updates
     realTimeUpdates,

@@ -35,41 +35,70 @@
             </div>
           </div>
 
-          <!-- Authentication Token Section -->
-          <div class="detail-section token-section">
-            <h4>
-              <i class="icon icon-lock"></i>
-              Authentication Token
-            </h4>
-            <div class="token-input-group">
-              <input 
-                :value="token" 
-                :type="showToken ? 'text' : 'password'"
-                readonly 
-                class="form-control token-input"
-                @click="selectText"
-              />
-              <button 
-                class="btn btn-sm btn-secondary toggle-btn"
-                @click="toggleTokenVisibility"
-              >
-                <i :class="showToken ? 'icon icon-eye-slash' : 'icon icon-eye'"></i>
-                {{ showToken ? 'Hide' : 'Show' }}
-              </button>
-              <button 
-                class="btn btn-sm btn-primary copy-btn"
-                @click="copyToClipboard(token, 'Token')"
-                :disabled="copying"
-              >
-                <i class="icon icon-copy" v-if="!copiedField"></i>
-                <i class="icon icon-check" v-else></i>
-                {{ copiedField === 'Token' ? 'Copied!' : 'Copy' }}
-              </button>
-            </div>
-            <div class="form-help">
-              Include this token in your MCP client authentication headers
-            </div>
-          </div>
+           <!-- Authentication Token Section -->
+           <div class="detail-section token-section">
+             <h4>
+               <i class="icon icon-lock"></i>
+               Authentication Token
+             </h4>
+             <div class="token-input-group">
+               <input
+                 :value="token"
+                 :type="showToken ? 'text' : 'password'"
+                 readonly
+                 class="form-control token-input"
+                 @click="selectText"
+               />
+               <button
+                 class="btn btn-sm btn-secondary toggle-btn"
+                 @click="toggleTokenVisibility"
+               >
+                 <i :class="showToken ? 'icon icon-eye-slash' : 'icon icon-eye'"></i>
+                 {{ showToken ? 'Hide' : 'Show' }}
+               </button>
+               <button
+                 class="btn btn-sm btn-primary copy-btn"
+                 @click="copyToClipboard(token, 'Token')"
+                 :disabled="copying"
+               >
+                 <i class="icon icon-copy" v-if="!copiedField"></i>
+                 <i class="icon icon-check" v-else></i>
+                 {{ copiedField === 'Token' ? 'Copied!' : 'Copy' }}
+               </button>
+             </div>
+             <div class="form-help">
+               Include this token in your MCP client authentication headers
+             </div>
+           </div>
+
+           <!-- Client Configuration Section -->
+           <div class="detail-section client-config-section">
+             <h4>
+               <i class="icon icon-settings"></i>
+               Client Configuration
+             </h4>
+             <p class="section-description">
+               Copy and paste these configurations into your preferred MCP client.
+             </p>
+             <div class="client-config-buttons">
+               <button
+                 class="btn btn-sm btn-outline-primary client-config-btn"
+                 @click="showClientConfig('google-gemini')"
+                 :disabled="!hasGeminiConfig"
+               >
+                 <i class="icon icon-copy"></i>
+                 Google Gemini Config
+               </button>
+               <button
+                 class="btn btn-sm btn-outline-primary client-config-btn"
+                 @click="showClientConfig('vscode')"
+                 :disabled="!hasVSCodeConfig"
+               >
+                 <i class="icon icon-copy"></i>
+                 VSCode Config
+               </button>
+             </div>
+           </div>
 
           <!-- General Information -->
           <div class="detail-section">
@@ -174,6 +203,39 @@
       </div>
     </div>
   </div>
+
+  <!-- Client Configuration Modal -->
+  <div v-if="showClientConfigModal" class="modal-overlay" @click="closeClientConfigModal">
+    <div class="modal-content client-config-modal" @click.stop>
+      <div class="modal-header">
+        <h3>
+          <i class="icon icon-settings"></i>
+          {{ selectedClientConfig === 'google-gemini' ? 'Google Gemini' : 'VSCode' }} MCP Configuration
+        </h3>
+        <button class="btn btn-sm btn-secondary" @click="closeClientConfigModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="config-instructions">
+          <p><strong>Instructions:</strong> Copy the configuration below and use it in your {{ selectedClientConfig === 'google-gemini' ? 'Google Gemini' : 'VSCode' }} MCP client settings.</p>
+        </div>
+        <div class="config-display">
+          <pre class="config-json">{{ getClientConfig(selectedClientConfig) }}</pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button
+          class="btn btn-primary"
+          @click="copyClientConfig(selectedClientConfig)"
+          :disabled="copying"
+        >
+          <i class="icon icon-copy" v-if="!copiedField || !copiedField.includes(selectedClientConfig)"></i>
+          <i class="icon icon-check" v-else></i>
+          {{ copiedField === `${selectedClientConfig}-config` ? 'Copied!' : 'Copy Configuration' }}
+        </button>
+        <button class="btn btn-secondary" @click="closeClientConfigModal">Close</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -196,6 +258,8 @@ const adapter = ref<AdapterResource | null>(null);
 const showToken = ref(false);
 const copying = ref(false);
 const copiedField = ref<string | null>(null);
+const showClientConfigModal = ref(false);
+const selectedClientConfig = ref<string>('');
 
 // Watch for adapter data changes
 watch(() => props.adapterData, (newAdapter) => {
@@ -206,7 +270,7 @@ watch(() => props.adapterData, (newAdapter) => {
 // Generate MCP URL from reactive API_BASE_URLS
 const mcpUrl = computed(() => {
   if (!adapter.value?.name) return '';
-  const url = `${API_BASE_URLS.MCP_GATEWAY}/adapters/${adapter.value.name}/mcp`;
+  const url = `${API_BASE_URLS.MCP_GATEWAY}/api/v1/adapters/${adapter.value.name}/mcp`;
   console.log('AdapterDetailsModal mcpUrl:', url, 'API_BASE_URLS:', API_BASE_URLS.MCP_GATEWAY);
   return url;
 });
@@ -214,6 +278,23 @@ const mcpUrl = computed(() => {
 // Extract token from authentication object in API response
 const token = computed(() => {
   return adapter.value?.authentication?.bearerToken?.token || '';
+});
+
+// Check if client configs are available
+const hasGeminiConfig = computed(() => {
+  const hasGemini = !!(adapter.value?.mcpClientConfig?.gemini);
+  const hasMcpServers = !!(adapter.value?.mcpClientConfig?.mcpServers);
+  const hasConfig = hasGemini || hasMcpServers;
+  console.log('AdapterDetailsModal hasGeminiConfig:', hasConfig, 'hasGemini:', hasGemini, 'hasMcpServers:', hasMcpServers, 'mcpClientConfig:', adapter.value?.mcpClientConfig);
+  return hasConfig;
+});
+
+const hasVSCodeConfig = computed(() => {
+  const hasVSCode = !!(adapter.value?.mcpClientConfig?.vscode);
+  const hasMcpServers = !!(adapter.value?.mcpClientConfig?.mcpServers);
+  const hasConfig = hasVSCode || hasMcpServers;
+  console.log('AdapterDetailsModal hasVSCodeConfig:', hasConfig, 'hasVSCode:', hasVSCode, 'hasMcpServers:', hasMcpServers, 'mcpClientConfig:', adapter.value?.mcpClientConfig);
+  return hasConfig;
 });
 
 const closeModal = () => {
@@ -293,6 +374,117 @@ const getStatusLabel = (status?: string) => {
       return 'Error';
     default:
       return status || 'Unknown';
+  }
+};
+
+const showClientConfig = async (clientType: string) => {
+  let hasConfig = false;
+  switch (clientType) {
+    case 'google-gemini':
+      hasConfig = hasGeminiConfig.value;
+      break;
+    case 'vscode':
+      hasConfig = hasVSCodeConfig.value;
+      break;
+  }
+
+  if (!hasConfig) return;
+
+  selectedClientConfig.value = clientType;
+  showClientConfigModal.value = true;
+};
+
+const closeClientConfigModal = () => {
+  showClientConfigModal.value = false;
+  selectedClientConfig.value = '';
+};
+
+const getClientConfig = (clientType: string): string => {
+  if (!adapter.value?.mcpClientConfig) return '';
+
+  let clientConfig;
+
+  // Check if new structure exists (gemini/vscode properties)
+  if (adapter.value.mcpClientConfig.gemini || adapter.value.mcpClientConfig.vscode) {
+    switch (clientType) {
+      case 'google-gemini':
+        clientConfig = adapter.value.mcpClientConfig.gemini;
+        break;
+      case 'vscode':
+        clientConfig = adapter.value.mcpClientConfig.vscode;
+        break;
+      default:
+        return '';
+    }
+  }
+  // Fall back to old structure (mcpServers) - transform for each client
+  else if (adapter.value.mcpClientConfig.mcpServers) {
+    const adapterName = adapter.value.name;
+    const mcpServer = adapter.value.mcpClientConfig.mcpServers[adapterName];
+
+    if (!mcpServer) return '';
+
+    switch (clientType) {
+      case 'google-gemini':
+        clientConfig = {
+          mcpServers: {
+            [adapterName]: {
+              headers: mcpServer.headers,
+              httpUrl: mcpServer.url
+            }
+          }
+        };
+        break;
+      case 'vscode':
+        clientConfig = {
+          inputs: [],
+          servers: {
+            [adapterName]: {
+              headers: mcpServer.headers,
+              type: 'http',
+              url: mcpServer.url
+            }
+          }
+        };
+        break;
+      default:
+        return '';
+    }
+  }
+
+  if (!clientConfig) return '';
+
+  return JSON.stringify(clientConfig, null, 2);
+};
+
+const copyClientConfig = async (clientType: string) => {
+  const config = getClientConfig(clientType);
+  if (!config) return;
+
+  try {
+    copying.value = true;
+    await navigator.clipboard.writeText(config);
+    copiedField.value = `${clientType}-config`;
+
+    setTimeout(() => {
+      copiedField.value = null;
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy client config:', err);
+    // Fallback for older browsers
+    const textArea = document.createElement('textarea');
+    textArea.value = config;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    copiedField.value = `${clientType}-config`;
+
+    setTimeout(() => {
+      copiedField.value = null;
+    }, 2000);
+  } finally {
+    copying.value = false;
   }
 };
 
@@ -566,25 +758,104 @@ const getStatusLabel = (status?: string) => {
   background: var(--accent-bg, #f3f4f6);
 }
 
+.client-config-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-color: var(--info, #0ea5e9);
+}
+
+.client-config-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.client-config-btn {
+  border: 1px solid var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.client-config-btn:hover:not(:disabled) {
+  background: var(--primary, #2563eb);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.2);
+}
+
+.client-config-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.client-config-modal {
+  max-width: 700px;
+  width: 90%;
+}
+
+.config-instructions {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--accent-bg, #f9fafb);
+  border-radius: 6px;
+  border-left: 4px solid var(--primary, #2563eb);
+}
+
+.config-instructions p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--body-text, #111827);
+}
+
+.config-display {
+  background: var(--input-bg, #ffffff);
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.config-json {
+  margin: 0;
+  padding: 16px;
+  background: var(--input-bg, #f9fafb);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--body-text, #111827);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .modal-content {
     width: 95%;
     max-height: 95vh;
   }
-  
+
   .info-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .url-input-group,
   .token-input-group {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .copy-btn,
   .toggle-btn {
+    width: 100%;
+  }
+
+  .client-config-buttons {
+    flex-direction: column;
+  }
+
+  .client-config-btn {
     width: 100%;
   }
 }

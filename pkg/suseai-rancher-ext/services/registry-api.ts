@@ -34,18 +34,27 @@ export interface MCPServer {
   readonly metadata?: any
   readonly validation_status?: string
    readonly _meta: {
-     readonly source: string
-     readonly userAuthRequired: boolean
-     readonly authType: string
-     readonly category: string
-     readonly tags: readonly string[]
-     readonly documentation?: string
-     readonly hosted?: boolean
-     readonly requiresInstallation?: boolean
-     readonly transportType?: string
-     readonly validation_status?: string
-     readonly badges?: readonly string[]
-   }
+      readonly source: string
+      readonly userAuthRequired: boolean
+      readonly authType: string
+      readonly category: string
+      readonly tags: readonly string[]
+      readonly documentation?: string
+      readonly hosted?: boolean
+      readonly requiresInstallation?: boolean
+      readonly transportType?: string
+      readonly validation_status?: string
+      readonly badges?: readonly string[]
+      readonly config?: {
+        readonly secrets?: readonly {
+          readonly name: string
+          readonly env: string
+          readonly description?: string
+          readonly example?: string
+          readonly required?: boolean
+        }[]
+      }
+    }
 }
 
 export interface Package {
@@ -126,29 +135,6 @@ export class RegistryAPI extends BaseAPI {
 
         // Handle different response formats
         if (Array.isArray(result)) {
-          // API returns array directly - use IDs as they are
-          servers = result.map((server: any) => {
-            const serverName = server.title || server.name
-            return {
-              ...server,
-              name: serverName
-            }
-          })
-          total = servers.length
-          hasMore = false
-          logger.info('Registry returned array format, using IDs as provided')
-        } else if (Array.isArray(result.servers)) {
-          // Expected structured format - use the servers as-is
-          servers = result.servers
-          total = result.total || servers.length
-          hasMore = result.hasMore || false
-        } else {
-          logger.warn('Invalid registry browse result structure', result)
-          return { servers: [], total: 0, hasMore: false }
-        }
-
-        // Handle different response formats
-        if (Array.isArray(result)) {
             // Raw array format (fallback for server.json) - transform to expected structure
             servers = result.map((server: any) => ({
               id: server.id || server.name, // Use name as id if id is not provided
@@ -161,18 +147,19 @@ export class RegistryAPI extends BaseAPI {
               },
               tags: server.tags || server._meta?.tags || [],
               packages: server.packages || [],
-              _meta: {
-                source: server.source || 'registry',
-                userAuthRequired: false,
-                authType: 'none',
-                category: server._meta?.category || 'general',
-                tags: server._meta?.tags || [],
-                hosted: server._meta?.hosted,
-                requiresInstallation: server._meta?.requiresInstallation,
-                transportType: server._meta?.transportType,
-                validation_status: server._meta?.validation_status,
-                badges: server._meta?.badges
-              }
+               _meta: {
+                 source: server.source || 'registry',
+                 userAuthRequired: false,
+                 authType: 'none',
+                 category: server._meta?.category || 'general',
+                 tags: server._meta?.tags || [],
+                 hosted: server._meta?.hosted,
+                 requiresInstallation: server._meta?.requiresInstallation,
+                 transportType: server._meta?.transportType,
+                 validation_status: server._meta?.validation_status,
+                 badges: server._meta?.badges,
+                 config: server._meta?.config
+               }
             }))
           total = servers.length
           hasMore = false

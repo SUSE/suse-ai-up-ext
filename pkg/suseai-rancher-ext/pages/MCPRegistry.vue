@@ -212,12 +212,21 @@
         </div>
        </main>
 
-        <!-- Server Details Modal -->
-       <ServerDetailsModal
-         :show="showServerDetailsModal"
-         :server-id="selectedServerId"
-         @close="closeServerDetailsModal"
-       />
+         <!-- Server Details Modal -->
+        <ServerDetailsModal
+          :show="showServerDetailsModal"
+          :server-id="selectedServerId"
+          @close="closeServerDetailsModal"
+        />
+
+        <!-- Deploy Modal -->
+        <DeployModal
+          :show="showDeployModal"
+          :server="selectedServerForDeploy"
+          :secrets="deploySecrets"
+          @close="closeDeployModal"
+          @deploy="executeDeploy"
+        />
 
 
    </div>
@@ -231,6 +240,7 @@ import { useAdapters } from '../composables/useAdapters'
 import type { MCPServer } from '../services/registry-api'
 import { updateApiBaseUrls, API_BASE_URLS } from '../config/api-config'
 import ServerDetailsModal from '../components/MCPRegistry/ServerDetailsModal.vue'
+import DeployModal, { type SecretConfig } from '../components/MCPRegistry/DeployModal.vue'
 
 // Generic MCP icon SVG (official logo with currentColor for theming)
 const genericMCPIcon = `<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -249,7 +259,8 @@ const genericMCPIcon = `<svg width="180" height="180" viewBox="0 0 180 180" fill
 export default defineComponent({
   name: 'MCPRegistry',
   components: {
-    ServerDetailsModal
+    ServerDetailsModal,
+    DeployModal
   },
 
   metaInfo() {
@@ -287,6 +298,11 @@ export default defineComponent({
     const showServerDetailsModal = ref(false)
     const selectedServerId = ref<string>('')
     const expandedCards = ref<Set<string>>(new Set())
+
+    // Deploy modal state
+    const showDeployModal = ref(false)
+    const selectedServerForDeploy = ref<MCPServer | null>(null)
+    const deploySecrets = ref<SecretConfig[]>([])
 
     // Check if server is a SUSE server
     const isSuseServer = (server: MCPServer): boolean => {
@@ -520,60 +536,83 @@ export default defineComponent({
       console.log('selectedServerId set to:', selectedServerId.value)
     }
 
-    const handleDeployServer = async (server: MCPServer) => {
+    // Extract secrets from server._meta.config.secrets[] only
+    const extractSecretsFromServer = (server: MCPServer): SecretConfig[] => {
+      console.log('extractSecretsFromServer called for:', server.name)
+      const configSecrets = (server as any)._meta?.config?.secrets || []
+      console.log('configSecrets found:', configSecrets)
+      console.log('configSecrets length:', configSecrets.length)
+
+      const secrets = configSecrets.map((secret: any) => ({
+        name: secret.name,
+        env: secret.env || secret.name,
+        description: secret.description,
+        example: secret.example,
+        required: secret.required || false,
+        selected: false,  // Start unselected
+        value: secret.example || ''  // Pre-fill with example
+      }))
+
+      console.log('Mapped secrets:', secrets)
+      return secrets
+    }
+
+    // Show deploy modal with secrets configuration
+    const handleDeployServer = (server: MCPServer) => {
       console.log('handleDeployServer called with server:', server.name, 'id:', server.id)
-      console.log('Full server config:', (server as any).config)
+      console.log('Server _meta:', (server as any)._meta)
+      console.log('Server _meta.config:', (server as any)._meta?.config)
+      console.log('Server _meta.config.secrets:', (server as any)._meta?.config?.secrets)
+
+      // Extract secrets from server._meta.config.secrets[]
+      const secrets = extractSecretsFromServer(server)
+      console.log('Extracted secrets:', secrets)
+
+      // Set modal state
+      selectedServerForDeploy.value = server
+      deploySecrets.value = secrets
+      showDeployModal.value = true
+
+      console.log('Showing deploy modal with', secrets.length, 'secrets for server:', server.name)
+    }
+
+    // Close deploy modal
+    const closeDeployModal = () => {
+      showDeployModal.value = false
+      selectedServerForDeploy.value = null
+      deploySecrets.value = []
+    }
+
+    // Execute deployment with configured secrets
+    const executeDeploy = async (config: { server: MCPServer; secrets: SecretConfig[] }) => {
+      const { server, secrets } = config
 
       try {
-        // Extract environment variables from multiple sources
+        console.log('Executing deployment for server:', server.name, 'with configured secrets')
+
+        // Create environment variables from selected and configured secrets only
         const envVars: Record<string, string> = {}
+        secrets.forEach(secret => {
+          if (secret.selected && secret.value.trim()) {
+            envVars[secret.env || secret.name] = secret.value
+          }
+        })
 
-        // Source 1: config_template.env (if exists)
-        if (server.config_template?.env) {
-          Object.assign(envVars, server.config_template.env)
+        // Validate required secrets
+        const requiredSecrets = secrets.filter(s => s.required)
+        const configuredRequired = requiredSecrets.filter(s => s.selected && s.value.trim())
+
+        if (configuredRequired.length !== requiredSecrets.length) {
+          const missingRequired = requiredSecrets.filter(s => !s.selected || !s.value.trim())
+          throw new Error(`Required secrets not configured: ${missingRequired.map(s => s.name).join(', ')}`)
         }
 
-        // Source 2: config.secrets (registry YAML structure)
-        const configSecrets = (server as any).config?.secrets
-        if (configSecrets && configSecrets.length > 0) {
-          configSecrets.forEach((secret: any) => {
-            const envName = secret.env || secret.name
-            // For now, use example values as defaults - in real deployment,
-            // user would need to provide actual values
-            if (secret.example) {
-              envVars[envName] = secret.example
-            }
-          })
-        }
-
-        // Source 3: secrets array (transformed data)
-        if (server.secrets && server.secrets.length > 0) {
-          server.secrets.forEach(secret => {
-            if (secret.value) {
-              envVars[secret.name] = secret.value
-            }
-          })
-        }
-
-        // Source 4: packages[].environmentVariables
-        if (server.packages) {
-          server.packages.forEach(pkg => {
-            if (pkg.environmentVariables) {
-              pkg.environmentVariables.forEach(env => {
-                if (env.default && !envVars[env.name]) {
-                  envVars[env.name] = env.default
-                }
-              })
-            }
-          })
-        }
-
-        // Generate unique adapter name: lowercase server name with spaces as hyphens + progressive number
+        // Generate unique adapter name
         const baseName = server.name.toLowerCase().replace(/\s+/g, '-')
         const timestamp = Date.now()
         const adapterName = `${baseName}-${timestamp}`
 
-        // Create adapter directly - this will deploy the server
+        // Create adapter with configured environment variables
         const adapterData = {
           name: adapterName,
           mcpServerId: server.id,
@@ -585,10 +624,14 @@ export default defineComponent({
         }
 
         console.log('Creating adapter with data:', adapterData)
+        console.log('Adapter API base URL:', API_BASE_URLS.MCP_GATEWAY)
         const adapter = await createAdapter(adapterData)
 
         if (adapter) {
           console.log('Adapter created successfully:', adapter)
+
+          // Close modal
+          closeDeployModal()
 
           // Show success message
           store.dispatch('growl/success', {
@@ -596,17 +639,13 @@ export default defineComponent({
             message: `${server.name} has been deployed and an adapter has been created.`
           })
         } else {
-          // Deployment succeeded but adapter creation failed
-          store.dispatch('growl/warning', {
-            title: 'Deployment Completed',
-            message: `${server.name} was deployed successfully, but adapter creation failed.`
-          })
+          throw new Error('Adapter creation failed')
         }
 
       } catch (error: any) {
         console.error('Deployment failed:', error)
 
-        // Show error message
+        // Show error message (don't close modal so user can retry)
         store.dispatch('growl/error', {
           title: 'Deployment Failed',
           message: error.message || `Failed to deploy ${server.name}`
@@ -721,6 +760,9 @@ export default defineComponent({
       categoryFilter,
         showServerDetailsModal,
         selectedServerId,
+        showDeployModal,
+        selectedServerForDeploy,
+        deploySecrets,
       filteredServers,
       availableCategories,
       isEnabled,
@@ -730,6 +772,8 @@ export default defineComponent({
           handleReloadRegistry,
           handleViewServer,
           handleDeployServer,
+          closeDeployModal,
+          executeDeploy,
           closeServerDetailsModal,
          getServerIcon,
          getSourceUrl,

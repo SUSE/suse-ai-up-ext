@@ -4,6 +4,7 @@
 import { BaseAPI, APIConfig, AuthHeaders } from './base-api'
 import { logger } from '../utils/logger'
 import { API_BASE_URLS } from '../config/api-config'
+import type { MCPClientConfig } from '../types/mcp-types'
 
 export interface Adapter {
   id: string
@@ -46,9 +47,7 @@ export interface AdapterAuthConfig {
   }
 }
 
-export interface MCPClientConfig {
-  mcpServers: Record<string, MCPServerConfig>
-}
+
 
 export interface MCPServerConfig {
   url: string

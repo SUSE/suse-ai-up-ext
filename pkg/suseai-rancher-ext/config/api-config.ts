@@ -70,15 +70,13 @@ export const MCP_ENDPOINTS = {
   ADAPTER_DETAILS: (name: string) => `/api/v1/adapters/${name}`,
   ADAPTER_STATUS: (name: string) => `/api/v1/adapters/${name}/status`,
   ADAPTER_LOGS: (name: string) => `/api/v1/adapters/${name}/logs`,
-  ADAPTER_UPDATE: (name: string) => `/api/v1/adapters/${name}`,
-  ADAPTER_DELETE: (name: string) => `/api/v1/adapters/${name}`,
+   ADAPTER_UPDATE: (name: string) => `/api/v1/adapters/${name}`,
+   ADAPTER_DELETE: (name: string) => `/api/v1/adapters/${name}`,
+   ADAPTER_HEALTH: (name: string) => `/api/v1/adapters/${name}/health`,
 
   // Session Management
   SESSIONS: (name: string) => `/api/v1/adapters/${name}/sessions`,
-  SESSION_DETAILS: (name: string, sessionId: string) => `/api/v1/adapters/${name}/sessions/${sessionId}`,
-  SESSION_CREATE: (name: string) => `/api/v1/adapters/${name}/sessions`,
-  SESSION_DELETE: (name: string, sessionId: string) => `/api/v1/adapters/${name}/sessions/${sessionId}`,
-  SESSION_DELETE_ALL: (name: string) => `/api/v1/adapters/${name}/sessions`,
+  SESSIONS_REINITIALIZE: (name: string) => `/api/v1/adapters/${name}/sessions`,
 
   // Token Management
   ADAPTER_TOKEN: (name: string) => `/api/v1/adapters/${name}/token`,
@@ -95,10 +93,11 @@ export const MCP_ENDPOINTS = {
   ADAPTER_WEBSOCKET: (name: string) => `/api/v1/adapters/${name}/ws`,
 
   // Network Discovery
-   DISCOVERY_SCAN: '/api/v1/discovery/scan',
-  DISCOVERY_SERVERS: '/api/v1/servers',
-  DISCOVERY_SERVER_DETAILS: (id: string) => `/api/v1/servers/${id}`,
-  DISCOVERY_REGISTER: '/api/v1/registry/upload',
+  DISCOVERY_SCAN: '/api/v1/discovery/scan',
+  DISCOVERY_SERVERS: '/api/v1/discovery/servers',
+  DISCOVERY_RESULTS: '/api/v1/discovery/results',
+  DISCOVERY_SERVER_DETAILS: (id: string) => `/api/v1/discovery/results/${id}`,
+  DISCOVERY_REGISTER: '/api/v1/discovery/register',
 
   // Legacy endpoints (for backward compatibility)
    SCAN_START: '/api/v1/discovery/scan',

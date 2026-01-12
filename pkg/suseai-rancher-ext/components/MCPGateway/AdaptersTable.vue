@@ -2,55 +2,44 @@
   <div class="endpoints-section">
      <h2>Registered MCP Adapters</h2>
     <table class="endpoints-table">
-        <thead>
-           <tr>
-              <th>Name</th>
-              <th>MCP Server ID</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Capabilities</th>
-             <th>Actions</th>
-           </tr>
-         </thead>
+         <thead>
+            <tr>
+               <th>Name</th>
+               <th>Status</th>
+               <th>Created</th>
+               <th>Capabilities</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
        <tbody>
-           <tr v-if="loading">
-             <td colspan="7" class="loading-row">Loading adapters...</td>
-           </tr>
-           <tr v-else-if="error">
-             <td colspan="7" class="error-row">{{ error }}</td>
-           </tr>
-           <tr v-else-if="adapters.length === 0">
-             <td colspan="7" class="empty-row">No adapters registered</td>
-           </tr>
-            <tr v-else v-for="adapter in adapters" :key="adapter.id">
-              <td>{{ adapter.name }}</td>
-              <td>{{ adapter.mcpServerId || 'N/A' }}</td>
-                <td>
-                  <span :class="getStatusClass(adapter)">
-                    {{ getStatusText(adapter) }}
-                  </span>
-                </td>
-                <td>{{ adapter.createdAt ? new Date(adapter.createdAt).toLocaleString() : 'N/A' }}</td>
-              <td>{{ getCapabilitiesCount(adapter) }}</td>
-           <td>
-              <div class="action-buttons">
-                <button class="btn btn-sm role-secondary" @click="handleViewDetails(adapter)" title="View Details">
-                  <i class="icon icon-info"></i>
-                </button>
-                <button class="btn btn-sm role-secondary" @click="handleViewLogs(adapter)" title="View Logs">
-                  <i class="icon icon-file"></i>
-                </button>
-                <button class="btn btn-sm role-secondary" @click="handleSyncAdapter(adapter)" title="Sync Capabilities">
-                  <i class="icon icon-refresh"></i>
-                </button>
-                <button class="btn btn-sm role-secondary" @click="handleEditAdapter(adapter)" title="Edit">
-                  <i class="icon icon-edit"></i>
-                </button>
-                <button class="btn btn-sm role-secondary" @click="handleDeleteAdapter(adapter)" title="Delete">
-                  <i class="icon icon-trash"></i>
-                </button>
-              </div>
-           </td>
+            <tr v-if="loading">
+              <td colspan="6" class="loading-row">Loading adapters...</td>
+            </tr>
+            <tr v-else-if="error">
+              <td colspan="6" class="error-row">{{ error }}</td>
+            </tr>
+            <tr v-else-if="adapters.length === 0">
+              <td colspan="6" class="empty-row">No adapters registered</td>
+            </tr>
+             <tr v-else v-for="adapter in adapters" :key="adapter.id">
+               <td>{{ adapter.name }}</td>
+                 <td>
+                   <span :class="getStatusClass(adapter)">
+                     {{ getStatusText(adapter) }}
+                   </span>
+                 </td>
+                 <td>{{ adapter.createdAt ? new Date(adapter.createdAt).toLocaleString() : 'N/A' }}</td>
+               <td>{{ getCapabilitiesCount(adapter) }}</td>
+            <td>
+               <div class="action-buttons">
+                 <button class="btn btn-sm role-secondary" @click="handleViewDetails(adapter)" title="View Details">
+                   <i class="icon icon-info"></i>
+                 </button>
+                 <button class="btn btn-sm role-secondary" @click="handleDeleteAdapter(adapter)" title="Delete">
+                   <i class="icon icon-trash"></i>
+                 </button>
+               </div>
+            </td>
          </tr>
        </tbody>
      </table>
@@ -92,7 +81,7 @@ export default defineComponent({
       default: () => ({})
     }
   },
-  emits: ['view-details', 'view-logs', 'sync-adapter', 'edit-adapter', 'delete-adapter', 'refresh-adapters'],
+  emits: ['view-details', 'delete-adapter'],
   setup(props, { emit }) {
     console.log('AdaptersTable setup - received adapters:', props.adapters?.length || 0, 'items')
 
@@ -113,21 +102,9 @@ export default defineComponent({
          }
        };
 
-       const handleViewLogs = (adapter: Adapter) => {
-         emit('view-logs', adapter);
-       };
-
-       const handleSyncAdapter = (adapter: Adapter) => {
-         emit('sync-adapter', adapter);
-       };
-
-       const handleEditAdapter = (adapter: Adapter) => {
-         emit('edit-adapter', adapter);
-       };
-
-       const handleDeleteAdapter = (adapter: Adapter) => {
-         emit('delete-adapter', adapter);
-       };
+        const handleDeleteAdapter = (adapter: Adapter) => {
+          emit('delete-adapter', adapter);
+        };
 
         const closeAdapterDetailsModal = () => {
           showAdapterDetailsModal.value = false;
@@ -153,19 +130,16 @@ export default defineComponent({
           return `${tools} tools, ${resources} resources, ${prompts} prompts`;
         };
 
-         return {
-           showAdapterDetailsModal,
-           selectedAdapter,
-           handleViewDetails,
-           handleViewLogs,
-           handleSyncAdapter,
-           handleEditAdapter,
-           handleDeleteAdapter,
-           closeAdapterDetailsModal,
-           getStatusClass,
-           getStatusText,
-           getCapabilitiesCount
-         };
+          return {
+            showAdapterDetailsModal,
+            selectedAdapter,
+            handleViewDetails,
+            handleDeleteAdapter,
+            closeAdapterDetailsModal,
+            getStatusClass,
+            getStatusText,
+            getCapabilitiesCount
+          };
    }
  });
 </script>

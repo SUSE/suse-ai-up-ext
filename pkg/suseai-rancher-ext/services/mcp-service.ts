@@ -90,6 +90,7 @@ export interface CreateAdapterRequest {
   tools?: any[];
   useWorkloadIdentity?: boolean;
   originalServer?: ServiceDiscoveredServer;
+  mcpServerId?: string;
 }
 
 export interface ScanStatus {
@@ -122,7 +123,7 @@ export class MCPService {
   // Discovery
   static async getDiscoveryServers(): Promise<DiscoveredServer[]> {
     try {
-      const response = await discoveryClient.get(MCP_ENDPOINTS.DISCOVERY_SERVERS);
+      const response = await discoveryClient.get(MCP_ENDPOINTS.DISCOVERY_RESULTS);
       return response.data.servers || response.data;
     } catch (error) {
       console.error('Failed to get discovery servers:', error);
@@ -181,67 +182,25 @@ export class MCPService {
     }
   }
 
-  // Session Management
-  static async listSessions(adapterName: string): Promise<SessionListResponse> {
+  // Session Management - Reinitialize session
+  static async reinitializeSession(adapterName: string, sessionData?: any): Promise<any> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.SESSIONS(adapterName));
-      return {
-        sessions: response.data.sessions || [],
-        total: response.data.total || 0,
-        limit: response.data.limit || 10,
-        offset: response.data.offset || 0
-      };
-    } catch (error) {
-      console.error('Failed to list sessions:', error);
-      throw error;
-    }
-  }
-
-  static async createSession(adapterName: string, sessionData: { clientInfo: any }): Promise<Session> {
-    try {
-      const response = await apiClient.post(MCP_ENDPOINTS.SESSION_CREATE(adapterName), sessionData);
+      const response = await apiClient.post(MCP_ENDPOINTS.SESSIONS_REINITIALIZE(adapterName), sessionData || {});
       return response.data;
     } catch (error) {
-      console.error('Failed to create session:', error);
+      console.error('Failed to reinitialize session:', error);
       throw error;
     }
   }
 
-  static async deleteSession(adapterName: string, sessionId: string): Promise<void> {
+  // Health check for adapter sidecar
+  static async checkAdapterHealth(adapterName: string, userId?: string): Promise<any> {
     try {
-      await apiClient.delete(MCP_ENDPOINTS.SESSION_DETAILS(adapterName, sessionId));
-    } catch (error) {
-      console.error('Failed to delete session:', error);
-      throw error;
-    }
-  }
-
-  static async deleteAllSessions(adapterName: string): Promise<void> {
-    try {
-      await apiClient.delete(MCP_ENDPOINTS.SESSION_DELETE_ALL(adapterName));
-    } catch (error) {
-      console.error('Failed to delete all sessions:', error);
-      throw error;
-    }
-  }
-
-  // Metrics
-  static async getAdapterMetrics(adapterName: string): Promise<AdapterMetrics> {
-    try {
-      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTER_STATUS(adapterName));
-      return response.data.metrics || response.data;
-    } catch (error) {
-      console.error('Failed to get adapter metrics:', error);
-      throw error;
-    }
-  }
-
-  static async getSystemMetrics(): Promise<SystemMetrics> {
-    try {
-      const response = await apiClient.get(MCP_ENDPOINTS.METRICS);
+      const headers = userId ? { 'X-User-ID': userId } : {};
+      const response = await apiClient.post(MCP_ENDPOINTS.ADAPTER_HEALTH(adapterName), {}, { headers });
       return response.data;
     } catch (error) {
-      console.error('Failed to get system metrics:', error);
+      console.error('Failed to check adapter health:', error);
       throw error;
     }
   }
@@ -258,12 +217,27 @@ export class MCPService {
   }
 
   // Token Management
-  static async getAdapterToken(adapterName: string): Promise<AdapterToken> {
+  static async getAdapterToken(adapterName: string, generate?: boolean, expiresIn?: number): Promise<AdapterToken> {
     try {
-      const response = await apiClient.get(MCP_ENDPOINTS.ADAPTER_TOKEN(adapterName));
+      const params = new URLSearchParams();
+      if (generate !== undefined) params.append('generate', generate.toString());
+      if (expiresIn !== undefined) params.append('expiresIn', expiresIn.toString());
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const response = await apiClient.get(`${MCP_ENDPOINTS.ADAPTER_TOKEN(adapterName)}${query}`);
       return response.data;
     } catch (error) {
       console.error('Failed to get adapter token:', error);
+      throw error;
+    }
+  }
+
+  // Registration - Register discovered server
+  static async registerDiscoveredServer(discoveredServerId: string): Promise<any> {
+    try {
+      const response = await discoveryClient.post(MCP_ENDPOINTS.DISCOVERY_REGISTER, { discoveredServerId });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to register discovered server:', error);
       throw error;
     }
   }

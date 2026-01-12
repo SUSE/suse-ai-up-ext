@@ -544,7 +544,29 @@ export interface ServerProtocol {
 }
 
 export interface MCPClientConfig {
-  mcpServers: Record<string, MCPServerConfig>
+  gemini?: GeminiClientConfig
+  vscode?: VSCodeClientConfig
+  [key: string]: GeminiClientConfig | VSCodeClientConfig | undefined
+}
+
+export interface GeminiClientConfig {
+  mcpServers: Record<string, GeminiServerConfig>
+}
+
+export interface GeminiServerConfig {
+  headers?: Record<string, string>
+  httpUrl?: string
+}
+
+export interface VSCodeClientConfig {
+  inputs?: any[]
+  servers: Record<string, VSCodeServerConfig>
+}
+
+export interface VSCodeServerConfig {
+  headers?: Record<string, string>
+  type?: string
+  url?: string
 }
 
 export interface MCPServerConfig {
