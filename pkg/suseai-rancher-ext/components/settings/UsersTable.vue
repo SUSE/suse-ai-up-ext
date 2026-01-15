@@ -14,7 +14,7 @@
           class="btn btn-primary"
           @click="$emit('add-user')"
         >
-          Add User
+           Create User
         </button>
       </div>
     </div>

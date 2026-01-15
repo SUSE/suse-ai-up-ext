@@ -1,5 +1,14 @@
   <template>
-    <div class="under-development-page">
+    <!-- Service not enabled message -->
+    <div v-if="!proxyInstalled" class="blank-page">
+      <div class="empty-state">
+        <h3>This service is not enabled</h3>
+        <p>Please enable it from the service selection page.</p>
+      </div>
+    </div>
+
+    <!-- Under Development message (when service is enabled) -->
+    <div v-else class="under-development-page">
       <div class="development-message">
         <div class="message-content">
           <h1>🚧 Under Development</h1>
@@ -8,13 +17,46 @@
         </div>
       </div>
     </div>
-</template>
+  </template>
 
 <script setup lang="ts">
-// No script needed for under development page
+import { computed } from 'vue';
+import { useStore } from 'vuex';
+
+const store = useStore();
+const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled);
 </script>
 
 <style scoped>
+/* Service not enabled state */
+.blank-page {
+  text-align: center;
+  padding: 50px;
+  font-size: 18px;
+  color: #666;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.empty-state h3 {
+  color: var(--body-text, #1a1a1a);
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  color: var(--muted, #666);
+  font-size: 16px;
+  margin: 0;
+}
+
 .under-development-page {
   display: flex;
   justify-content: center;

@@ -22,7 +22,7 @@
 
     <!-- Registered MCP Adapters Table -->
     <div class="table-section">
-      <h2>Registered MCP Adapters</h2>
+       <h2>Adapters</h2>
       <div v-if="adaptersLoading" class="loading-state">
         <i class="icon icon-spinner icon-spin"></i>
         <p>Loading adapters...</p>
@@ -75,7 +75,7 @@
 
     <!-- Discovered MCP Servers Table -->
     <div class="table-section" :key="discoveredServers?.length || 0">
-      <h2>Discovered MCP Servers</h2>
+       <h2>Discovery</h2>
       <div v-if="discoveryLoading" class="loading-state">
         <i class="icon icon-spinner icon-spin"></i>
         <p>Loading discovered servers...</p>
@@ -91,7 +91,7 @@
        <DiscoveredServersTable
          :discovered-servers="discoveredServers"
          :loading="discoveryLoading"
-         :registered-server-ids="[]"
+          :registered-server-ids="new Set()"
          @view-server-details="handleViewServerDetails"
          @register-server="handleRegisterServer"
        />
@@ -108,6 +108,7 @@ import DiscoveredServersTable from './DiscoveredServersTable.vue';
 
 import { useHealthMonitoring } from '../../composables/useHealthMonitoring';
 import { useAdapters } from '../../composables/useAdapters';
+import { MCPService } from '../../services/mcp-service';
 
 export default defineComponent({
   name: 'Dashboard',
@@ -117,7 +118,7 @@ export default defineComponent({
     AdaptersTable,
     DiscoveredServersTable
   },
-  emits: ['scan-modal-open', 'security-modal-open', 'rule-modal-open', 'sync-adapter', 'view-server-details'],
+   emits: ['scan-modal-open', 'security-modal-open', 'rule-modal-open', 'sync-adapter', 'view-server-details', 'server-registered', 'retry-discovery'],
   props: {
     adapters: {
       type: Array as () => any[],
@@ -247,8 +248,24 @@ export default defineComponent({
       emit('view-server-details', server);
     };
 
-    const handleRegisterServer = (server: any) => {
-      console.log('Register server:', server.name);
+    const handleRegisterServer = async (server: any) => {
+      try {
+        console.log('Registering discovered server:', server.name, 'with ID:', server.id);
+
+        // Call the discovery register API to create an adapter
+        const result = await MCPService.registerDiscoveredServer(server.id);
+
+        console.log('Server registered successfully:', result);
+
+        // Emit event to notify parent component that a server was registered
+        emit('server-registered', { server, result });
+
+      } catch (error: any) {
+        console.error('Failed to register server:', error);
+
+        // Emit event to notify parent component of the error
+        emit('server-registered', { server, error });
+      }
     };
 
 

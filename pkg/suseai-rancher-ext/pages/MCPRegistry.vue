@@ -1,6 +1,9 @@
 <template>
   <div v-if="!isEnabled" class="blank-page">
-    This service is not enabled. Please enable it from the service selection page.
+    <div class="empty-state">
+      <h3>This service is not enabled</h3>
+      <p>Please enable it from the service selection page.</p>
+    </div>
   </div>
   <div v-else>
     <div class="experimental-banner">
@@ -219,14 +222,16 @@
           @close="closeServerDetailsModal"
         />
 
-        <!-- Deploy Modal -->
-        <DeployModal
-          :show="showDeployModal"
-          :server="selectedServerForDeploy"
-          :secrets="deploySecrets"
-          @close="closeDeployModal"
-          @deploy="executeDeploy"
-        />
+         <!-- Deploy Modal -->
+         <DeployModal
+           :show="showDeployModal"
+            :server="selectedServerForDeploy"
+           :secrets="deploySecrets"
+           :waiting-for-adapter="waitingForAdapter"
+           :deploying="deployingAdapter"
+           @close="closeDeployModal"
+           @deploy="executeDeploy"
+         />
 
 
    </div>
@@ -289,6 +294,7 @@ export default defineComponent({
     // Use adapters composable for creating adapters
     const {
       createAdapter,
+      getAdapter,
       loading: adaptersLoading
     } = useAdapters()
 
@@ -301,8 +307,10 @@ export default defineComponent({
 
     // Deploy modal state
     const showDeployModal = ref(false)
-    const selectedServerForDeploy = ref<MCPServer | null>(null)
+    const selectedServerForDeploy = ref<MCPServer | undefined>(undefined)
     const deploySecrets = ref<SecretConfig[]>([])
+    const waitingForAdapter = ref(false)
+    const deployingAdapter = ref(false)
 
     // Check if server is a SUSE server
     const isSuseServer = (server: MCPServer): boolean => {
@@ -381,6 +389,10 @@ export default defineComponent({
             // Update stored service URLs in store
             await store.dispatch('suseai/setServiceUrls', ['http://localhost:8911'])
             // Update API instances
+            import('../services/adapter-api').then(({ adapterAPI }) => {
+              adapterAPI.updateBaseURL()
+              console.log('MCPRegistry adapterAPI baseURL updated to:', adapterAPI.getBaseURL())
+            })
             import('../services/registry-api').then(({ registryAPI }) => {
               registryAPI.updateBaseURL()
               console.log('MCPRegistry registryAPI baseURL updated to:', registryAPI.getBaseURL())
@@ -406,6 +418,11 @@ export default defineComponent({
       if (serviceUrl) {
         console.log('MCPRegistry initializing with stored service URL:', serviceUrl)
         updateApiBaseUrls(serviceUrl)
+        // Update API instances with new base URLs
+        import('../services/adapter-api').then(({ adapterAPI }) => {
+          adapterAPI.updateBaseURL()
+          console.log('MCPRegistry adapterAPI baseURL updated to:', adapterAPI.getBaseURL())
+        })
         // registryAPI.updateBaseURL() // Not needed for registryService
       }
 
@@ -550,7 +567,8 @@ export default defineComponent({
         example: secret.example,
         required: secret.required || false,
         selected: false,  // Start unselected
-        value: secret.example || ''  // Pre-fill with example
+        value: secret.type === 'bool' ? (secret.example === 'true' || secret.example === true) : (secret.example || ''),  // Pre-fill with example, handle boolean
+        type: secret.type || 'secret'  // Default to 'secret' if not specified
       }))
 
       console.log('Mapped secrets:', secrets)
@@ -579,8 +597,10 @@ export default defineComponent({
     // Close deploy modal
     const closeDeployModal = () => {
       showDeployModal.value = false
-      selectedServerForDeploy.value = null
+      selectedServerForDeploy.value = undefined
       deploySecrets.value = []
+      waitingForAdapter.value = false
+      deployingAdapter.value = false
     }
 
     // Execute deployment with configured secrets
@@ -588,6 +608,8 @@ export default defineComponent({
       const { server, secrets } = config
 
       try {
+        // Keep deploying state active
+        deployingAdapter.value = true
         console.log('Executing deployment for server:', server.name, 'with configured secrets')
 
         // Create environment variables from selected and configured secrets only
@@ -630,20 +652,18 @@ export default defineComponent({
         if (adapter) {
           console.log('Adapter created successfully:', adapter)
 
-          // Close modal
-          closeDeployModal()
-
-          // Show success message
-          store.dispatch('growl/success', {
-            title: 'Deployment Successful',
-            message: `${server.name} has been deployed and an adapter has been created.`
-          })
+          // Transition to waiting state and start polling for adapter readiness
+          waitingForAdapter.value = true
+          await pollAdapterStatus(adapter.id, server)
         } else {
           throw new Error('Adapter creation failed')
         }
 
       } catch (error: any) {
         console.error('Deployment failed:', error)
+
+        // Reset deployment state on error
+        deployingAdapter.value = false
 
         // Show error message (don't close modal so user can retry)
         store.dispatch('growl/error', {
@@ -654,8 +674,23 @@ export default defineComponent({
     }
 
 
+    // Fake adapter status polling with 10-second timer for testing
+    const pollAdapterStatus = async (adapterId: string, server: MCPServer) => {
+      console.log('Starting 10-second fake wait for adapter deployment...')
 
+      setTimeout(() => {
+        console.log('Fake adapter deployment wait completed')
+        // Adapter is "ready", close modal and show success
+        waitingForAdapter.value = false
+        deployingAdapter.value = false
+        closeDeployModal()
 
+        store.dispatch('growl/success', {
+          title: 'Deployment Successful',
+          message: `${server.name} has been deployed and is ready to use.`
+        })
+      }, 10000) // 10 seconds
+    }
 
     // Adapter status methods
     const getAdapterStatusClass = (adapter: any): string => {
@@ -760,9 +795,11 @@ export default defineComponent({
       categoryFilter,
         showServerDetailsModal,
         selectedServerId,
-        showDeployModal,
-        selectedServerForDeploy,
-        deploySecrets,
+         showDeployModal,
+         selectedServerForDeploy,
+         deploySecrets,
+         waitingForAdapter,
+         deployingAdapter,
       filteredServers,
       availableCategories,
       isEnabled,
@@ -799,6 +836,27 @@ export default defineComponent({
   padding: 50px;
   font-size: 18px;
   color: var(--muted, #666);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.empty-state h3 {
+  color: var(--body-text, #1a1a1a);
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  color: var(--muted, #666);
+  font-size: 16px;
+  margin: 0;
 }
 
 /* Experimental Banner */

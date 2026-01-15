@@ -73,29 +73,29 @@
             <td>{{ getPermissionsSummary(group.permissions) }}</td>
             <td>{{ formatCreatedDate(group.createdAt) }}</td>
             <td class="actions-cell">
-              <button
-                class="btn btn-sm btn-outline"
-                @click.stop="$emit('view-group', group.id)"
-                title="View Details"
-              >
-                View
-              </button>
-              <button
-                v-if="canManageGroups"
-                class="btn btn-sm btn-outline"
-                @click.stop="$emit('edit-group', group.id)"
-                title="Edit Group"
-              >
-                Edit
-              </button>
-              <button
-                v-if="canManageGroups"
-                class="btn btn-sm btn-outline"
-                @click.stop="$emit('manage-members', group.id)"
-                title="Manage Members"
-              >
-                Members
-              </button>
+               <button
+                 class="btn btn-sm btn-outline"
+                 @click.stop="$emit('view-group', group)"
+                 title="View Details"
+               >
+                 View
+               </button>
+               <button
+                 v-if="canManageGroups"
+                 class="btn btn-sm btn-outline"
+                 @click.stop="$emit('edit-group', group)"
+                 title="Edit Group"
+               >
+                 Edit
+               </button>
+               <button
+                 v-if="canManageGroups"
+                 class="btn btn-sm btn-outline"
+                 @click.stop="$emit('manage-members', group)"
+                 title="Manage Members"
+               >
+                 Members
+               </button>
               <button
                 v-if="canManageGroups"
                 class="btn btn-sm btn-outline remove-btn"

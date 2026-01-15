@@ -24,6 +24,7 @@
         @rule-modal-open="openRuleModal"
         @sync-adapter="handleSyncAdapter"
         @view-server-details="openServerDetailsModal"
+        @server-registered="handleServerRegistered"
       />
 
     <ProxyStatus v-if="proxyInstalled && isEnabled" />
@@ -234,6 +235,33 @@ export default defineComponent({
       }
     }
 
+    const handleServerRegistered = async (data: any) => {
+      const { server, result, error } = data
+
+      if (error) {
+        console.error('Server registration failed:', error)
+        // Show error notification if available
+        if (store?.dispatch) {
+          store.dispatch('growl/error', {
+            title: 'Registration Failed',
+            message: `Failed to register ${server.name}: ${error.message || 'Unknown error'}`
+          })
+        }
+      } else {
+        console.log('Server registration successful:', result)
+        // Refresh adapters list to show the newly registered adapter
+        await loadAdapters()
+
+        // Show success notification
+        if (store?.dispatch) {
+          store.dispatch('growl/success', {
+            title: 'Server Registered',
+            message: `${server.name} has been successfully registered as an MCP adapter.`
+          })
+        }
+      }
+    }
+
     const onScanStarted = () => {
       console.log('Scan started');
       // Additional logic for when scan starts can be added here
@@ -268,8 +296,9 @@ export default defineComponent({
        openScanModal,
        openSecurityModal,
        openRuleModal,
-       handleSyncAdapter,
-       onScanStarted,
+        handleSyncAdapter,
+        handleServerRegistered,
+        onScanStarted,
        loadDiscoveredServers,
        startPolling,
        startScan,
@@ -285,6 +314,35 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* Service not enabled state */
+.blank-page {
+  text-align: center;
+  padding: 50px;
+  font-size: 18px;
+  color: #666;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.empty-state h3 {
+  color: var(--body-text, #1a1a1a);
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  color: var(--muted, #666);
+  font-size: 16px;
+  margin: 0;
+}
+
 .proxy-not-installed {
   text-align: center;
   padding: 50px 20px;

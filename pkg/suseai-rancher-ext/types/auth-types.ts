@@ -106,8 +106,13 @@ export interface ExternalUser {
   name: string;
   email: string;
   groups: string[];
-  createdAt: string;
-  updatedAt: string;
+  auth_provider?: string;
+  external_id?: string;
+  last_login_at?: string;
+  password_changed_at?: string;
+  provider_groups?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ExternalGroup {
@@ -146,7 +151,6 @@ export interface UpdateUserRequest {
 }
 
 export interface CreateUserResponse {
-  createdAt: string;
   user: ExternalUser;
 }
 

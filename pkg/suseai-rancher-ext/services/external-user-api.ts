@@ -1,7 +1,7 @@
 // External User API Service
 // Handles user management operations with the external MCP Gateway API
 
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
+import { BaseAPI, APIConfig } from './base-api'
 import { logger } from '../utils/logger'
 import { API_BASE_URLS } from '../config/api-config'
 import type {
@@ -11,84 +11,12 @@ import type {
   CreateUserResponse
 } from '../types/auth-types'
 
-export class ExternalUserAPI {
-  private api: AxiosInstance
-
-  constructor(baseURL: string, timeout: number = 30000) {
-    this.api = axios.create({
-      baseURL,
-      timeout,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    // Setup basic error handling (no auth headers for CORS compatibility)
-    this.api.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response) {
-          const { status, data } = error.response
-          const apiError = {
-            code: data?.code || `HTTP_${status}`,
-            message: data?.error || data?.message || `HTTP ${status} error`,
-            details: data?.details,
-            status
-          }
-          return Promise.reject(apiError)
-        } else if (error.request) {
-          return Promise.reject({
-            code: 'NETWORK_ERROR',
-            message: 'Network error - please check your connection',
-            details: { originalError: error.message }
-          })
-        } else {
-          return Promise.reject({
-            code: 'UNKNOWN_ERROR',
-            message: error.message || 'An unexpected error occurred',
-            details: { originalError: error }
-          })
-        }
-      }
-    )
+export class ExternalUserAPI extends BaseAPI {
+  constructor(config: APIConfig) {
+    super(config)
   }
 
-  // HTTP methods
-  private async request<T>(
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-    url: string,
-    data?: any,
-    config?: AxiosRequestConfig
-  ): Promise<T> {
-    try {
-      const response = await this.api.request({
-        method,
-        url,
-        data,
-        ...config
-      })
-      return response.data
-    } catch (error) {
-      // Error already handled by interceptor
-      throw error
-    }
-  }
 
-  protected async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>('GET', url, undefined, config)
-  }
-
-  protected async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>('POST', url, data, config)
-  }
-
-  protected async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>('PUT', url, data, config)
-  }
-
-  protected async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>('DELETE', url, undefined, config)
-  }
 
   /**
    * List all users
@@ -108,21 +36,23 @@ export class ExternalUserAPI {
   }
 
   /**
-   * Create a new user
-   */
-  async create(data: CreateUserRequest): Promise<CreateUserResponse> {
-    try {
-      logger.info('Creating external user', { id: data.id, name: data.name })
+    * Create a new user
+    */
+   async create(data: CreateUserRequest): Promise<CreateUserResponse> {
+     try {
+       logger.info('Creating external user', { id: data.id, name: data.name })
+       console.log('About to POST /api/v1/users with data:', data)
 
-      const response = await this.post<CreateUserResponse>('/api/v1/users', data)
-      logger.info('External user created', { id: response.user.id, name: response.user.name })
+       const response = await this.post<CreateUserResponse>('/api/v1/users', data)
+       console.log('POST response:', response)
+       logger.info('External user created', { id: response.user.id, name: response.user.name })
 
-      return response
-    } catch (error) {
-      logger.error('Failed to create external user', error)
-      throw error
-    }
-  }
+       return response
+     } catch (error) {
+       logger.error('Failed to create external user', error)
+       throw error
+     }
+   }
 
   /**
    * Get user by ID
@@ -176,7 +106,8 @@ export class ExternalUserAPI {
 }
 
 // Singleton instance
-export const externalUserAPI = new ExternalUserAPI(
-  API_BASE_URLS.MCP_GATEWAY,
-  30000
-)
+export const externalUserAPI = new ExternalUserAPI({
+  baseURL: API_BASE_URLS.MCP_GATEWAY,
+  timeout: 30000,
+  retries: 3
+})

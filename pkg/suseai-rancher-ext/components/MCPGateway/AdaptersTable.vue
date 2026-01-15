@@ -1,7 +1,6 @@
 <template>
-  <div class="endpoints-section">
-     <h2>Registered MCP Adapters</h2>
-    <table class="endpoints-table">
+   <div class="endpoints-section">
+     <table class="endpoints-table">
          <thead>
             <tr>
                <th>Name</th>

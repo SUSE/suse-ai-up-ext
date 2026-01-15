@@ -245,7 +245,7 @@ import { API_BASE_URLS } from '../../config/api-config';
 
 interface Props {
   show: boolean;
-  adapterData: AdapterResource | null;
+  adapterData: any;
 }
 
 const props = defineProps<Props>();
@@ -420,7 +420,7 @@ const getClientConfig = (clientType: string): string => {
   // Fall back to old structure (mcpServers) - transform for each client
   else if (adapter.value.mcpClientConfig.mcpServers) {
     const adapterName = adapter.value.name;
-    const mcpServer = adapter.value.mcpClientConfig.mcpServers[adapterName];
+    const mcpServer = (adapter.value.mcpClientConfig as any).mcpServers[adapterName];
 
     if (!mcpServer) return '';
 

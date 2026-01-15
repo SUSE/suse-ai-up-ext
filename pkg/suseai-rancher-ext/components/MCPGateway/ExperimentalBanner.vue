@@ -16,15 +16,15 @@ export default defineComponent({
 
 <style scoped>
 .experimental-banner {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  border-radius: 4px;
+  background: var(--warning-bg, #fff3cd);
+  border: 1px solid var(--warning-border, #ffeaa7);
+  border-radius: var(--border-radius, 4px);
   padding: 12px 16px;
   margin: 16px 24px 0;
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  color: #856404;
+  color: var(--warning-text, #856404);
 }
 
 .banner-icon {
@@ -34,7 +34,7 @@ export default defineComponent({
 
 .experimental-banner strong {
   font-weight: 600;
-  color: #856404;
+  color: var(--warning-text, #856404);
 }
 
 .experimental-banner p {
@@ -44,11 +44,11 @@ export default defineComponent({
 }
 
 .experimental-banner a {
-  color: #d63384;
+  color: var(--link, #d63384);
   text-decoration: underline;
 }
 
 .experimental-banner a:hover {
-  color: #b02a5b;
+  color: var(--link-hover, #b02a5b);
 }
 </style>

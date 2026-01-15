@@ -11,7 +11,7 @@
       <span class="metric-value" v-else>...</span>
     </div>
     <div class="metric-card">
-      <h3>Adapters in Error</h3>
+       <h3>Announced Adapters</h3>
       <span class="metric-value" v-if="!loading">{{ adaptersInErrorCount }}</span>
       <span class="metric-value" v-else>...</span>
     </div>

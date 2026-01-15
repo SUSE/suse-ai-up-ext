@@ -1,7 +1,5 @@
 plugin/img/generic-catalog.1842a50e.svg
 plugin/package.json
-plugin/suseai-rancher-ext-0.1.0.umd.min.10.js
-plugin/suseai-rancher-ext-0.1.0.umd.min.10.js.map
 plugin/suseai-rancher-ext-0.1.0.umd.min.154.js
 plugin/suseai-rancher-ext-0.1.0.umd.min.154.js.map
 plugin/suseai-rancher-ext-0.1.0.umd.min.163.js
@@ -14,8 +12,10 @@ plugin/suseai-rancher-ext-0.1.0.umd.min.318.js
 plugin/suseai-rancher-ext-0.1.0.umd.min.318.js.map
 plugin/suseai-rancher-ext-0.1.0.umd.min.335.js
 plugin/suseai-rancher-ext-0.1.0.umd.min.335.js.map
-plugin/suseai-rancher-ext-0.1.0.umd.min.41.js
-plugin/suseai-rancher-ext-0.1.0.umd.min.41.js.map
+plugin/suseai-rancher-ext-0.1.0.umd.min.4.js
+plugin/suseai-rancher-ext-0.1.0.umd.min.4.js.map
+plugin/suseai-rancher-ext-0.1.0.umd.min.556.js
+plugin/suseai-rancher-ext-0.1.0.umd.min.556.js.map
 plugin/suseai-rancher-ext-0.1.0.umd.min.559.js
 plugin/suseai-rancher-ext-0.1.0.umd.min.559.js.map
 plugin/suseai-rancher-ext-0.1.0.umd.min.587.js

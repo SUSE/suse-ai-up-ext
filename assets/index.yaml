@@ -12,12 +12,12 @@ entries:
       catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
     apiVersion: v2
     appVersion: 0.1.0
-    created: "2026-01-09T09:00:12.52305+01:00"
+    created: "2026-01-14T08:58:44.768064+01:00"
     description: suseai-rancher-ext plugin
-    digest: 279ce26babbb58f177a951ce4b13398b8332160ae301a0526f8ec8d739d7c497
+    digest: f51be39d3947defca59382b6f07b4aef865c4f92be444ae06950f2315a09e776
     name: suseai-rancher-ext
     type: application
     urls:
     - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.0.tgz
     version: 0.1.0
-generated: "2026-01-09T09:00:12.522585+01:00"
+generated: "2026-01-14T08:58:44.767398+01:00"

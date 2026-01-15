@@ -343,8 +343,18 @@
                   </div>
                 </div>
               </div>
-           </div>
-         </template>
+            </div>
+          </template>
+
+      <!-- Login Step -->
+      <template #login>
+        <div class="login-step">
+          <LoginStep
+            :proxy-url="selectedServiceUrl"
+            @login-success="$emit('login-success')"
+          />
+        </div>
+      </template>
     </Wizard>
   </div>
 </template>
@@ -640,6 +650,7 @@ import { useStore } from 'vuex';
 import Wizard from '@shell/components/Wizard';
 import { Banner } from '@rancher/shell/rancher-components/Banner';
 import Loading from '@shell/components/Loading';
+import LoginStep from '../LoginStep.vue';
 import { useAuth } from '../../../composables/useAuth';
 import { useClusterDiscovery } from '../../../composables/useClusterDiscovery';
 import type { ServiceInstance } from '../../../types/service-discovery';
@@ -698,6 +709,7 @@ const emit = defineEmits<Emits>();
     const selectedServices = ref<string[]>([]);
     const serviceSelectionError = ref('');
     const reviewError = ref('');
+    const selectedServiceUrl = ref('');
 
     // Available services
     const availableServices = [
@@ -758,6 +770,12 @@ const wizardSteps = computed(() => [
     label: 'Select Services',
     ready: false,
     weight: 5
+  },
+  {
+    name: 'login',
+    label: 'Authenticate',
+    ready: false,
+    weight: 6
   }
 ]);
 

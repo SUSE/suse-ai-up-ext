@@ -206,7 +206,7 @@ export class RegistryAPI extends BaseAPI {
     try {
       logger.info('Reloading MCP registry')
 
-        const result = await this.post<{ status: string; message: string }>('/registry/reload')
+        const result = await this.post<{ status: string; message: string }>(MCP_ENDPOINTS.REGISTRY_SYNC_OFFICIAL)
       logger.info('Registry reload completed', result)
 
       return result

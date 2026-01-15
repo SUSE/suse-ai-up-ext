@@ -2,35 +2,64 @@
   <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h2>{{ isEditing ? 'Edit User' : 'User Details' }}</h2>
+         <h2>{{ !user ? 'Create User' : isEditing ? 'Edit User' : 'User Details' }}</h2>
         <button class="close-btn" @click="$emit('close')" aria-label="Close modal">
           ×
         </button>
       </div>
 
       <div class="modal-body">
-        <form v-if="isEditing && formData" @submit.prevent="handleSave" class="user-form">
-          <div class="form-group">
-            <label for="username">{{ $props.isExternal ? 'Name' : 'Username' }} *</label>
-            <input
-              id="username"
-              v-model="formUsername"
-              type="text"
-              required
-              :disabled="!canEditUsername"
-              class="form-input"
-            />
-          </div>
+        <form v-if="(!user || isEditing) && formData" @submit.prevent="handleSave" class="user-form">
+           <div class="form-group">
+             <label for="username">Username *</label>
+             <input
+               id="username"
+               v-model="formUsername"
+               type="text"
+               required
+               class="form-input"
+             />
+           </div>
 
-          <div v-if="$props.isExternal" class="form-group">
-            <label for="email">Email</label>
-            <input
-              id="email"
-              v-model="formEmail"
-              type="email"
-              class="form-input"
-            />
-          </div>
+           <div class="form-group">
+             <label for="firstName">First Name</label>
+             <input
+               id="firstName"
+               v-model="firstName"
+               type="text"
+               class="form-input"
+             />
+           </div>
+
+           <div class="form-group">
+             <label for="lastName">Last Name</label>
+             <input
+               id="lastName"
+               v-model="lastName"
+               type="text"
+               class="form-input"
+             />
+           </div>
+
+           <div class="form-group">
+             <label for="email">Email *</label>
+             <input
+               id="email"
+               v-model="formEmail"
+               type="email"
+               required
+               class="form-input"
+             />
+           </div>
+
+           <div v-if="props.isExternal" class="form-group">
+             <label>Groups</label>
+             <select multiple v-model="selectedGroups" class="form-input">
+               <option v-for="group in availableGroups" :key="group.id" :value="group.id">
+                 {{ group.name }}
+               </option>
+             </select>
+           </div>
 
           <div v-if="!props.isExternal" class="form-group">
             <label for="displayName">Display Name</label>
@@ -102,10 +131,10 @@
             </div>
           </div>
 
-          <div v-if="user?.description" class="detail-section">
-            <h3>Description</h3>
-            <p>{{ user.description }}</p>
-          </div>
+           <div v-if="(user as any)?.description" class="detail-section">
+             <h3>Description</h3>
+             <p>{{ (user as any).description }}</p>
+           </div>
 
           <div v-if="!isExternal" class="detail-section">
             <h3>Principal IDs</h3>
@@ -145,32 +174,19 @@
               </div>
             </div>
           </div>
-          <div v-if="isExternal" class="detail-section">
-            <h3>Groups</h3>
-            <div v-if="getUserField('groups')?.length" class="groups-list">
-              <div
-                v-for="groupId in getUserField('groups')"
-                :key="groupId"
-                class="group-item"
-              >
-                {{ groupId }}
-              </div>
-            </div>
-            <p v-else class="no-data">No groups assigned</p>
-          </div>
-          <div v-if="isExternal" class="detail-section">
-            <h3>Groups</h3>
-            <div v-if="getUserField('groups')?.length" class="groups-list">
-              <div
-                v-for="groupId in getUserField('groups')"
-                :key="groupId"
-                class="group-item"
-              >
-                {{ groupId }}
-              </div>
-            </div>
-            <p v-else class="no-data">No groups assigned</p>
-          </div>
+           <div v-if="isExternal" class="detail-section">
+             <h3>Groups</h3>
+             <div v-if="getUserField('groups')?.length" class="groups-list">
+               <div
+                 v-for="groupId in getUserField('groups')"
+                 :key="groupId"
+                 class="group-item"
+               >
+                 {{ getGroupName(groupId) || groupId }}
+               </div>
+             </div>
+             <p v-else class="no-data">No groups assigned</p>
+           </div>
         </div>
       </div>
 
@@ -178,15 +194,15 @@
         <button type="button" class="btn btn-secondary" @click="$emit('close')">
           {{ isEditing ? 'Cancel' : 'Close' }}
         </button>
-        <button
-          v-if="isEditing"
-          type="submit"
-          class="btn btn-primary"
-          @click="handleSave"
-          :disabled="!isFormValid"
-        >
-          Save Changes
-        </button>
+         <button
+           v-if="!user || isEditing"
+           type="submit"
+           class="btn btn-primary"
+           @click="handleSave"
+           :disabled="!isFormValid"
+         >
+           {{ !user ? 'Create User' : 'Save Changes' }}
+         </button>
         <button
           v-else-if="canEditUser"
           type="button"
@@ -201,8 +217,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from 'vue';
+import { defineComponent, ref, computed, watch, onMounted } from 'vue';
 import type { RancherUser, ExternalUser, UserPermissions } from '../../types/auth-types';
+import { API_BASE_URLS } from '../../config/api-config';
 
 export default defineComponent({
   name: 'UserDetailsModal',
@@ -232,27 +249,57 @@ export default defineComponent({
   setup(props, { emit }) {
     const isEditing = ref(false);
     const formData = ref<RancherUser | ExternalUser | null>(null);
+    const availableGroups = ref<any[]>([]);
+    const firstName = ref('');
+    const lastName = ref('');
+    const selectedGroups = ref<string[]>([]);
 
     // Watch for user changes to reset form
     watch(() => props.user, (newUser) => {
       if (newUser) {
         // Create a mutable copy of the user data
         formData.value = JSON.parse(JSON.stringify(newUser));
+        // Initialize selected groups for external users
+        if (props.isExternal && (newUser as ExternalUser).groups) {
+          selectedGroups.value = [...(newUser as ExternalUser).groups];
+        }
         isEditing.value = false;
+      } else {
+        // For creation
+        formData.value = {
+          id: '',
+          name: '',
+          email: '',
+          groups: []
+        } as any;
+        selectedGroups.value = [];
+        isEditing.value = true;
       }
     }, { immediate: true });
+
+    // Fetch available groups for external users
+    onMounted(async () => {
+      if (props.isExternal) {
+        try {
+          // Assuming API_BASE_URLS is available, fetch groups
+          const response = await fetch(`${API_BASE_URLS.MCP_GATEWAY}/api/v1/groups`);
+          if (response.ok) {
+            availableGroups.value = await response.json();
+          }
+        } catch (error) {
+          console.error('Failed to fetch groups:', error);
+        }
+      }
+    });
 
     // Computed properties
     const isFormValid = computed(() => {
       if (!formData.value) return false;
 
-      if (props.isExternal) {
-        const externalData = formData.value as ExternalUser;
-        return externalData.name?.trim();
-      } else {
-        const rancherData = formData.value as RancherUser;
-        return rancherData.username?.trim();
-      }
+      const username = formUsername.value?.trim();
+      const email = formEmail.value?.trim();
+
+      return username && email;
     });
 
     const canEditUsername = computed(() => {
@@ -328,7 +375,29 @@ export default defineComponent({
     const handleSave = () => {
       if (!isFormValid.value || !formData.value) return;
 
-      emit('save', formData.value);
+      if (!props.user) {
+        // Creation payload
+        const name = `${firstName.value} ${lastName.value}`.trim();
+        const payload = {
+          id: formUsername.value,
+          name: name || formUsername.value,
+          email: formEmail.value,
+          groups: selectedGroups.value
+        };
+        emit('save', payload);
+      } else {
+        // Update payload - include selected groups for external users
+        const payload = {
+          ...formData.value,
+          ...(props.isExternal && { groups: selectedGroups.value })
+        };
+        emit('save', payload);
+      }
+    };
+
+    const getGroupName = (groupId: string): string => {
+      const group = availableGroups.value.find(g => g.id === groupId);
+      return group?.name || groupId;
     };
 
     const handleOverlayClick = (event: Event) => {
@@ -418,6 +487,10 @@ export default defineComponent({
       formDisplayName,
       formDescription,
       formEnabled,
+      availableGroups,
+      firstName,
+      lastName,
+      selectedGroups,
       startEditing,
       handleSave,
       handleOverlayClick,
@@ -426,6 +499,7 @@ export default defineComponent({
       getUserField,
       getFormField,
       setFormField,
+      getGroupName,
       props
     };
   }

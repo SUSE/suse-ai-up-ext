@@ -350,7 +350,7 @@ export default defineComponent({
 
       const spawnEnvVars = reactive<Record<string, string>>({});
       const spawning = ref(false);
-      // const showDeploymentModal = ref(false);
+       const showDeploymentModal = ref(false);
       const fullServerDetails = ref<MCPServer | null>(null);
       const loadingDetails = ref(false);
       const detailsError = ref<string>('');
@@ -507,7 +507,7 @@ export default defineComponent({
       return {
         spawnEnvVars,
         spawning,
-        // showDeploymentModal,
+         showDeploymentModal,
         fullServerDetails,
         loadingDetails,
         detailsError,

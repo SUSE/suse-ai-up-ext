@@ -1,7 +1,6 @@
 <template>
-  <div class="discovered-servers-section">
-    <h2>Discovered MCP Servers</h2>
-    <table class="servers-table">
+   <div class="discovered-servers-section">
+     <table class="servers-table">
       <thead>
         <tr>
           <th>Name</th>

@@ -121,29 +121,32 @@ export function useRegistry() {
     }
   }
 
-  // Reload registry
-  const reloadRegistry = async (): Promise<boolean> => {
-    loading.value = true
-    error.value = null
+   // Reload registry
+   const reloadRegistry = async (): Promise<boolean> => {
+     loading.value = true
+     error.value = null
 
-    try {
-      logger.info('Reloading registry')
+     try {
+       logger.info('Reloading registry')
 
-      // Clear cache before reloading
-      registryCache.clear()
+       // Reset pagination to ensure we start fresh
+       resetPagination()
 
-      await registryAPI.reload()
-      // Refresh the current browse results
-      await browseServers()
-      return true
-    } catch (err: any) {
-      error.value = err.message || 'Failed to reload registry'
-      logger.error('Failed to reload registry', err)
-      return false
-    } finally {
-      loading.value = false
-    }
-  }
+       // Clear cache before reloading
+       registryCache.clear()
+
+       await registryAPI.reload()
+       // Refresh the current browse results
+       await browseServers()
+       return true
+     } catch (err: any) {
+       error.value = err.message || 'Failed to reload registry'
+       logger.error('Failed to reload registry', err)
+       return false
+     } finally {
+       loading.value = false
+     }
+   }
 
   // Search servers
   const searchServers = async (query: string, category?: string): Promise<void> => {

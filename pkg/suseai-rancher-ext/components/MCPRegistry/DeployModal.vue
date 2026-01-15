@@ -1,6 +1,14 @@
 <template>
   <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
     <div class="deploy-modal" @click.stop>
+      <!-- Modal spinner overlay -->
+      <div v-if="deploying || waitingForAdapter" class="spinner-overlay">
+        <div class="spinner-content">
+          <i class="icon icon-spinner icon-spin"></i>
+          <h3>{{ deploying ? 'Deploying...' : 'Waiting for adapter...' }}</h3>
+          <p>{{ deploying ? 'Creating your MCP adapter' : 'Adapter is being deployed to the sidecar container' }}</p>
+        </div>
+      </div>
       <div class="modal-header">
         <h2>Deploy MCP Server</h2>
         <button class="close-btn" @click="handleCancel" aria-label="Close modal">
@@ -65,24 +73,69 @@
                 {{ secret.description }}
               </div>
 
-              <div v-if="secret.selected" class="secret-input">
-                <label :for="`secret-${index}`" class="input-label">
-                  Value for {{ secret.env || secret.name }}:
-                </label>
-                <input
-                  :id="`secret-${index}`"
-                  type="password"
-                  :value="secret.value"
-                  @input="updateSecretValue(index, $event)"
-                  :placeholder="secret.example || 'Enter value...'"
-                  class="secret-value-input"
-                  :aria-label="`Value for ${secret.name}`"
-                />
-                <div v-if="secret.example" class="example-hint">
-                  Example: {{ secret.example }}
-                </div>
-              </div>
-            </div>
+               <div v-if="secret.selected" class="secret-input">
+                 <label :for="`secret-${index}`" class="input-label">
+                   Value for {{ secret.env || secret.name }}:
+                 </label>
+
+                 <!-- Boolean type - checkbox -->
+                 <div v-if="secret.type === 'bool'" class="boolean-input">
+                   <label class="checkbox-container">
+                     <input
+                       :id="`secret-${index}`"
+                       type="checkbox"
+                        :checked="secret.value === 'true'"
+                       @change="updateSecretBooleanValue(index, $event)"
+                       :aria-label="`Value for ${secret.name}`"
+                     />
+                     <span class="checkmark"></span>
+                     <span class="checkbox-label">{{ secret.description || 'Enable' }}</span>
+                   </label>
+                 </div>
+
+                 <!-- Text type - regular text input -->
+                 <div v-else-if="secret.type === 'text'">
+                   <input
+                     :id="`secret-${index}`"
+                     type="text"
+                     :value="secret.value"
+                     @input="updateSecretValue(index, $event)"
+                     :placeholder="secret.example || 'Enter value...'"
+                     class="secret-value-input"
+                     :aria-label="`Value for ${secret.name}`"
+                   />
+                   <div v-if="secret.example" class="example-hint">
+                     Example: {{ secret.example }}
+                   </div>
+                 </div>
+
+                 <!-- Secret type (default) - password input -->
+                 <div v-else>
+                   <input
+                     :id="`secret-${index}`"
+                     type="password"
+                     :value="secret.value"
+                     @input="updateSecretValue(index, $event)"
+                     :placeholder="secret.example || 'Enter value...'"
+                     class="secret-value-input"
+                     :aria-label="`Value for ${secret.name}`"
+                   />
+                    <div v-if="secret.example" class="example-hint">
+                      Example: {{ secret.example }}
+                    </div>
+                  </div>
+
+           <!-- Waiting for adapter message -->
+           <div v-if="waitingForAdapter" class="waiting-message">
+             <h4>Deployment in Progress</h4>
+             <p>The adapter has been created successfully. The sidecar container is being deployed and will be ready shortly.</p>
+             <div class="progress-indicator">
+               <i class="icon icon-spinner icon-spin"></i>
+               <span>This usually takes about 10 seconds.</span>
+             </div>
+           </div>
+         </div>
+       </div>
           </div>
         </div>
       </div>
@@ -96,21 +149,20 @@
         </div>
 
         <div class="footer-actions">
-          <button
-            class="btn btn-secondary"
-            @click="handleCancel"
-            :disabled="deploying"
-          >
-            Cancel
-          </button>
-          <button
-            class="btn btn-primary"
-            @click="handleDeploy"
-            :disabled="!canDeploy || deploying"
-          >
-            <i v-if="deploying" class="icon icon-spinner icon-spin"></i>
-            {{ deploying ? 'Deploying...' : 'Deploy' }}
-          </button>
+           <button
+             class="btn btn-secondary"
+             @click="handleCancel"
+             :disabled="deploying || waitingForAdapter"
+           >
+             Cancel
+           </button>
+            <button
+              class="btn btn-primary"
+              @click="handleDeploy"
+              :disabled="!canDeploy || deploying || waitingForAdapter"
+            >
+              Deploy
+            </button>
         </div>
       </div>
     </div>
@@ -129,6 +181,7 @@ export interface SecretConfig {
   required?: boolean
   selected: boolean
   value: string
+  type?: 'text' | 'secret' | 'bool'
 }
 
 export default defineComponent({
@@ -145,12 +198,19 @@ export default defineComponent({
     secrets: {
       type: Array as () => SecretConfig[],
       default: () => []
+    },
+    waitingForAdapter: {
+      type: Boolean,
+      default: false
+    },
+    deploying: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['close', 'deploy'],
   setup(props, { emit }) {
     const secrets = ref<SecretConfig[]>([])
-    const deploying = ref(false)
     const validationErrors = ref<string[]>([])
 
     // Sync props to local state
@@ -174,7 +234,13 @@ export default defineComponent({
 
       // Check required secrets are configured
       const requiredSecrets = secrets.value.filter(s => s.required)
-      const configuredRequired = requiredSecrets.filter(s => s.selected && s.value.trim())
+      const configuredRequired = requiredSecrets.filter(s => {
+        if (!s.selected) return false
+        // For boolean types, value is always valid (true/false)
+        if (s.type === 'bool') return true
+        // For text/secret types, check if value is not empty
+        return s.value.trim()
+      })
 
       return configuredRequired.length === requiredSecrets.length
     })
@@ -184,8 +250,13 @@ export default defineComponent({
       const errors: string[] = []
 
       secrets.value.forEach(secret => {
-        if (secret.required && secret.selected && !secret.value.trim()) {
-          errors.push(`Required secret "${secret.name}" cannot be empty`)
+        if (secret.required && secret.selected) {
+          // Boolean values are always valid
+          if (secret.type === 'bool') return
+          // Text and secret values must not be empty
+          if (!secret.value.trim()) {
+            errors.push(`Required secret "${secret.name}" cannot be empty`)
+          }
         }
       })
 
@@ -214,16 +285,27 @@ export default defineComponent({
       }
     }
 
+    // Update secret boolean value
+    const updateSecretBooleanValue = (index: number, event: Event) => {
+      const target = event.target as HTMLInputElement
+      secrets.value[index].value = target.checked ? 'true' : 'false'
+
+      // Clear validation errors when user makes changes
+      if (validationErrors.value.length > 0) {
+        validationErrors.value = []
+      }
+    }
+
     // Handle overlay click (close modal)
     const handleOverlayClick = () => {
-      if (!deploying.value) {
+      if (!props.deploying) {
         handleCancel()
       }
     }
 
     // Handle cancel
     const handleCancel = () => {
-      if (!deploying.value) {
+      if (!props.deploying) {
         emit('close')
       }
     }
@@ -236,30 +318,27 @@ export default defineComponent({
         return
       }
 
-      deploying.value = true
-
       try {
         // Emit deploy event with configured secrets
         emit('deploy', {
           server: props.server,
           secrets: secrets.value
         })
+        // Note: deploying prop is controlled by parent component
       } catch (error) {
         console.error('Deploy error:', error)
         validationErrors.value = ['Deployment failed. Please try again.']
-      } finally {
-        deploying.value = false
       }
     }
 
     return {
       secrets,
-      deploying,
       validationErrors,
       serverIcon,
       canDeploy,
       toggleSecret,
       updateSecretValue,
+      updateSecretBooleanValue,
       handleOverlayClick,
       handleCancel,
       handleDeploy
@@ -269,6 +348,46 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* Full-screen Spinner Overlay */
+.spinner-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: var(--border-radius, 8px);
+}
+
+.spinner-content {
+  text-align: center;
+  color: var(--body-text, #1a1a1a);
+}
+
+.spinner-content .icon {
+  font-size: 48px;
+  color: var(--primary, #007bff);
+  margin-bottom: 16px;
+}
+
+.spinner-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.spinner-content p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted, #666);
+  opacity: 0.8;
+}
+
 /* Modal Overlay */
 .modal-overlay {
   position: fixed;
@@ -286,6 +405,7 @@ export default defineComponent({
 
 /* Modal Container */
 .deploy-modal {
+  position: relative;
   background: var(--card-bg, #ffffff);
   border-radius: var(--border-radius, 8px);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
@@ -496,6 +616,38 @@ export default defineComponent({
   display: block;
 }
 
+/* Boolean Input - Checkbox for boolean secrets */
+.boolean-input {
+  margin-top: 8px;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.checkbox-container:hover {
+  background-color: var(--accent-bg, #f8f9fa);
+}
+
+.checkbox-container input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.checkbox-label {
+  font-size: 14px;
+  color: var(--body-text, #1a1a1a);
+  user-select: none;
+}
+
 .secret-info {
   display: flex;
   align-items: center;
@@ -631,6 +783,42 @@ export default defineComponent({
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-hover, #0056b3);
   border-color: var(--primary-hover, #0056b3);
+}
+
+/* Waiting for adapter message */
+.waiting-message {
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--accent-bg, #f8f9fa);
+  border-radius: var(--border-radius, 6px);
+  border: 1px solid var(--border, #e1e5e9);
+  text-align: center;
+}
+
+.waiting-message h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--body-text, #1a1a1a);
+}
+
+.waiting-message p {
+  margin: 0 0 12px 0;
+  color: var(--muted, #666);
+  line-height: 1.4;
+}
+
+.progress-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--primary, #007bff);
+}
+
+.progress-indicator .icon {
+  font-size: 16px;
 }
 
 /* Responsive */

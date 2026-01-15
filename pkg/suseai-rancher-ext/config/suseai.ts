@@ -55,7 +55,7 @@ export interface NavItem {
 export const PAGE_TYPES = {
 
   SETTINGS: 'settings',
-   UP: "SUSE AI",
+   UP: "SUSE AI Universal Proxy",
   HOME: "Home",
   MCPGATEWAY: "mcp-gateway",
   MCPREGISTRY: "mcp-registry",
@@ -79,7 +79,7 @@ export const VIRTUAL_TYPES: VirtualTypeConfig[] = [
 
   {
     name: PAGE_TYPES.UP,
-    label: 'SUSE AI',
+    label: 'SUSE AI Universal Proxy',
     route: {
       name: `c-cluster-${PRODUCT}-universal-adapter`,
       params: { product: PRODUCT, cluster: BLANK_CLUSTER },
@@ -124,7 +124,7 @@ export const VIRTUAL_TYPES: VirtualTypeConfig[] = [
    },
    {
      name: PAGE_TYPES.SETTINGS,
-     label: 'Settings',
+     label: 'Global Settings',
      route: {
        name: `c-cluster-${PRODUCT}-settings`,
        params: { product: PRODUCT, cluster: BLANK_CLUSTER },

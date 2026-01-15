@@ -35,24 +35,26 @@ export function useExternalUsers() {
   }
 
   // Create new user
-  const createUser = async (data: CreateUserRequest): Promise<ExternalUser | null> => {
-    loading.value = true
-    error.value = null
+   const createUser = async (data: CreateUserRequest): Promise<ExternalUser | null> => {
+     loading.value = true
+     error.value = null
 
-    try {
-      logger.info('Creating external user', { name: data.name, email: data.email })
-      const response = await externalUserAPI.create(data)
-      users.value.push(response.user)
-      logger.info('External user created', { id: response.user.id, name: response.user.name })
-      return response.user
-    } catch (err: any) {
-      error.value = err.message || 'Failed to create user'
-      logger.error('Failed to create external user', err)
-      return null
-    } finally {
-      loading.value = false
-    }
-  }
+     try {
+       logger.info('Creating external user', { name: data.name, email: data.email })
+       console.log('Calling externalUserAPI.create with:', data)
+       const response = await externalUserAPI.create(data)
+       console.log('Create response:', response)
+       users.value.push(response.user)
+       logger.info('External user created', { id: response.user.id, name: response.user.name })
+       return response.user
+     } catch (err: any) {
+       error.value = err.message || 'Failed to create user'
+       logger.error('Failed to create external user', err)
+       return null
+     } finally {
+       loading.value = false
+     }
+   }
 
   // Get user by ID
   const getUser = async (id: string): Promise<ExternalUser | null> => {

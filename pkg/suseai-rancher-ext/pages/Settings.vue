@@ -1,678 +1,575 @@
 <template>
   <div class="settings-page">
-    <!-- Access denied message for non-admin users -->
-    <div v-if="!isAuthenticated || !hasAdminPrivileges" class="access-denied">
+    <div class="fixed-header">
+      <h1>SUSE AI Proxy Settings</h1>
+      <p class="page-description">Manage users and groups for the SUSE AI Universal Proxy</p>
+    </div>
+
+    <!-- Service Not Enabled -->
+    <div v-if="!serviceEnabled" class="blank-page">
+      <div class="empty-state">
+        <h3>SUSE AI Universal Proxy Not Configured</h3>
+        <p>Please configure the SUSE AI Universal Proxy service before managing users and groups.</p>
+      </div>
+    </div>
+
+    <!-- Access Denied -->
+    <div v-else-if="!hasAccess" class="access-denied">
       <div class="access-denied-content">
         <h2>Access Denied</h2>
-        <p>You need administrator privileges to access the Settings page.</p>
-        <p v-if="!isAuthenticated">Please log in with an administrator account.</p>
-        <p v-else-if="currentUser">Current user: {{ currentUser.displayName || currentUser.username }}</p>
-
-        <!-- Debug information for troubleshooting -->
-        <details class="debug-section">
-          <summary>🔍 Authentication Debug Info (Click to expand)</summary>
-          <div class="debug-content">
-            <div class="debug-item">
-              <strong>Is Authenticated:</strong> {{ debugInfo.isAuthenticated }}
-            </div>
-            <div class="debug-item">
-              <strong>Has Admin Privileges:</strong> {{ debugInfo.hasAdminPrivileges }}
-            </div>
-            <div class="debug-item">
-              <strong>Current User:</strong>
-              <pre>{{ JSON.stringify(debugInfo.currentUser, null, 2) }}</pre>
-            </div>
-            <div class="debug-item">
-              <strong>Available Auth Getters:</strong>
-              <ul>
-                <li v-for="getter in debugInfo.availableGetters" :key="getter">{{ getter }}</li>
-              </ul>
-            </div>
-            <div class="debug-item">
-              <strong>Store State (Auth):</strong>
-              <pre>{{ JSON.stringify(debugInfo.storeState?.auth, null, 2) }}</pre>
-            </div>
-            <div class="debug-item">
-              <strong>Store State (Management):</strong>
-              <pre>{{ JSON.stringify(debugInfo.storeState?.management, null, 2) }}</pre>
-            </div>
-          </div>
-        </details>
+        <p>You need administrator privileges to manage SUSE AI Proxy users and groups.</p>
+        <p>Please contact your system administrator if you believe this is an error.</p>
       </div>
     </div>
 
-    <!-- Settings content for admin users -->
-    <div v-else>
-      <header class="fixed-header">
-        <div class="title">
-          <h1 class="m-0" id="page-title">Settings</h1>
-          <p class="page-description">Manage users, roles, and authentication settings</p>
-        </div>
-      </header>
-
-    <div class="main-content">
-    <div class="tabs-container">
-      <div class="tab-nav">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          :class="['tab-button', { active: activeTab === tab.id }]"
-          @click="activeTab = tab.id"
-        >
-          {{ tab.label }}
-        </button>
+    <!-- Authentication Required -->
+    <div v-else-if="!isAuthenticated" class="access-denied">
+      <div class="access-denied-content">
+        <h2>Authentication Required</h2>
+        <p>You need to authenticate with the SUSE AI Universal Proxy to manage users and groups.</p>
+        <p>Please log in through the service selection wizard first.</p>
       </div>
+    </div>
 
-      <div class="tab-content">
-        <!-- Users Tab -->
-        <div v-if="activeTab === 'users'" class="tab-pane">
-          <UsersTable
-            :users="externalUsers"
-            :loading="loadingExternalUsers"
-            :error="externalUsersError || undefined"
-            :can-manage-users="hasAdminPrivileges"
-            :is-external="true"
-            @view-user="handleViewExternalUser"
-            @edit-user="handleEditExternalUser"
-            @add-user="handleAddExternalUser"
-            @delete-user="handleDeleteExternalUser"
-            @retry="loadExternalUsers"
-          />
+    <!-- Main Content -->
+    <div v-else class="main-content">
+      <div class="tabs-container">
+        <div class="tab-nav">
+          <button
+            class="tab-button"
+            :class="{ active: activeTab === 'users' }"
+            @click="activeTab = 'users'"
+          >
+            Users
+          </button>
+          <button
+            class="tab-button"
+            :class="{ active: activeTab === 'groups' }"
+            @click="activeTab = 'groups'"
+          >
+            Groups
+          </button>
         </div>
 
-        <!-- Groups Tab -->
-        <div v-if="activeTab === 'groups'" class="tab-pane">
-          <GroupsTable
-            :groups="externalGroups"
-            :all-users="externalUsers"
-            :loading="loadingExternalGroups"
-            :error="externalGroupsError || undefined"
-            :can-manage-groups="hasAdminPrivileges"
-            @view-group="handleViewExternalGroup"
-            @edit-group="handleEditExternalGroup"
-            @add-group="handleAddExternalGroup"
-            @manage-members="handleManageGroupMembers"
-            @delete-group="handleDeleteExternalGroup"
-            @retry="loadExternalGroups"
-          />
-        </div>
+        <div class="tab-content">
+          <!-- Users Tab -->
+          <div v-if="activeTab === 'users'" class="tab-pane">
+            <UsersTable
+              :users="users"
+              :loading="usersLoading"
+              :error="usersError || undefined"
+              :can-manage-users="canManageUsers"
+              :is-external="true"
+              @view-user="handleViewUser"
+              @edit-user="handleEditUser"
+              @add-user="handleAddUser"
+              @delete-user="handleDeleteUser"
+              @retry="loadUsers"
+            />
+          </div>
 
-        <!-- Permissions Tab -->
-        <div v-if="activeTab === 'permissions'" class="tab-pane">
-          <PermissionsTable
-            :assignments="permissionAssignments"
-            :all-users="externalUsers"
-            :all-groups="externalGroups"
-            :loading="loadingPermissions"
-            :error="permissionsError || undefined"
-            :can-manage-permissions="hasAdminPrivileges"
-            @assign-permissions="handleAssignPermissions"
-            @edit-permissions="handleEditPermissions"
-            @remove-permissions="handleRemovePermissions"
-            @retry="loadPermissions"
-          />
-        </div>
-
-        <!-- SUSE AI Proxy Tab -->
-        <div v-if="activeTab === 'proxy'" class="tab-pane">
-          <div class="proxy-settings">
-            <h3>SUSE AI Universal Proxy Configuration</h3>
-            <p>Configure discovery and connection settings for the SUSE AI Universal Proxy.</p>
-
-            <div class="settings-section">
-              <h4>Namespace Filtering</h4>
-              <p>Optionally restrict proxy discovery to specific namespaces. Leave empty to search all namespaces.</p>
-              <div class="form-group">
-                <label for="allowed-namespaces">Allowed Namespaces (comma-separated):</label>
-                <input
-                  id="allowed-namespaces"
-                  type="text"
-                  :value="proxyConfig.allowedNamespaces?.join(', ') || ''"
-                  @input="updateAllowedNamespaces"
-                  placeholder="e.g., kube-system, default, suse-ai-up"
-                  class="form-control"
-                />
-              </div>
-            </div>
-
-            <div class="settings-section">
-              <h4>Current Configuration</h4>
-              <div v-if="proxyConfig.selectedServer" class="current-server">
-                <div class="server-info">
-                  <strong>Selected Proxy:</strong> {{ proxyConfig.selectedServer.namespace }}/{{ proxyConfig.selectedServer.podName }}
-                </div>
-                <div class="server-info">
-                  <strong>Cluster:</strong> {{ proxyConfig.selectedServer.clusterId }}
-                </div>
-                <div class="server-info">
-                  <strong>Service URL:</strong> {{ proxyConfig.selectedServer.serviceUrl }}
-                </div>
-              </div>
-              <div v-else class="no-server">
-                <p>No proxy server configured. Use the main dashboard to discover and configure a proxy.</p>
-              </div>
-
-              <div class="actions">
-                <button
-                  class="btn btn-secondary"
-                  @click="reRunWizard"
-                >
-                  Re-run Discovery Wizard
-                </button>
-              </div>
-            </div>
+          <!-- Groups Tab -->
+          <div v-if="activeTab === 'groups'" class="tab-pane">
+            <GroupsTable
+              :groups="groups"
+              :all-users="users"
+              :loading="groupsLoading"
+              :error="groupsError || undefined"
+              :can-manage-groups="canManageGroups"
+              @view-group="handleViewGroup"
+              @edit-group="handleEditGroup"
+              @add-group="handleAddGroup"
+              @manage-members="handleManageMembers"
+              @delete-group="handleDeleteGroup"
+              @retry="loadGroups"
+            />
           </div>
         </div>
       </div>
     </div>
-    </div>
 
-      <!-- External User Details Modal -->
-      <UserDetailsModal
-        v-if="showExternalUserModal"
-        :user="selectedExternalUser"
-        :show="showExternalUserModal"
-        :can-edit-user="hasAdminPrivileges"
-        :is-external="true"
-        @close="showExternalUserModal = false"
-        @save="handleSaveExternalUser"
-      />
+    <!-- User Details Modal -->
+    <UserDetailsModal
+      v-if="userModal.show"
+      :show="userModal.show"
+      :user="userModal.user"
+      :is-editing="userModal.isEditing"
+      :can-edit-user="canManageUsers"
+      :is-external="true"
+      @close="closeUserModal"
+      @save="handleSaveUser"
+      @delete="handleDeleteUserModal"
+    />
 
-      <!-- External Group Details Modal -->
-      <GroupDetailsModal
-        v-if="showExternalGroupModal"
-        :group="selectedExternalGroup"
-        :all-users="externalUsers"
-        :show="showExternalGroupModal"
-        :can-edit-group="hasAdminPrivileges"
-        @close="showExternalGroupModal = false"
-        @save="handleSaveExternalGroup"
-        @add-member="handleAddGroupMember"
-        @remove-member="handleRemoveGroupMember"
-      />
+    <!-- Group Details Modal -->
+    <GroupDetailsModal
+      v-if="groupModal.show"
+      :show="groupModal.show"
+      :group="groupModal.group"
+      :all-users="users"
+      :is-editing="groupModal.isEditing"
+      :can-edit-group="canManageGroups"
+      @close="closeGroupModal"
+      @save="handleSaveGroup"
+      @delete="handleDeleteGroupModal"
+      @add-member="handleAddMember"
+      @remove-member="handleRemoveMember"
+    />
 
-      <!-- Permission Assignment Modal -->
-      <PermissionAssignmentModal
-        v-if="showPermissionModal"
-        :assignment="selectedPermissionAssignment"
-        :all-users="externalUsers"
-        :all-groups="externalGroups"
-        :show="showPermissionModal"
-        :can-manage-permissions="hasAdminPrivileges"
-        @close="showPermissionModal = false"
-        @save="handleSavePermissionAssignment"
-      />
-
-      <!-- Legacy Rancher Auth Modals (for backward compatibility) -->
-      <UserDetailsModal
-        v-if="showUserModal"
-        :user="selectedUser"
-        :show="showUserModal"
-        :can-edit-user="hasAdminPrivileges"
-        @close="showUserModal = false"
-        @save="handleSaveUser"
-      />
-
-      <RoleDetailsModal
-        v-if="showRoleModal"
-        :role="selectedRole"
-        :show="showRoleModal"
-        :can-edit-role="hasAdminPrivileges"
-        @close="showRoleModal = false"
-        @save="handleSaveRole"
-      />
-    </div>
+    <!-- Debug Information (commented out due to type issues) -->
+    <!-- <details class="debug-section">
+      <summary>Debug Information</summary>
+      <div class="debug-content">
+        <div class="debug-item">
+          <strong>Service Status:</strong>
+          <pre>{{ JSON.stringify({ serviceEnabled, hasAccess, isAuthenticated }, null, 2) }}</pre>
+        </div>
+        <div class="debug-item">
+          <strong>Authentication:</strong>
+          <pre>{{ JSON.stringify({ authMode, currentUser }, null, 2) }}</pre>
+        </div>
+        <div class="debug-item">
+          <strong>Users Count:</strong>
+          <span>{{ users.length }}</span>
+        </div>
+        <div class="debug-item">
+          <strong>Groups Count:</strong>
+          <span>{{ groups.length }}</span>
+        </div>
+      </div>
+    </details> -->
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from 'vue';
-import { useStore } from 'vuex';
-import { useAuth } from '../composables/useAuth';
-import { useExternalUsers } from '../composables/useExternalUsers';
-import { useExternalGroups } from '../composables/useExternalGroups';
-import { usePermissions } from '../composables/usePermissions';
-import { updateApiBaseUrls } from '../config/api-config';
-import { SUSEAIProxyConfig } from '../config/suseai';
-import type { RancherUser, RancherRole, ExternalUser, ExternalGroup } from '../types/auth-types';
-import UsersTable from '../components/settings/UsersTable.vue';
-import GroupsTable from '../components/settings/GroupsTable.vue';
-import PermissionsTable from '../components/settings/PermissionsTable.vue';
-import UserDetailsModal from '../components/settings/UserDetailsModal.vue';
-import GroupDetailsModal from '../components/settings/GroupDetailsModal.vue';
-import PermissionAssignmentModal from '../components/settings/PermissionAssignmentModal.vue';
-import RolesTable from '../components/settings/RolesTable.vue';
-import RoleDetailsModal from '../components/settings/RoleDetailsModal.vue';
+import { defineComponent, ref, computed, onMounted, watch } from 'vue'
+import { useStore } from 'vuex'
+import { MANAGEMENT } from '@shell/config/types'
+import { useExternalUsers } from '../composables/useExternalUsers'
+import { useExternalGroups } from '../composables/useExternalGroups'
+import { ProxyAuthService } from '../services/proxy-auth-service'
+import type { AuthMode } from '../services/base-api'
+import UsersTable from '../components/settings/UsersTable.vue'
+import GroupsTable from '../components/settings/GroupsTable.vue'
+import UserDetailsModal from '../components/settings/UserDetailsModal.vue'
+import GroupDetailsModal from '../components/settings/GroupDetailsModal.vue'
+import type { ExternalUser, ExternalGroup } from '../types/auth-types'
 
 export default defineComponent({
   name: 'Settings',
   components: {
     UsersTable,
     GroupsTable,
-    PermissionsTable,
     UserDetailsModal,
-    GroupDetailsModal,
-    PermissionAssignmentModal,
-    RolesTable,
-    RoleDetailsModal
+    GroupDetailsModal
   },
   setup() {
-    const store = useStore();
-    const activeTab = ref('users');
+    const store = useStore()
+    const activeTab = ref<'users' | 'groups'>('users')
 
-    const tabs = [
-      { id: 'users', label: 'Users' },
-      { id: 'groups', label: 'Groups' },
-      { id: 'permissions', label: 'Permissions' },
-      { id: 'proxy', label: 'SUSE AI Proxy' }
-    ];
+    // Service and auth state
+    const serviceEnabled = ref(false)
+    const hasAccess = ref(false)
+    const isAuthenticated = ref(false)
+    const authMode = ref<AuthMode | undefined>(undefined)
+    const currentUser = ref<any>(null)
 
-    // Modal states - External API
-    const showExternalUserModal = ref(false);
-    const showExternalGroupModal = ref(false);
-    const showPermissionModal = ref(false);
-    const selectedExternalUser = ref<ExternalUser | null>(null);
-    const selectedExternalGroup = ref<ExternalGroup | null>(null);
-    const selectedPermissionAssignment = ref<any>(null);
+    // Modal states
+    const userModal = ref({
+      show: false,
+      user: null as ExternalUser | null,
+      isEditing: false
+    })
 
-    // Modal states - Legacy Rancher (for backward compatibility)
-    const showUserModal = ref(false);
-    const showRoleModal = ref(false);
-    const selectedUser = ref<RancherUser | null>(null);
-    const selectedRole = ref<RancherRole | null>(null);
+    const groupModal = ref({
+      show: false,
+      group: null as ExternalGroup | null,
+      isEditing: false
+    })
 
-    // External API composables
-    const {
-      users: externalUsers,
-      loading: loadingExternalUsers,
-      error: externalUsersError,
-      loadUsers: loadExternalUsers,
-      createUser: createExternalUser,
-      getUser: getExternalUser,
-      updateUser: updateExternalUser,
-      deleteUser: deleteExternalUser
-    } = useExternalUsers();
+    // Auth service
+    const serviceUrl = localStorage.getItem('suseai-service-url') || ''
+    const authService = new ProxyAuthService({
+      baseURL: serviceUrl,
+      timeout: 10000,
+      retries: 3
+    })
 
-    const {
-      groups: externalGroups,
-      loading: loadingExternalGroups,
-      error: externalGroupsError,
-      loadGroups: loadExternalGroups,
-      createGroup: createExternalGroup,
-      getGroup: getExternalGroup,
-      updateGroup: updateExternalGroup,
-      deleteGroup: deleteExternalGroup,
-      addUserToGroup: addUserToExternalGroup,
-      removeUserFromGroup: removeUserFromExternalGroup
-    } = useExternalGroups();
-
-    const {
-      assignments: permissionAssignments,
-      loading: loadingPermissions,
-      error: permissionsError,
-      loadAssignments: loadPermissions,
-      assignPermissions: assignAdapterPermissions,
-      updatePermissions: updateAdapterPermissions,
-      removePermissions: removeAdapterPermissions
-    } = usePermissions();
-
-    // Legacy Rancher auth composable (for backward compatibility)
+    // Composables
     const {
       users,
-      roles,
-      loadingUsers,
-      loadingRoles,
-      usersError,
-      rolesError,
-      currentUser,
-      hasAdminPrivileges,
-      isAuthenticated,
+      loading: usersLoading,
+      error: usersError,
       loadUsers,
-      loadRoles,
-      getUserDetails,
-      getRoleDetails,
+      createUser,
       updateUser,
-      updateRole,
-      loadClusterAccess,
-      canAccessCluster,
-      canManageCluster,
-      debugInfo
-    } = useAuth();
+      deleteUser: deleteUserComposable
+    } = useExternalUsers()
 
-    // SUSE AI Proxy configuration
-    const proxyConfig = computed<SUSEAIProxyConfig>(() => store.getters['suseai/proxyConfig'] || {});
+    const {
+      groups,
+      loading: groupsLoading,
+      error: groupsError,
+      loadGroups,
+      createGroup,
+      updateGroup,
+      deleteGroup: deleteGroupComposable,
+      addUserToGroup,
+      removeUserFromGroup
+    } = useExternalGroups()
 
-    // Load data on mount
-    onMounted(async () => {
-      // Initialize API URLs with service URL from store
-      const serviceUrls = store.state.suseai?.settings?.serviceUrls || []
-      const serviceUrl = serviceUrls.length > 0 ? serviceUrls[0] : undefined
-      console.log('Settings serviceUrls from store:', serviceUrls)
-      console.log('Settings serviceUrl to use:', serviceUrl)
+    // Computed properties
+    const canManageUsers = computed(() => hasAccess.value && isAuthenticated.value)
+    const canManageGroups = computed(() => hasAccess.value && isAuthenticated.value)
 
-      // Set initial API URLs
-      updateApiBaseUrls(serviceUrl)
-
-      if (hasAdminPrivileges.value) {
-        await Promise.all([
-          // Load external API data
-          loadExternalUsers(),
-          loadExternalGroups(),
-          loadPermissions(),
-          // Load legacy Rancher data (for backward compatibility)
-          loadUsers(),
-          loadRoles(),
-          loadClusterAccess()
-        ]);
-      }
-    });
-
-    // Event handlers
-    const handleViewUser = async (userId: string) => {
+    // Check service and auth status
+    const checkStatus = async () => {
       try {
-        const user = await getUserDetails(userId);
-        selectedUser.value = user;
-        showUserModal.value = true;
-      } catch (error) {
-        console.error('Failed to load user details:', error);
+        // Check service configuration first
+        const serviceUrl = localStorage.getItem('suseai-service-url')
+        serviceEnabled.value = !!serviceUrl
+
+        // Check authentication mode
+        if (serviceEnabled.value) {
+          try {
+            const mode = await authService.getAuthMode()
+            authMode.value = mode
+
+            // Check if user is Rancher admin OR authentication is disabled (dev mode)
+            const user = store.getters['auth/user']
+            const isRancherAdmin = user?.isAdmin || false
+            const isAuthDisabled = mode?.mode === 'dev'
+
+            hasAccess.value = isRancherAdmin || isAuthDisabled
+
+            isAuthenticated.value = authService.isAuthenticated()
+
+            // Auto-login for admin users (only if not in dev mode)
+            if (hasAccess.value && !isAuthenticated.value && !isAuthDisabled) {
+              await authService.login({
+                user_id: 'admin',
+                password: 'admin'
+              })
+              isAuthenticated.value = authService.isAuthenticated()
+            }
+
+            // In dev mode with disabled auth, consider authenticated
+            if (isAuthDisabled) {
+              isAuthenticated.value = true
+            }
+          } catch (err) {
+            console.warn('Failed to check auth mode:', err)
+            // Fallback: check if user is Rancher admin
+            const user = store.getters['auth/user']
+            hasAccess.value = user?.isAdmin || false
+            isAuthenticated.value = false
+          }
+        } else {
+          // No service configured - fallback to Rancher admin check
+          const user = store.getters['auth/user']
+          hasAccess.value = user?.isAdmin || false
+        }
+
+        // Load data if authenticated
+        if (isAuthenticated.value) {
+          await Promise.all([loadUsers(), loadGroups()])
+        }
+      } catch (err) {
+        console.error('Failed to check status:', err)
       }
-    };
+    }
+
+    // User modal handlers
+    const handleViewUser = (userId: string) => {
+      const user = users.value.find(u => u.id === userId)
+      if (user) {
+        userModal.value = {
+          show: true,
+          user,
+          isEditing: false
+        }
+      }
+    }
 
     const handleEditUser = (userId: string) => {
-      // For now, same as view - edit functionality can be added later
-      handleViewUser(userId);
-    };
-
-    const handleViewRole = async (roleId: string) => {
-      try {
-        const role = await getRoleDetails(roleId);
-        selectedRole.value = role;
-        showRoleModal.value = true;
-      } catch (error) {
-        console.error('Failed to load role details:', error);
+      const user = users.value.find(u => u.id === userId)
+      if (user) {
+        userModal.value = {
+          show: true,
+          user,
+          isEditing: true
+        }
       }
-    };
+    }
 
-    const handleEditRole = (roleId: string) => {
-      // For now, same as view - edit functionality can be added later
-      handleViewRole(roleId);
-    };
+    const handleAddUser = () => {
+      userModal.value = {
+        show: true,
+        user: null,
+        isEditing: true
+      }
+    }
 
     const handleSaveUser = async (userData: any) => {
       try {
-        await updateUser(userData.id, userData);
-        showUserModal.value = false;
-        // Reload users list
-        await loadUsers();
-      } catch (error) {
-        console.error('Failed to save user:', error);
-      }
-    };
+        console.log('handleSaveUser called with:', userData)
 
-    const handleSaveRole = async (roleData: any) => {
-      try {
-        await updateRole(roleData.id, roleData);
-        showRoleModal.value = false;
-        // Reload roles list
-        await loadRoles();
-      } catch (error) {
-        console.error('Failed to save role:', error);
-      }
-    };
+        let createdUser: any = null
 
-    const handleAddUser = () => {
-      // For now, just show an alert - full user creation would need additional UI
-      alert('User creation functionality would be implemented here');
-    };
+        if (userModal.value.user) {
+          // Update existing user
+          const { groups, ...userUpdateData } = userData // Extract groups from update data
 
-    const handleAddRole = () => {
-      // For now, just show an alert - full role creation would need additional UI
-      alert('Role creation functionality would be implemented here');
-    };
+          // Update user data (without groups)
+          createdUser = await updateUser(userModal.value.user.id, userUpdateData)
 
-    // External API handlers
-    const handleViewExternalUser = async (userId: string) => {
-      try {
-        const user = await getExternalUser(userId);
-        selectedExternalUser.value = user;
-        showExternalUserModal.value = true;
-      } catch (error) {
-        console.error('Failed to load external user details:', error);
-      }
-    };
+          // Handle group membership changes if groups were provided
+          if (groups !== undefined) {
+            const currentGroups = (userModal.value.user as any).groups || []
+            const newGroups = groups || []
 
-    const handleEditExternalUser = (userId: string) => {
-      handleViewExternalUser(userId);
-    };
+            console.log('Handling group membership changes:', { currentGroups, newGroups })
 
-    const handleAddExternalUser = () => {
-      selectedExternalUser.value = null;
-      showExternalUserModal.value = true;
-    };
+            // Groups to add
+            const groupsToAdd = newGroups.filter((g: string) => !currentGroups.includes(g))
+            // Groups to remove
+            const groupsToRemove = currentGroups.filter((g: string) => !newGroups.includes(g))
 
-    const handleSaveExternalUser = async (userData: ExternalUser) => {
-      try {
-        if (userData.id) {
-          await updateExternalUser(userData.id, userData);
+            console.log('Groups to add:', groupsToAdd, 'Groups to remove:', groupsToRemove)
+
+            // Add user to new groups
+            for (const groupId of groupsToAdd) {
+              try {
+                await addUserToGroup(groupId, userModal.value.user.id)
+                console.log(`Added user ${userModal.value.user.id} to group ${groupId}`)
+              } catch (err) {
+                console.error(`Failed to add user to group ${groupId}:`, err)
+              }
+            }
+
+            // Remove user from old groups
+            for (const groupId of groupsToRemove) {
+              try {
+                await removeUserFromGroup(groupId, userModal.value.user.id)
+                console.log(`Removed user ${userModal.value.user.id} from group ${groupId}`)
+              } catch (err) {
+                console.error(`Failed to remove user from group ${groupId}:`, err)
+              }
+            }
+          }
         } else {
-          await createExternalUser(userData);
+          // Create new user
+          const { groups, ...userCreateData } = userData // Extract groups from create data
+
+          // Create user without groups first
+          createdUser = await createUser(userCreateData)
+
+          // Add user to groups if specified
+          if (groups && groups.length > 0) {
+            console.log('Adding new user to groups:', groups)
+            for (const groupId of groups) {
+              try {
+                await addUserToGroup(groupId, createdUser.id)
+                console.log(`Added new user ${createdUser.id} to group ${groupId}`)
+              } catch (err) {
+                console.error(`Failed to add new user to group ${groupId}:`, err)
+              }
+            }
+          }
         }
-        showExternalUserModal.value = false;
-        await loadExternalUsers();
-      } catch (error) {
-        console.error('Failed to save external user:', error);
+        closeUserModal()
+      } catch (err) {
+        console.error('Failed to save user:', err)
+        // Error handling is done in the modal
       }
-    };
+    }
 
-    const handleViewExternalGroup = async (groupId: string) => {
-      try {
-        const group = await getExternalGroup(groupId);
-        selectedExternalGroup.value = group;
-        showExternalGroupModal.value = true;
-      } catch (error) {
-        console.error('Failed to load external group details:', error);
+    const handleDeleteUser = async (userId: string) => {
+      const success = await deleteUserComposable(userId)
+      return success
+    }
+
+    const handleDeleteUserModal = async () => {
+      if (userModal.value.user) {
+        const success = await deleteUserComposable(userModal.value.user.id)
+        if (success) {
+          closeUserModal()
+        }
       }
-    };
+    }
 
-    const handleEditExternalGroup = (groupId: string) => {
-      handleViewExternalGroup(groupId);
-    };
+    const closeUserModal = () => {
+      userModal.value.show = false
+      userModal.value.user = null
+      userModal.value.isEditing = false
+    }
 
-    const handleAddExternalGroup = () => {
-      selectedExternalGroup.value = null;
-      showExternalGroupModal.value = true;
-    };
+    // Group modal handlers
+    const handleViewGroup = (groupId: string) => {
+      const group = groups.value.find(g => g.id === groupId)
+      if (group) {
+        groupModal.value = {
+          show: true,
+          group,
+          isEditing: false
+        }
+      }
+    }
 
-    const handleManageGroupMembers = (groupId: string) => {
-      handleViewExternalGroup(groupId);
-    };
+    const handleEditGroup = (groupId: string) => {
+      const group = groups.value.find(g => g.id === groupId)
+      if (group) {
+        groupModal.value = {
+          show: true,
+          group,
+          isEditing: true
+        }
+      }
+    }
 
-    const handleSaveExternalGroup = async (groupData: ExternalGroup) => {
+    const handleAddGroup = () => {
+      groupModal.value = {
+        show: true,
+        group: null,
+        isEditing: true
+      }
+    }
+
+    const handleSaveGroup = async (groupData: any) => {
       try {
-        if (groupData.id) {
-          await updateExternalGroup(groupData.id, groupData);
+        if (groupModal.value.group) {
+          // Update existing group
+          await updateGroup(groupModal.value.group.id, groupData)
         } else {
-          await createExternalGroup(groupData);
+          // Create new group
+          await createGroup(groupData)
         }
-        showExternalGroupModal.value = false;
-        await loadExternalGroups();
-      } catch (error) {
-        console.error('Failed to save external group:', error);
+        closeGroupModal()
+      } catch (err) {
+        console.error('Failed to save group:', err)
+        // Error handling is done in the modal
       }
-    };
+    }
 
-    const handleAddGroupMember = async (groupId: string, userId: string) => {
-      try {
-        await addUserToExternalGroup(groupId, userId);
-        await loadExternalGroups();
-      } catch (error) {
-        console.error('Failed to add user to group:', error);
-      }
-    };
+    const handleDeleteGroup = async (groupId: string) => {
+      const success = await deleteGroupComposable(groupId)
+      return success
+    }
 
-    const handleRemoveGroupMember = async (groupId: string, userId: string) => {
-      try {
-        await removeUserFromExternalGroup(groupId, userId);
-        await loadExternalGroups();
-      } catch (error) {
-        console.error('Failed to remove user from group:', error);
-      }
-    };
-
-    const handleAssignPermissions = () => {
-      selectedPermissionAssignment.value = null;
-      showPermissionModal.value = true;
-    };
-
-    const handleEditPermissions = (assignment: any) => {
-      selectedPermissionAssignment.value = assignment;
-      showPermissionModal.value = true;
-    };
-
-    const handleRemovePermissions = async (assignmentId: string) => {
-      try {
-        await removeAdapterPermissions(assignmentId);
-        await loadPermissions();
-      } catch (error) {
-        console.error('Failed to remove permissions:', error);
-      }
-    };
-
-    const handleSavePermissionAssignment = async (assignment: any) => {
-      try {
-        if (assignment.id) {
-          await updateAdapterPermissions(assignment.id, assignment.permissions);
-        } else {
-          await assignAdapterPermissions(assignment);
-        }
-        showPermissionModal.value = false;
-        await loadPermissions();
-      } catch (error) {
-        console.error('Failed to save permission assignment:', error);
-      }
-    };
-
-    const handleDeleteExternalUser = async (userId: string) => {
-      if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-        try {
-          await deleteExternalUser(userId);
-          await loadExternalUsers();
-        } catch (error) {
-          console.error('Failed to delete external user:', error);
+    const handleDeleteGroupModal = async () => {
+      if (groupModal.value.group) {
+        const success = await deleteGroupComposable(groupModal.value.group.id)
+        if (success) {
+          closeGroupModal()
         }
       }
-    };
+    }
 
-    const handleDeleteExternalGroup = async (groupId: string) => {
-      if (confirm('Are you sure you want to delete this group? This action cannot be undone.')) {
-        try {
-          await deleteExternalGroup(groupId);
-          await loadExternalGroups();
-        } catch (error) {
-          console.error('Failed to delete external group:', error);
-        }
+    const handleManageMembers = (group: ExternalGroup) => {
+      // For now, just open edit mode - member management can be enhanced later
+      handleEditGroup(group.id)
+    }
+
+    const handleAddMember = async (groupId: string, userId: string) => {
+      await addUserToGroup(groupId, userId)
+    }
+
+    const handleRemoveMember = async (groupId: string, userId: string) => {
+      await removeUserFromGroup(groupId, userId)
+    }
+
+    const closeGroupModal = () => {
+      groupModal.value.show = false
+      groupModal.value.group = null
+      groupModal.value.isEditing = false
+    }
+
+    // Watch for auth changes
+    watch(isAuthenticated, (newVal) => {
+      if (newVal) {
+        loadUsers()
+        loadGroups()
       }
-    };
+    })
 
-    // SUSE AI Proxy handlers
-    const updateAllowedNamespaces = (event: Event) => {
-      const target = event.target as HTMLInputElement;
-      const namespaces = target.value
-        .split(',')
-        .map(ns => ns.trim())
-        .filter(ns => ns.length > 0);
-
-      const newConfig: SUSEAIProxyConfig = {
-        ...proxyConfig.value,
-        allowedNamespaces: namespaces.length > 0 ? namespaces : undefined
-      };
-
-      store.dispatch('suseai/setProxyConfig', newConfig);
-    };
-
-    const reRunWizard = () => {
-      // Clear proxy config to re-run wizard
-      store.dispatch('suseai/setProxyConfig', {});
-      // Navigate to home/dashboard
-      store.dispatch('nav/replace', { name: 'c-cluster-suseai-universal-adapter' });
-    };
+    // Initialize
+    onMounted(() => {
+      checkStatus()
+    })
 
     return {
       activeTab,
-      tabs,
-      // External API state and handlers
-      showExternalUserModal,
-      showExternalGroupModal,
-      showPermissionModal,
-      selectedExternalUser,
-      selectedExternalGroup,
-      selectedPermissionAssignment,
-      externalUsers,
-      externalGroups,
-      permissionAssignments,
-      loadingExternalUsers,
-      loadingExternalGroups,
-      loadingPermissions,
-      externalUsersError,
-      externalGroupsError,
-      permissionsError,
-      handleViewExternalUser,
-      handleEditExternalUser,
-      handleAddExternalUser,
-      handleSaveExternalUser,
-      handleViewExternalGroup,
-      handleEditExternalGroup,
-      handleAddExternalGroup,
-      handleManageGroupMembers,
-      handleSaveExternalGroup,
-      handleAddGroupMember,
-      handleRemoveGroupMember,
-      handleAssignPermissions,
-      handleEditPermissions,
-      handleRemovePermissions,
-      handleSavePermissionAssignment,
-       handleDeleteExternalUser,
-       handleDeleteExternalGroup,
-       loadExternalUsers,
-       loadExternalGroups,
-       loadPermissions,
-       // SUSE AI Proxy
-       proxyConfig,
-       updateAllowedNamespaces,
-       reRunWizard,
-       // Legacy Rancher state and handlers (for backward compatibility)
-       showUserModal,
-       showRoleModal,
-       selectedUser,
-       selectedRole,
-       users,
-       roles,
-       loadingUsers,
-       loadingRoles,
-       usersError,
-       rolesError,
-       currentUser,
-       hasAdminPrivileges,
-       isAuthenticated,
-       debugInfo,
-       handleViewUser,
-       handleEditUser,
-       handleViewRole,
-       handleEditRole,
-       handleSaveUser,
-       handleSaveRole,
-       handleAddUser,
-       handleAddRole,
-       loadUsers,
-       loadRoles
-     };
-   }
- });
+      serviceEnabled,
+      hasAccess,
+      isAuthenticated,
+      authMode,
+      currentUser,
+      userModal,
+      groupModal,
+      users,
+      usersLoading,
+      usersError,
+      groups,
+      groupsLoading,
+      groupsError,
+      canManageUsers,
+      canManageGroups,
+      loadUsers,
+      loadGroups,
+      handleViewUser,
+      handleEditUser,
+      handleAddUser,
+      handleSaveUser,
+      handleDeleteUser,
+      handleDeleteUserModal,
+      closeUserModal,
+      handleViewGroup,
+      handleEditGroup,
+      handleAddGroup,
+      handleSaveGroup,
+      handleDeleteGroup,
+      handleDeleteGroupModal,
+      handleManageMembers,
+      handleAddMember,
+      handleRemoveMember,
+      closeGroupModal
+    }
+  }
+})
 </script>
 
 <style scoped>
 .settings-page {
   padding: 20px;
+}
+
+/* Service not enabled state */
+.blank-page {
+  text-align: center;
+  padding: 50px;
+  font-size: 18px;
+  color: #666;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.empty-state h3 {
+  color: var(--body-text, #1a1a1a);
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  color: var(--muted, #666);
+  font-size: 16px;
+  margin: 0;
 }
 
 .fixed-header {
@@ -809,109 +706,5 @@ export default defineComponent({
   font-family: monospace;
   font-size: 12px;
   color: var(--text-muted);
-}
-
-/* SUSE AI Proxy Settings */
-.proxy-settings {
-  max-width: 800px;
-}
-
-.proxy-settings h3 {
-  margin-bottom: 8px;
-  color: var(--text);
-}
-
-.proxy-settings > p {
-  color: var(--text-muted);
-  margin-bottom: 24px;
-}
-
-.settings-section {
-  margin-bottom: 32px;
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card-bg);
-}
-
-.settings-section h4 {
-  margin: 0 0 8px 0;
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.settings-section p {
-  margin: 0 0 16px 0;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.form-control {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--input-bg);
-  color: var(--text);
-  font-size: 14px;
-}
-
-.form-control:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
-}
-
-.current-server {
-  margin-bottom: 16px;
-}
-
-.server-info {
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.server-info strong {
-  color: var(--text);
-}
-
-.no-server {
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.actions {
-  margin-top: 16px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.btn-secondary {
-  background: var(--secondary-bg);
-  color: var(--secondary-text);
-  border-color: var(--border);
-}
-
-.btn-secondary:hover {
-  background: var(--secondary-hover);
 }
 </style>

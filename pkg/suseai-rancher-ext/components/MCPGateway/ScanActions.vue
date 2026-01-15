@@ -1,14 +1,14 @@
 <template>
   <div>
     <div class="scan-actions">
-      <button class="btn btn-primary" @click="handleScanStart" :disabled="scanning">
+       <button class="btn btn-sm btn-success" @click="handleScanStart" :disabled="scanning">
         <i class="icon icon-search"></i>
-        {{ scanning ? 'Scanning...' : 'Start Discovery Scan' }}
+         {{ scanning ? 'Scanning...' : 'Start Discovery' }}
       </button>
-      <button class="btn btn-secondary" @click="handleRuleManagement">
-        <i class="icon icon-cog"></i>
-        Manage Security Rules
-      </button>
+       <button v-if="false" class="btn btn-secondary" @click="handleRuleManagement">
+         <i class="icon icon-cog"></i>
+         Manage Security Rules
+       </button>
     </div>
 
     <!-- Security Scan Progress -->

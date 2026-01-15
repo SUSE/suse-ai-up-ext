@@ -61,16 +61,16 @@
           <div v-if="selectedProxyIndex >= 0 && selectedProxy" class="proxy-details">
             <h4>Selected Proxy Details</h4>
             <div class="detail-item">
-              <strong>Pod Name:</strong> {{ selectedProxy.metadata?.name }}
+               <strong>Pod Name:</strong> {{ (selectedProxy as any)?.metadata?.name }}
             </div>
             <div class="detail-item">
-              <strong>Namespace:</strong> {{ selectedProxy.metadata?.namespace }}
+               <strong>Namespace:</strong> {{ (selectedProxy as any)?.metadata?.namespace }}
             </div>
             <div class="detail-item">
               <strong>Cluster:</strong> {{ getClusterName(selectedProxy) }}
             </div>
             <div class="detail-item">
-              <strong>IP:</strong> {{ selectedProxy.primaryIP || selectedProxy.status?.podIP || 'Unknown' }}
+               <strong>IP:</strong> {{ (selectedProxy as any)?.primaryIP || (selectedProxy as any)?.status?.podIP || 'Unknown' }}
             </div>
             <div class="actions">
               <button class="btn-primary" @click="confirmProxySelection">Configure This Proxy</button>
@@ -106,17 +106,17 @@
             :services="availableServices"
           />
 
-          <div class="actions">
-            <button
-              class="btn-primary"
-              :disabled="selectedServices.length === 0"
-              @click="onCompleteSetup"
-            >
-              Save Configuration
-            </button>
-          </div>
+        <div class="actions">
+          <button
+            class="btn-primary"
+            :disabled="selectedServices.length === 0"
+            @click="onServiceSelectionComplete"
+          >
+            Continue
+          </button>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- Configuration Review -->
@@ -228,6 +228,7 @@ export default defineComponent({
     const proxySaved = ref(false)
     const selectedServices = ref<string[]>([])
     const configurationCompleted = ref(false)
+    const serviceUrl = ref('')
 
     // Legacy cluster/pod state for backward compatibility
     const selectedCluster = ref('')
@@ -450,12 +451,26 @@ export default defineComponent({
       console.log('Pod saved, showing service selection')
     }
 
-    const onCompleteSetup = async () => {
+    const onServiceSelectionComplete = () => {
       if (selectedServices.value.length === 0) {
         console.warn('No services selected')
         return
       }
 
+      // Generate service URL from proxy info (always use external IP if available)
+      const externalIP = selectedProxy.value!.externalIPs?.[0]
+      const primaryIP = selectedProxy.value!.primaryIP || selectedProxy.value!.clusterIP
+      const ip = externalIP || primaryIP
+      serviceUrl.value = `http://${ip}:8911`
+
+      // Persist service URL for authentication
+      localStorage.setItem('suseai-service-url', serviceUrl.value)
+
+      // Proceed with configuration (authentication handled in Settings)
+      handleLoginSuccess()
+    }
+
+    const handleLoginSuccess = async () => {
       try {
         // Store configuration in Vuex
         await store.dispatch('suseai/setSelectedServices', selectedServices.value)
@@ -463,12 +478,10 @@ export default defineComponent({
         await store.dispatch('suseai/setSelectedPod', selectedPod.value)
         await store.dispatch('suseai/setProxyInstalled', true)
 
-        // Generate service URL from proxy info (always use external IP if available)
-        const externalIP = selectedProxy.value!.externalIPs?.[0]
-        const primaryIP = selectedProxy.value!.primaryIP || selectedProxy.value!.clusterIP
-        const ip = externalIP || primaryIP
-        const serviceUrl = `http://${ip}:8911`
-        await store.dispatch('suseai/setServiceUrls', [serviceUrl])
+        await store.dispatch('suseai/setServiceUrls', [serviceUrl.value])
+
+        // Persist service URL for authentication
+        localStorage.setItem('suseai-service-url', serviceUrl.value)
 
         // Save selected proxy to proxy config
         const proxyConfigData = {
@@ -476,7 +489,7 @@ export default defineComponent({
             clusterId: getClusterId(selectedProxy.value),
             namespace: selectedProxy.value!.metadata?.namespace,
             podName: selectedProxy.value!.metadata?.name,
-            serviceUrl
+            serviceUrl: serviceUrl.value
           }
         }
         await store.dispatch('suseai/setProxyConfig', proxyConfigData)
@@ -484,7 +497,7 @@ export default defineComponent({
         console.log('Configuration saved:', {
           proxy: selectedProxy.value,
           services: selectedServices.value,
-          serviceUrl,
+          serviceUrl: serviceUrl.value,
           proxyConfig: proxyConfigData
         })
 
@@ -595,6 +608,7 @@ export default defineComponent({
       selectedServices,
       availableServices,
       configurationCompleted,
+      serviceUrl,
       clustersLoading,
       clustersError,
       availableClusters,
@@ -604,7 +618,8 @@ export default defineComponent({
       onPodSelected,
       onProxySave,
       onPodSave,
-      onCompleteSetup,
+      onServiceSelectionComplete,
+      handleLoginSuccess,
       resetClusterSelection,
       resetProxySelection,
       resetPodSelection,

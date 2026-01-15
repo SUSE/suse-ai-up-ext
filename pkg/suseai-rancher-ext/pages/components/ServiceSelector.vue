@@ -32,14 +32,7 @@
       </div>
     </div>
 
-    <div v-if="selectedServices.length > 0" class="selection-summary">
-      <h4>Selected Services ({{ selectedServices.length }})</h4>
-      <ul>
-        <li v-for="serviceId in selectedServices" :key="serviceId">
-          {{ getServiceName(serviceId) }}
-        </li>
-      </ul>
-    </div>
+
 
     <div v-if="selectedServices.length === 0" class="no-selection">
       <p>Please select at least one service to continue.</p>
@@ -257,37 +250,7 @@ export default defineComponent({
   background: var(--secondary-hover, #5a6268);
 }
 
-.selection-summary {
-  background: var(--card-bg, var(--body-bg));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 20px;
-  margin-top: 20px;
-}
 
-.selection-summary h4 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--body-text);
-  margin: 0 0 12px 0;
-}
-
-.selection-summary ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.selection-summary li {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.1));
-  color: var(--body-text);
-  font-size: 14px;
-}
-
-.selection-summary li:last-child {
-  border-bottom: none;
-}
 
 .no-selection {
   text-align: center;

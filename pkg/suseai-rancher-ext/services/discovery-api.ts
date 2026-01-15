@@ -249,48 +249,10 @@ export class DiscoveryAPI extends BaseAPI {
 
       logger.info('Discovered servers retrieved and transformed', { count: servers.length });
       return servers;
-    } catch (error) {
-      logger.error('Failed to get discovered servers from API', error);
-      // TEMP: Return test data to check if UI works
-      console.log('Returning test data to check UI');
-      return [
-        {
-          id: 'test-server-1',
-          address: 'http://192.168.1.74:8000',
-          port: 8000,
-          protocol: 'MCP',
-          discoveredAt: new Date().toISOString(),
-          lastSeen: new Date().toISOString(),
-          name: 'Test Server 1',
-          connection: 'StreamableHttp',
-          status: 'discovered',
-          metadata: {
-            auth_type: 'none',
-            detectionMethod: 'network-scan',
-            validation_status: 'valid'
-          },
-          _meta: {
-            authType: 'none',
-            category: 'discovered',
-            source: 'network-scan',
-            tags: [],
-            userAuthRequired: false,
-            validation_status: 'valid'
-          },
-          vulnerability_score: 'high' as const,
-          security_findings: [],
-          auth_info: {
-            required: false,
-            type: 'none',
-            detected_mechanisms: [],
-            vulnerabilities: [],
-            confidence: 'unknown'
-          },
-          last_deep_scan: new Date().toISOString()
-        }
-      ];
-      // throw error; // Re-throw the error instead of falling back to mock data
-    }
+     } catch (error) {
+       logger.error('Failed to get discovered servers from API', error);
+       throw error;
+     }
   }
 }
 

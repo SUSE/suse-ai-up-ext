@@ -12,9 +12,29 @@ export interface APIConfig {
 }
 
 export interface AuthHeaders {
-  'X-API-Key': string
+  'X-API-Key'?: string
   'X-User-ID'?: string
   'Authorization'?: string
+}
+
+export interface AuthMode {
+  mode: 'local' | 'github' | 'rancher' | 'dev'
+  github?: {
+    clientId: string
+    redirectUri: string
+  }
+  rancher?: {
+    issuerUrl: string
+    clientId: string
+    redirectUri: string
+  }
+}
+
+export interface AuthToken {
+  token: string
+  tokenType: string
+  expiresAt: string
+  userId: string
 }
 
 export interface APIError {
@@ -37,6 +57,7 @@ export class BaseAPI {
         'Content-Type': 'application/json',
       },
     })
+    this.setupInterceptors()
   }
 
   // Get current baseURL
@@ -71,18 +92,51 @@ export class BaseAPI {
   }
 
   protected getAuthHeaders(): AuthHeaders | null {
-    // Get authentication headers from Rancher or stored tokens
-    // This should be implemented based on the authentication system
-    try {
-      // For now, return basic headers - this will be updated with proper auth
-      return {
-        'X-API-Key': 'rancher-managed-key',
-        'X-User-ID': 'admin'
+    // Always check for stored token
+    const stored = localStorage.getItem('suseai-auth-token')
+    if (stored) {
+      try {
+        const token: AuthToken = JSON.parse(stored)
+        // Check if token is expired
+        if (new Date(token.expiresAt) > new Date()) {
+          return {
+            'Authorization': `Bearer ${token.token}`
+          }
+        } else {
+          localStorage.removeItem('suseai-auth-token')
+        }
+      } catch (error) {
+        localStorage.removeItem('suseai-auth-token')
       }
-    } catch (error) {
-      logger.warn('Failed to get auth headers:', error)
-      return null
     }
+    // No fallback headers when authentication is disabled
+    return null
+  }
+
+  // Token management
+  protected setAuthToken(token: AuthToken): void {
+    try {
+      localStorage.setItem('suseai-auth-token', JSON.stringify(token))
+    } catch (error) {
+      logger.warn('Failed to store auth token:', error)
+    }
+  }
+
+  protected clearAuthToken(): void {
+    try {
+      localStorage.removeItem('suseai-auth-token')
+    } catch (error) {
+      logger.warn('Failed to clear auth token:', error)
+    }
+  }
+
+  // Get authentication mode (unauthenticated)
+  public async getAuthMode(): Promise<AuthMode> {
+    // Use a direct axios call without auth headers
+    const response = await axios.get(`${this.getBaseURL()}/auth/mode`, {
+      timeout: this.config.timeout
+    })
+    return response.data
   }
 
   protected handleError(error: any): APIError {
