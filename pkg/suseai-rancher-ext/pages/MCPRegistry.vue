@@ -153,14 +153,14 @@
                            <span class="category-label">Category: {{ server._meta.category }}</span>
                          </div>
 
-                         <div v-if="server.tags && server.tags.length" class="tile-tags">
-                           <span v-for="tag in server.tags.slice(0, 3)" :key="tag" class="tag">
-                             {{ tag }}
-                           </span>
-                           <span v-if="server.tags.length > 3" class="tag more-tags">
-                             +{{ server.tags.length - 3 }} more
-                           </span>
-                         </div>
+                          <div v-if="getAllTags(server) && getAllTags(server).length" class="tile-tags">
+                            <span v-for="tag in getAllTags(server).slice(0, 3)" :key="tag" class="tag">
+                              {{ tag }}
+                            </span>
+                            <span v-if="getAllTags(server).length > 3" class="tag more-tags">
+                              +{{ getAllTags(server).length - 3 }} more
+                            </span>
+                          </div>
 
                          <!-- Package and Tool counts -->
                          <div class="tile-capabilities" v-if="server.packages?.length || server.tools?.length">
@@ -536,6 +536,15 @@ export default defineComponent({
         return (server as any).source?.branch || (server as any).repository?.branch || ''
       }
 
+      // Get all tags including type
+      const getAllTags = (server: MCPServer): string[] => {
+        const tags = [...(server.tags || [])]
+        if (server.type) {
+          tags.unshift(server.type) // Add type as the first tag
+        }
+        return tags
+      }
+
      // Event handlers
     const handleSearch = async () => {
       await browseServers({ q: searchQuery.value, category: categoryFilter.value })
@@ -804,17 +813,18 @@ export default defineComponent({
       availableCategories,
       isEnabled,
 
-         // Methods
-          handleSearch,
-          handleReloadRegistry,
-          handleViewServer,
-          handleDeployServer,
-          closeDeployModal,
-          executeDeploy,
-          closeServerDetailsModal,
-         getServerIcon,
-         getSourceUrl,
-         getSourceBranch,
+          // Methods
+           handleSearch,
+           handleReloadRegistry,
+           handleViewServer,
+           handleDeployServer,
+           closeDeployModal,
+           executeDeploy,
+           closeServerDetailsModal,
+          getServerIcon,
+          getSourceUrl,
+          getSourceBranch,
+          getAllTags,
          toggleCardExpansion,
          isSuseServer,
          isCertifiedServer,

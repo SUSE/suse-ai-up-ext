@@ -15,21 +15,26 @@
           <p>{{ error }}</p>
         </div>
         <div v-else-if="serverData" class="server-details">
-          <!-- Server Header -->
-          <div class="server-header">
-            <h3 class="server-title">{{ serverData.name }}</h3>
-            <div class="server-meta">
-              <span class="version-badge">v{{ serverData.version }}</span>
-              <span v-if="serverData._meta?.hosted" class="hosted-badge">Hosted</span>
-              <span v-else class="self-hosted-badge">Self-hosted</span>
-            </div>
-          </div>
+           <!-- Server Header -->
+           <div class="server-header">
+             <div class="server-icon-container" v-if="serverData.about?.icon_url || serverData.icon">
+               <img :src="serverData.about?.icon_url || serverData.icon" :alt="serverData.about?.title || serverData.name" class="server-icon" />
+             </div>
+             <div class="server-title-section">
+               <h3 class="server-title">{{ serverData.about?.title || serverData.name }}</h3>
+               <div class="server-meta">
+                 <span class="version-badge">v{{ serverData.version }}</span>
+                 <span v-if="serverData._meta?.hosted" class="hosted-badge">Hosted</span>
+                 <span v-else class="self-hosted-badge">Self-hosted</span>
+               </div>
+             </div>
+           </div>
 
-          <!-- Description -->
-          <div class="detail-section">
-            <h4>Description</h4>
-            <p class="server-description">{{ serverData.description }}</p>
-          </div>
+           <!-- Description -->
+           <div class="detail-section">
+             <h4>Description</h4>
+             <p class="server-description">{{ serverData.about?.description || serverData.description }}</p>
+           </div>
 
            <!-- Connection Details -->
            <div v-if="serverData.address || serverData.port || serverData.protocol || serverData.connection" class="detail-section">
@@ -233,52 +238,60 @@
 
  
 
-           <!-- Source Information -->
-            <div v-if="serverData._meta?.source || (serverData as any).repository || serverData.source_url || serverData.project_url" class="detail-section">
-              <h4>Source Information</h4>
-              <div class="source-details">
-                <!-- Repository -->
-                <div v-if="(serverData as any).repository?.url" class="source-item">
-                  <div class="source-label">Repository:</div>
-                  <a :href="(serverData as any).repository.url" target="_blank" rel="noopener noreferrer" class="source-link">
-                    {{ (serverData as any).repository.url }}
-                    <i class="icon icon-external-link"></i>
-                  </a>
-                </div>
-                <!-- Branch -->
-                <div v-if="(serverData as any).repository?.branch" class="source-item">
-                  <div class="source-label">Branch:</div>
-                  <div class="source-value">{{ (serverData as any).repository.branch }}</div>
-                </div>
-                <!-- Commit -->
-                <div v-if="(serverData as any).repository?.commit" class="source-item">
-                  <div class="source-label">Commit:</div>
-                  <div class="source-value">{{ (serverData as any).repository.commit }}</div>
-                </div>
-                <!-- Source from meta -->
-                <div v-if="serverData._meta?.source && !(serverData as any).repository?.url" class="source-item">
-                  <div class="source-label">Source:</div>
-                  <a :href="serverData._meta.source" target="_blank" rel="noopener noreferrer" class="source-link">
-                    {{ serverData._meta.source }}
-                    <i class="icon icon-external-link"></i>
-                  </a>
-                </div>
-                <!-- Source URL fallback -->
-                <div v-if="serverData.source_url && !serverData._meta?.source && !(serverData as any).repository?.url" class="source-item">
-                  <div class="source-label">Source Code:</div>
-                  <a :href="serverData.source_url" target="_blank" rel="noopener noreferrer" class="source-link">
-                    View Source
-                    <i class="icon icon-external-link"></i>
-                  </a>
-                </div>
-                <!-- Project URL -->
-                <div v-if="serverData.project_url" class="source-item">
-                  <div class="source-label">Project:</div>
-                  <a :href="serverData.project_url" target="_blank" rel="noopener noreferrer" class="source-link">
-                    View Project
-                    <i class="icon icon-external-link"></i>
-                  </a>
-                </div>
+            <!-- Source Information -->
+             <div v-if="getSourceUrl(serverData) || (serverData as any).repository || serverData.source_url || serverData.project_url" class="detail-section">
+               <h4>Source Information</h4>
+               <div class="source-details">
+                 <!-- Source/Project URL (highest priority) -->
+                 <div v-if="getSourceUrl(serverData)" class="source-item">
+                   <div class="source-label">Source:</div>
+                   <a :href="getSourceUrl(serverData)" target="_blank" rel="noopener noreferrer" class="source-link">
+                     {{ getSourceUrl(serverData) }}
+                     <i class="icon icon-external-link"></i>
+                   </a>
+                 </div>
+                 <!-- Repository -->
+                 <div v-if="(serverData as any).repository?.url && !(serverData as any).source?.project" class="source-item">
+                   <div class="source-label">Repository:</div>
+                   <a :href="(serverData as any).repository.url" target="_blank" rel="noopener noreferrer" class="source-link">
+                     {{ (serverData as any).repository.url }}
+                     <i class="icon icon-external-link"></i>
+                   </a>
+                 </div>
+                 <!-- Branch -->
+                 <div v-if="(serverData as any).repository?.branch" class="source-item">
+                   <div class="source-label">Branch:</div>
+                   <div class="source-value">{{ (serverData as any).repository.branch }}</div>
+                 </div>
+                 <!-- Commit -->
+                 <div v-if="(serverData as any).repository?.commit" class="source-item">
+                   <div class="source-label">Commit:</div>
+                   <div class="source-value">{{ (serverData as any).repository.commit }}</div>
+                 </div>
+                 <!-- Source from meta (fallback) -->
+                 <div v-if="serverData._meta?.source && !getSourceUrl(serverData) && !(serverData as any).repository?.url" class="source-item">
+                   <div class="source-label">Source:</div>
+                   <a :href="serverData._meta.source" target="_blank" rel="noopener noreferrer" class="source-link">
+                     {{ serverData._meta.source }}
+                     <i class="icon icon-external-link"></i>
+                   </a>
+                 </div>
+                 <!-- Source URL fallback -->
+                 <div v-if="serverData.source_url && !getSourceUrl(serverData) && !serverData._meta?.source && !(serverData as any).repository?.url" class="source-item">
+                   <div class="source-label">Source Code:</div>
+                   <a :href="serverData.source_url" target="_blank" rel="noopener noreferrer" class="source-link">
+                     View Source
+                     <i class="icon icon-external-link"></i>
+                   </a>
+                 </div>
+                 <!-- Project URL (fallback) -->
+                 <div v-if="serverData.project_url && !getSourceUrl(serverData)" class="source-item">
+                   <div class="source-label">Project:</div>
+                   <a :href="serverData.project_url" target="_blank" rel="noopener noreferrer" class="source-link">
+                     View Project
+                     <i class="icon icon-external-link"></i>
+                   </a>
+                 </div>
               </div>
             </div>
         </div>
@@ -353,7 +366,26 @@ export default defineComponent({
       return String(config)
     }
 
-
+    const getSourceUrl = (server: any): string => {
+      // Check for source.project from YAML (highest priority)
+      if (server.source?.project) {
+        return server.source.project
+      }
+      // Check for source.url as alternative
+      if (server.source?.url) {
+        return server.source.url
+      }
+      // Prefer repository URL if available
+      if (server.repository?.url) {
+        return server.repository.url
+      }
+      // Fall back to _meta.source
+      if (server._meta?.source) {
+        return server._meta.source
+      }
+      // Last resort: source_url
+      return server.source_url || ''
+    }
 
     const fetchServerDetails = async () => {
       if (!props.serverId) return
@@ -393,7 +425,8 @@ export default defineComponent({
       error,
       getAllEnvironmentVariables,
       formatDate,
-      formatConfigTemplate
+      formatConfigTemplate,
+      getSourceUrl
     }
   }
 })
@@ -452,9 +485,26 @@ export default defineComponent({
 
 /* Server Header */
 .server-header {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.server-icon-container {
+  flex-shrink: 0;
+}
+
+.server-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.server-title-section {
+  flex: 1;
 }
 
 .server-title {
@@ -466,7 +516,6 @@ export default defineComponent({
 
 .server-meta {
   display: flex;
-  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
 }

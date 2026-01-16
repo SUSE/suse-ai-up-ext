@@ -14,6 +14,7 @@ export interface MCPServer {
     readonly icon_url: string
     readonly title: string
   }
+  readonly type?: string
   readonly secrets?: readonly {
     readonly name: string
     readonly description?: string
@@ -145,6 +146,7 @@ export class RegistryAPI extends BaseAPI {
                 icon_url: server._meta?.about?.icon || server.about?.icon_url,
                 title: server._meta?.about?.title || server.about?.title
               },
+              type: server.type,
               tags: server.tags || server._meta?.tags || [],
               packages: server.packages || [],
                _meta: {
