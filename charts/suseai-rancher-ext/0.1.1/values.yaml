@@ -4,9 +4,9 @@ plugin:
   enabled: true
   versionOverride: ""
   endpoint: >-
-    https://raw.githubusercontent.com/suse/suse-ai-up-ext/stable/extensions/suseai-up-ext/0.1.1
+    https://raw.githubusercontent.com/suse/suse-ai-up-ext/stable/extensions/suseai-rancher-ext/0.1.1
   compressedEndpoint: >-
-    https://raw.githubusercontent.com/suse/suse-ai-up-ext/stable/extensions/suseai-up-ext/0.1.1.tgz
+    https://raw.githubusercontent.com/suse/suse-ai-up-ext/stable/extensions/suseai-rancher-ext/0.1.1.tgz
   noCache: false
   noAuth: false
   metadata:

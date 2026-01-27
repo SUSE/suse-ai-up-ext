@@ -15,7 +15,7 @@ entries:
     created: "2026-01-27T15:18:36.31402+01:00"
     description: suseai-rancher-ext plugin
     digest: 2d4c86f931d00b45aa5f0e1bd10e698bd260374a7de63fb8f1f78296190ab2fc
-    name: suseai-rancher-ext
+    name: suseai-up-ext
     type: application
     urls:
     - assets/suseai-rancher-ext/suseai-up-ext-0.1.1.tgz
