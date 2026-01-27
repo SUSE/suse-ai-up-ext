@@ -1,0 +1,46 @@
+apiVersion: v1
+entries:
+  suseai-rancher-ext:
+  - annotations:
+      catalog.cattle.io/certified: rancher
+      catalog.cattle.io/namespace: cattle-ui-plugin-system
+      catalog.cattle.io/os: linux
+      catalog.cattle.io/permits-os: linux, windows
+      catalog.cattle.io/rancher-version: '>= 2.10.0'
+      catalog.cattle.io/scope: management
+      catalog.cattle.io/ui-component: plugins
+      catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
+      catalog.cattle.io/display-name: 'SUSE AI Universal Proxy'
+    apiVersion: v2
+    appVersion: 0.1.1
+    created: "2026-01-27T15:53:01.999622+01:00"
+    description: "SUSE AI Universal Proxy - A comprehensive MCP proxy system with discovery, registry, and much more"
+    icon: https://apps.rancher.io/logos/suse-ai-deployer.png
+    digest: c88bf5d0f5eb5624689d3987476429ed6e0de8e9f3db1304dde6a0e9378e611f
+    name: suseai-rancher-ext
+    type: application
+    urls:
+    - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.1.tgz
+    version: 0.1.1
+  - annotations:
+      catalog.cattle.io/certified: rancher
+      catalog.cattle.io/namespace: cattle-ui-plugin-system
+      catalog.cattle.io/os: linux
+      catalog.cattle.io/permits-os: linux, windows
+      catalog.cattle.io/rancher-version: '>= 2.10.0'
+      catalog.cattle.io/scope: management
+      catalog.cattle.io/ui-component: plugins
+      catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
+      catalog.cattle.io/display-name: 'SUSE AI Universal Proxy'
+    apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-01-27T15:53:01.999479+01:00"
+    description: "SUSE AI Universal Proxy - A comprehensive MCP proxy system with discovery, registry, and much more"
+    icon: https://apps.rancher.io/logos/suse-ai-deployer.png
+    digest: 2d4c86f931d00b45aa5f0e1bd10e698bd260374a7de63fb8f1f78296190ab2fc
+    name: suseai-rancher-ext
+    type: application
+    urls:
+    - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-01-27T15:53:01.99891+01:00"
