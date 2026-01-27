@@ -1,0 +1,84 @@
+version: "1.0"
+
+# Global security settings
+global_settings:
+  secrets_action: block  # block, warn, or log
+  pii_action: warn       # block, warn, or log
+
+# Built-in security checks
+builtin_rules:
+  secrets: true          # Enable secrets detection
+  pii: true             # Enable PII detection
+  prompt_injection:
+    enabled: true
+    sensitivity: high   # low, medium, high
+  tool_poisoning:
+    enabled: true
+    check_descriptions: true
+    check_parameters: true
+
+# Server-specific rules
+server_rules:
+  # Global rules (apply to all servers)
+  "*":
+    custom_rules:
+      - name: "Block dangerous file operations"
+        id: "file_security_global"
+        action: block
+        conditions:
+          - field: tool_name
+            operator: in
+            value: ["write_file", "delete_file", "execute_command"]
+          - field: arguments.path
+            operator: contains
+            value: "/etc"
+
+  # Server-specific overrides
+  "localhost":
+    disabled_rules: ["file_security_global"]  # Allow dangerous ops on localhost for development
+    custom_rules:
+      - name: "Development server warning"
+        id: "dev_server_warning"
+        action: warn
+        conditions:
+          - field: tool_name
+            operator: equals
+            value: "run_command"
+
+  "production-server":
+    overrides:
+      secrets_action: block  # Extra strict on production
+      pii_action: block
+    custom_rules:
+      - name: "Block network access to sensitive domains"
+        id: "network_security_prod"
+        action: block
+        conditions:
+          - field: tool_name
+            operator: equals
+            value: "http_request"
+          - field: arguments.url
+            operator: matches
+            value: ".*\\.(internal|secret)\\.company\\.com.*"
+
+# Example of more complex rules
+  "api-server":
+    custom_rules:
+      - name: "Monitor API key usage"
+        id: "api_key_monitor"
+        action: log
+        conditions:
+          - field: arguments.api_key
+            operator: matches
+            value: ".+"  # Any non-empty API key
+
+      - name: "Block deprecated endpoints"
+        id: "deprecated_api_block"
+        action: block
+        conditions:
+          - field: tool_name
+            operator: equals
+            value: "api_call"
+          - field: arguments.endpoint
+            operator: starts_with
+            value: "/v1/deprecated/"

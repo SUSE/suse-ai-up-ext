@@ -29,4 +29,23 @@ This extension follows established domain-model-driven architecture patterns tha
 - **Feature Flag System**: Version-aware feature management
 - **Utility-First Architecture**: Reusable utility modules and services
 
+## How to use it
+
+Use this extension is very simple.
+
+1. Open Rancher UI
+2. Choose the local cluster, this will be where we'll install the extension
+3.  Click Apps and Repositories
+4. Add a new repository with this informations
+ ```SHELL
+ Name: suse-ai-universal-proxy-ui
+ Select GIT
+ Url: https://github.com/SUSE/suse-ai-up-ext
+ Git Branch: v0.1.0
+ ```
+ 5. Click Create
+ 
+ Wait for the repository to be refreshed and show the "Active" status.
+ Move to the Extension icon on the sidebar you should be able to see the new extension named "SUSE AI Universal Proxy"
+
 
