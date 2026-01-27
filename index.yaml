@@ -19,6 +19,6 @@ entries:
     icon: https://apps.rancher.io/logos/suse-ai-deployer.png
     type: application
     urls:
-    - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.1.tgz
+    - assets/suseai-rancher-ext/suseai-up-ext-0.1.1.tgz
     version: 0.1.1
 generated: "2026-01-27T15:18:36.313528+01:00"

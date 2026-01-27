@@ -18,7 +18,7 @@ entries:
     name: suseai-rancher-ext
     type: application
     urls:
-    - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.1.tgz
+    - assets/suseai-rancher-ext/suseai-up-ext-0.1.1.tgz
     version: 0.1.1
   - annotations:
       catalog.cattle.io/certified: rancher
