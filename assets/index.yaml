@@ -14,6 +14,7 @@ entries:
     appVersion: 0.1.0
     created: "2026-02-04T11:29:17.684331+01:00"
     description: "SUSE AI Universal Proxy - A comprehensive MCP proxy system with discovery, registry, and much more"
+    icon: https://apps.rancher.io/logos/suse-ai-deployer.png
     digest: 456407a77fff7fa1b5af79f2ff6882c6146b96e6f0debeefc1d5c5e3938bf7a8
     name: suse-ai-universal-proxy
     type: application
