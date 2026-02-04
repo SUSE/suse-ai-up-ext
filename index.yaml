@@ -17,7 +17,7 @@ entries:
     description: "SUSE AI Universal Proxy - A comprehensive MCP proxy system with discovery, registry, and much more"
     icon: https://apps.rancher.io/logos/suse-ai-deployer.png
     digest: 2d4c86f931d00b45aa5f0e1bd10e698bd260374a7de63fb8f1f78296190ab2fc
-    name: suseai-rancher-ext
+    name: suse-ai-universal-proxy
     type: application
     urls:
     - assets/suseai-rancher-ext/suse-ai-universal-proxy-0.1.0.tgz
