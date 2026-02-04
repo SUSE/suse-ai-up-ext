@@ -1,4 +1,3 @@
-version: v1
 annotations:
   catalog.cattle.io/certified: rancher
   catalog.cattle.io/namespace: cattle-ui-plugin-system
