@@ -295,14 +295,43 @@ export function useServiceDiscovery() {
     };
 
   /**
-     * Construct accessible URL from pod and cluster data
-     * Uses Rancher Proxy URL to access the pod through the Rancher API
+     * Validate if a service URL is healthy
      */
+    const validateServiceUrl = async (url: string): Promise<boolean> => {
+      try {
+        const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000)
+
+        const response = await fetch(healthUrl, {
+          method: 'GET',
+          signal: controller.signal
+        })
+
+        clearTimeout(timeoutId)
+        return response.ok
+      } catch {
+        return false
+      }
+    }
+
+   /**
+      * Construct accessible URL from pod and cluster data
+      * Uses Rancher Proxy URL to access the pod through the Rancher API
+      */
     const constructPodUrl = (pod: KubernetesPod, clusterInfo: any, clusterId: string): string | undefined => {
-      // First, check if service URLs are configured manually
       const configuredUrls = store.state.suseai?.settings?.serviceUrls;
       if (configuredUrls && configuredUrls.length > 0) {
-        return configuredUrls[0]; // Use the first configured service URL
+        const cachedUrl = configuredUrls[0]
+        if (cachedUrl.startsWith('http://') || cachedUrl.startsWith('https://')) {
+          validateServiceUrl(cachedUrl).then(isHealthy => {
+            if (!isHealthy) {
+              console.warn('⚠️ Cached service URL is not healthy, clearing cache')
+              store.dispatch('suseai/setServiceUrls', [])
+            }
+          })
+        }
+        return cachedUrl;
       }
 
       // Construct Rancher Proxy URL for the pod
@@ -318,6 +347,7 @@ export function useServiceDiscovery() {
 
       return undefined;
     };
+
 
   /**
     * Discover SUSE AI pods with port 8911

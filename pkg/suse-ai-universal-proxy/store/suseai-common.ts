@@ -1,5 +1,5 @@
 // SUSE AI Store
-import { persistLoad, persistSave } from '../services/ui-persist';
+import { persistLoad, persistSave, persistClear } from '../services/ui-persist';
 import { SUSEAIProxyConfig } from '../config/suseai';
 
 interface SUSEAIState {
@@ -96,7 +96,7 @@ export default {
 
    },
 
-  actions: {
+actions: {
     setProxyInstalled({ commit }: any, value: boolean) {
       commit('SET_PROXY_INSTALLED', value);
     },
@@ -129,10 +129,37 @@ export default {
         commit('SET_PROXY_CONFIG', config);
       },
 
+      async validateBackend({ getters, dispatch }: { getters: any, dispatch: any }) {
+        const serviceUrls = getters.serviceUrls
+        if (serviceUrls.length > 0) {
+          try {
+            const response = await fetch(`${serviceUrls[0]}/health`, {
+              method: 'GET',
+              signal: AbortSignal.timeout(3000)
+            })
+            if (!response.ok) {
+              dispatch('resetState')
+            }
+          } catch {
+            dispatch('resetState')
+          }
+        }
+      },
+
+      resetState({ commit }: { commit: any }) {
+        commit('SET_WIZARD_COMPLETED', false)
+        commit('SET_SELECTED_SERVICES', [])
+        commit('SET_AVAILABLE_CLUSTERS', [])
+        commit('SET_SERVICE_URLS', [])
+        commit('SET_PROXY_INSTALLED', false)
+        commit('SET_PROXY_CONFIG', {})
+        persistClear(SETTINGS_KEY)
+        persistClear(PROXY_CONFIG_KEY)
+      },
 
    },
 
-  getters: {
+   getters: {
     proxyInstalled: (state: SUSEAIState) => state.settings.proxyInstalled,
     wizardCompleted: (state: SUSEAIState) => state.settings.wizardCompleted,
     selectedServices: (state: SUSEAIState) => state.settings.selectedServices,

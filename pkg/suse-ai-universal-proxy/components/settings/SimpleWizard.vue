@@ -107,6 +107,7 @@ import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useClusterDiscovery } from '../../composables/useClusterDiscovery'
 import { useServiceDiscovery } from '../../composables/useServiceDiscovery'
+import { persistClear } from '../../services/ui-persist'
 
 interface ActivationStep {
   id: string
@@ -381,36 +382,69 @@ export default defineComponent({
       console.log('Selected cluster:', selectedClusterId.value)
     }
 
-    const restartWizard = () => {
-      // Reset wizard state
-      showActivationSteps.value = false
-      activationComplete.value = false
-      selectedClusterId.value = ''
+    const validateCachedBackend = async (url: string): Promise<boolean> => {
+  try {
+    const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000)
 
-      // Reset all activation steps
-      activationSteps.value.forEach(step => {
-        step.status = 'pending'
-        step.details = undefined
-        if (step.endpoint === 'Loading...') {
-          step.endpoint = 'Loading...'
-        }
-      })
+    const response = await fetch(healthUrl, {
+      method: 'GET',
+      signal: controller.signal
+    })
 
-      // Clear wizard completion status
-      store.dispatch('suseai/setWizardCompleted', false)
+    clearTimeout(timeoutId)
+    return response.ok
+  } catch {
+    return false
+  }
+}
 
-      console.log('🔄 Wizard restarted')
+const restartWizard = async () => {
+  showActivationSteps.value = false
+  activationComplete.value = false
+  selectedClusterId.value = ''
+
+  activationSteps.value.forEach(step => {
+    step.status = 'pending'
+    step.details = undefined
+    if (step.endpoint !== 'Loading...') {
+      step.endpoint = 'Loading...'
     }
+  })
+
+  store.dispatch('suseai/setWizardCompleted', false)
+  store.dispatch('suseai/setSelectedServices', [])
+  store.dispatch('suseai/setAvailableClusters', [])
+  store.dispatch('suseai/setServiceUrls', [])
+  store.dispatch('suseai/setProxyInstalled', false)
+  store.dispatch('suseai/setProxyConfig', {})
+
+  persistClear('suseai-settings')
+  persistClear('suseai-proxy-config')
+
+  await loadClusters()
+
+  console.log('🔄 Wizard fully reset')
+}
 
     // Load clusters on mount
     onMounted(async () => {
       await loadClusters()
 
-      // If wizard was already completed, show final state
       if (wizardCompleted.value) {
+        const serviceUrls = store.getters['suseai/serviceUrls']
+        if (serviceUrls.length > 0) {
+          const isHealthy = await validateCachedBackend(serviceUrls[0])
+          if (!isHealthy) {
+            console.warn('⚠️ Cached backend is not healthy, resetting wizard')
+            await restartWizard()
+            return
+          }
+        }
+
         showActivationSteps.value = true
         activationComplete.value = true
-        // Load the saved cluster if available
         const savedClusters = store.getters['suseai/availableClusters']
         if (savedClusters.length > 0) {
           selectedClusterId.value = savedClusters[0].clusterId
