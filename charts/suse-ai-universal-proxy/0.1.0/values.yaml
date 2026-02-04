@@ -4,9 +4,9 @@ plugin:
   enabled: true
   versionOverride: ""
   endpoint: >-
-    https://raw.githubusercontent.com/suse/suse-ai-up-ext/main/extensions/suse-ai-universal-proxy/0.1.0
+    https://raw.githubusercontent.com/suse/suse-ai-up-ext/dev/extensions/suse-ai-universal-proxy/0.1.0
   compressedEndpoint: >-
-    https://raw.githubusercontent.com/suse/suse-ai-up-ext/main/extensions/suse-ai-universal-proxy/0.1.0.tgz
+    https://raw.githubusercontent.com/suse/suse-ai-up-ext/dev/extensions/suse-ai-universal-proxy/0.1.0.tgz
   noCache: false
   noAuth: false
   metadata:
