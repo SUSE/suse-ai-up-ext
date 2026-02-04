@@ -1,5 +1,6 @@
 apiVersion: v1
 entries:
+<<<<<<< Updated upstream
   suseai-rancher-ext:
   - annotations:
       catalog.cattle.io/certified: rancher
@@ -20,6 +21,9 @@ entries:
     urls:
     - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.1.tgz
     version: 0.1.1
+=======
+  suse-ai-universal-proxy:
+>>>>>>> Stashed changes
   - annotations:
       catalog.cattle.io/certified: rancher
       catalog.cattle.io/namespace: cattle-ui-plugin-system
@@ -31,6 +35,7 @@ entries:
       catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
     apiVersion: v2
     appVersion: 0.1.0
+<<<<<<< Updated upstream
     created: "2026-01-27T18:14:52.033402+01:00"
     description: suseai-rancher-ext plugin
     digest: 29dca31f618e3ecb20a2bda3bc310814c16b014e2cda38ce74ff5f48fe0ae44b
@@ -40,3 +45,37 @@ entries:
     - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.0.tgz
     version: 0.1.0
 generated: "2026-01-27T18:14:52.032836+01:00"
+=======
+    created: "2026-02-04T10:07:07.588931+01:00"
+    description: suse-ai-universal-proxy plugin
+    digest: 271d325ab7dee5f2ffb7ac160bdf4cd1086a322c976d2c6d7a49000ad9080538
+    name: suse-ai-universal-proxy
+    type: application
+    urls:
+    - assets/suse-ai-universal-proxy/suse-ai-universal-proxy-0.1.0.tgz
+    version: 0.1.0
+  universal-proxy:
+  - annotations:
+      catalog.cattle.io/certified: rancher
+      catalog.cattle.io/display-name: SUSE AI Universal Proxy
+      catalog.cattle.io/namespace: cattle-ui-plugin-system
+      catalog.cattle.io/os: linux
+      catalog.cattle.io/permits-os: linux, windows
+      catalog.cattle.io/rancher-version: '>= 2.10.0'
+      catalog.cattle.io/scope: management
+      catalog.cattle.io/ui-component: plugins
+      catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
+    apiVersion: v2
+    appVersion: 0.1.0
+    created: "2025-11-14T13:57:27.18556+01:00"
+    description: SUSE AI Universal Proxy extension for Rancher - provides unified
+      access to AI services and model context protocols
+    digest: 75c6059076fcf593c913b7aa30201aa0df81a5757e6cfb8a454d327af44a2d52
+    icon: https://raw.githubusercontent.com/alessandro-festa/up/main/universal-proxy/0.1.0/icon.svg
+    name: universal-proxy
+    type: application
+    urls:
+    - assets/universal-proxy/universal-proxy-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-02-04T10:07:07.588274+01:00"
+>>>>>>> Stashed changes
