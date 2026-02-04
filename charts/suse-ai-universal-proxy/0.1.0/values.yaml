@@ -1,5 +1,5 @@
-nameOverride: "SUSE AI Universal Proxy"
-fullnameOverride: "SUSE AI Universal Proxy"
+nameOverride: ""
+fullnameOverride: ""
 plugin:
   enabled: true
   versionOverride: ""
