@@ -185,36 +185,8 @@ export default defineComponent({
     // Track if scan was running to detect completion
     const scanWasRunning = ref(false);
 
-    // Mock Announced MCPs
-    const announcedMcps = ref([
-      {
-        id: '1',
-        name: 'Weather MCP',
-        ip: '192.168.1.105',
-        port: 8080,
-        availability: 'Available',
-        toolsCount: 5,
-        lastSeen: new Date().toISOString()
-      },
-      {
-        id: '2',
-        name: 'Stock Market MCP',
-        ip: '192.168.1.106',
-        port: 3000,
-        availability: 'Busy',
-        toolsCount: 12,
-        lastSeen: new Date(Date.now() - 3600000).toISOString()
-      },
-      {
-        id: '3',
-        name: 'File System MCP',
-        ip: '192.168.1.107',
-        port: 9090,
-        availability: 'Offline',
-        toolsCount: 3,
-        lastSeen: new Date(Date.now() - 86400000).toISOString()
-      }
-    ]);
+    // Announced MCPs
+    const announcedMcps = ref([]);
 
     // Track scan state for modal management
     watch(scanning, (newScanning, oldScanning) => {
