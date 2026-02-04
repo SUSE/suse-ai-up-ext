@@ -1,29 +1,6 @@
 apiVersion: v1
 entries:
-<<<<<<< Updated upstream
-  suseai-rancher-ext:
-  - annotations:
-      catalog.cattle.io/certified: rancher
-      catalog.cattle.io/namespace: cattle-ui-plugin-system
-      catalog.cattle.io/os: linux
-      catalog.cattle.io/permits-os: linux, windows
-      catalog.cattle.io/rancher-version: '>= 2.10.0'
-      catalog.cattle.io/scope: management
-      catalog.cattle.io/ui-component: plugins
-      catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
-    apiVersion: v2
-    appVersion: 0.1.1
-    created: "2026-01-27T18:14:52.033554+01:00"
-    description: suseai-rancher-ext plugin
-    digest: 199c658f4e6a892732264ab67c555b6eb7cf0c622fc4185eb6b6b3624b819ae1
-    name: suseai-rancher-ext
-    type: application
-    urls:
-    - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.1.tgz
-    version: 0.1.1
-=======
   suse-ai-universal-proxy:
->>>>>>> Stashed changes
   - annotations:
       catalog.cattle.io/certified: rancher
       catalog.cattle.io/namespace: cattle-ui-plugin-system
@@ -35,17 +12,6 @@ entries:
       catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
     apiVersion: v2
     appVersion: 0.1.0
-<<<<<<< Updated upstream
-    created: "2026-01-27T18:14:52.033402+01:00"
-    description: suseai-rancher-ext plugin
-    digest: 29dca31f618e3ecb20a2bda3bc310814c16b014e2cda38ce74ff5f48fe0ae44b
-    name: suseai-rancher-ext
-    type: application
-    urls:
-    - assets/suseai-rancher-ext/suseai-rancher-ext-0.1.0.tgz
-    version: 0.1.0
-generated: "2026-01-27T18:14:52.032836+01:00"
-=======
     created: "2026-02-04T10:07:07.588931+01:00"
     description: suse-ai-universal-proxy plugin
     digest: 271d325ab7dee5f2ffb7ac160bdf4cd1086a322c976d2c6d7a49000ad9080538
@@ -78,4 +44,3 @@ generated: "2026-01-27T18:14:52.032836+01:00"
     - assets/universal-proxy/universal-proxy-0.1.0.tgz
     version: 0.1.0
 generated: "2026-02-04T10:07:07.588274+01:00"
->>>>>>> Stashed changes
