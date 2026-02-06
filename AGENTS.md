@@ -1,7 +1,7 @@
 # SUSE AI Rancher Extension - Agent Guidelines
 
 ## Commands
-- **Build**: `yarn build-pkg suseai-rancher-ext`
+- **Build**: `yarn build-pkg suse-ai-universal-proxy`
 - **Dev**: `yarn dev`
 - **Type check**: `yarn typecheck` (vue-tsc --noEmit)
 - **Test**: No test runner - use `yarn typecheck` for validation
