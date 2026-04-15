@@ -75,6 +75,10 @@ if (isGitHubBuild) {
 // Always set compressedEndpoint as endpoint + .tgz
 values.plugin.compressedEndpoint = `${ values.plugin.endpoint }.tgz`;
 
+if (pkgFile.rancher?.noCache === true) {
+  values.plugin.noCache = true;
+}
+
 // Write updated values.yaml
 fs.writeFileSync(valuesFile, yaml.dump(values, { quotingType: '"' }), 'utf8');
 console.log('Updated values.yaml endpoints:');

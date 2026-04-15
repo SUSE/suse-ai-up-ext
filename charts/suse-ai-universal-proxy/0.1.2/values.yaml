@@ -7,6 +7,6 @@ plugin:
     https://raw.githubusercontent.com/alessandro-festa/suse-ai-up-ui/dev/extensions/suse-ai-universal-proxy/0.1.2
   compressedEndpoint: >-
     https://raw.githubusercontent.com/alessandro-festa/suse-ai-up-ui/dev/extensions/suse-ai-universal-proxy/0.1.2.tgz
-  noCache: false
+  noCache: true
   noAuth: false
   metadata: {}

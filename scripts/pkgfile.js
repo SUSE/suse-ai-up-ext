@@ -19,7 +19,7 @@ const annotations = pkg.annotations || pkg.rancher?.annotations;
 if (annotations) {
   pkg.annotations = annotations;
 }
-pkg.rancher = true;
+pkg.rancher = pkg.rancher || true;
 pkg.main = `${ pkg.name }-${ pkg.version }.umd.min.js`;
 
 delete pkg.scripts;

@@ -7,7 +7,7 @@ plugin:
     https://raw.githubusercontent.com/alessandro-festa/suse-ai-up-ui/dev/extensions/suseai-rancher-ext/0.1.2
   compressedEndpoint: >-
     https://raw.githubusercontent.com/alessandro-festa/suse-ai-up-ui/dev/extensions/suseai-rancher-ext/0.1.2.tgz
-  noCache: false
+  noCache: true
   noAuth: false
   metadata:
     catalog.cattle.io/rancher-version: ">= 2.10.0"
