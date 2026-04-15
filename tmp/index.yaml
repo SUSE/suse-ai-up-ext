@@ -13,32 +13,12 @@ entries:
       catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
     apiVersion: v2
     appVersion: 0.1.2
-    created: "2026-04-15T11:42:52.070502+02:00"
+    created: "2026-04-15T11:50:21.694009+02:00"
     description: suse-ai-universal-proxy plugin
-    digest: 728f2c1ad606f9456c416d7ce68a24bbb0e44e01aaccb69585a481a332b8f03b
+    digest: d5d3b1fd505865c8ef7253289cfe33190960e6fdb925a209019449a620fcf961
     name: suse-ai-universal-proxy
     type: application
     urls:
     - assets/suse-ai-universal-proxy/suse-ai-universal-proxy-0.1.2.tgz
     version: 0.1.2
-  suseai-up-ext:
-  - annotations:
-      catalog.cattle.io/certified: rancher
-      catalog.cattle.io/namespace: cattle-ui-plugin-system
-      catalog.cattle.io/os: linux
-      catalog.cattle.io/permits-os: linux, windows
-      catalog.cattle.io/rancher-version: '>= 2.10.0'
-      catalog.cattle.io/scope: management
-      catalog.cattle.io/ui-component: plugins
-      catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
-    apiVersion: v2
-    appVersion: 0.1.2
-    created: "2026-04-15T11:42:52.070636+02:00"
-    description: SUSE AI Universal Proxy extension for Rancher
-    digest: 3e46ae614e6ed30e3e61791ce960914a5b2b71c6ef88c84915307f07411a6854
-    name: suseai-up-ext
-    type: application
-    urls:
-    - assets/suseai-rancher-ext/suseai-up-ext-0.1.2.tgz
-    version: 0.1.2
-generated: "2026-04-15T11:42:52.070293+02:00"
+generated: "2026-04-15T11:50:21.693474+02:00"

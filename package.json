@@ -1,5 +1,5 @@
 {
-  "name": "suse-ai-universal-proxy",
+  "name": "suse-ai-universal-proxy-app",
   "version": "0.1.2",
   "description": "Rancher UI Extension for SUSE AI",
   "private": false,
