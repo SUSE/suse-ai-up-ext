@@ -30,7 +30,7 @@ export const SUSEAI_PRODUCT: ProductConfig = {
   version: EXTENSION_VERSION,
   category: 'global',
   weight: 80,
-  icon: 'fork',
+  icon: 'icon-fork',
   inStore: 'management',
   supportRoute: 'https://www.suse.com/support/',
   docsRoute: 'https://documentation.suse.com/'
