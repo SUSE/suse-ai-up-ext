@@ -1,3 +1,8 @@
+declare module '*.svg' {
+  const content: any;
+  export default content;
+}
+
 declare module '@shell/*' {
   const shellComponent: any
   export default shellComponent
