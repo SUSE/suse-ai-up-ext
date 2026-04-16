@@ -1,0 +1,1 @@
+"use strict";(("undefined"!==typeof self?self:this)["webpackChunksuse_ai_universal_proxy_0_1_2"]=("undefined"!==typeof self?self:this)["webpackChunksuse_ai_universal_proxy_0_1_2"]||[]).push([[584],{2584:function(e,s,_){e.exports=_.p+"img/logo.fc0743e1.svg"}}]);
