@@ -2,13 +2,14 @@
    <div class="endpoints-section">
      <table class="endpoints-table">
          <thead>
-            <tr>
-               <th>Name</th>
-               <th>Status</th>
-               <th>Created</th>
-               <th>Capabilities</th>
-              <th>Actions</th>
-            </tr>
+             <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Type</th>
+                <th>Actions</th>
+             </tr>
+
           </thead>
        <tbody>
             <tr v-if="loading">
@@ -20,15 +21,16 @@
             <tr v-else-if="adapters.length === 0">
               <td colspan="6" class="empty-row">{{ emptyMessage }}</td>
             </tr>
-             <tr v-else v-for="adapter in adapters" :key="adapter.id">
-               <td>{{ adapter.name }}</td>
-                 <td>
-                   <span :class="getStatusClass(adapter)">
-                     {{ getStatusText(adapter) }}
-                   </span>
-                 </td>
-                 <td>{{ adapter.createdAt ? new Date(adapter.createdAt).toLocaleString() : 'N/A' }}</td>
-               <td>{{ getCapabilitiesCount(adapter) }}</td>
+              <tr v-else v-for="adapter in adapters" :key="adapter.id">
+                <td class="name-column"><strong>{{ adapter.name }}</strong></td>
+                  <td>
+                    <span :class="getStatusClass(adapter)">
+                      {{ getStatusText(adapter) }}
+                    </span>
+                  </td>
+                  <td>{{ adapter.createdAt ? new Date(adapter.createdAt).toLocaleString() : 'N/A' }}</td>
+                <td>{{ getAdapterTypeLabel(adapter) }}</td>
+
             <td>
                <div class="action-buttons">
                  <button class="btn btn-sm role-secondary" @click="handleViewDetails(adapter)" title="View Details">
@@ -98,8 +100,6 @@ export default defineComponent({
   },
   emits: ['view-details', 'delete-adapter'],
   setup(props, { emit }) {
-    console.log('AdaptersTable setup - received adapters:', props.adapters?.length || 0, 'items')
-
         const showAdapterDetailsModal = ref(false);
         const showAssignGroupModal = ref(false);
         const selectedAdapter = ref<Adapter | null>(null);
@@ -156,6 +156,20 @@ export default defineComponent({
           return `${tools} tools, ${resources} resources, ${prompts} prompts`;
         };
 
+        const getAdapterTypeLabel = (adapter: any) => {
+          const type = adapter.connectionType || 'unknown';
+          switch (type) {
+            case 'StreamableHttp':
+              return 'Server';
+            case 'Remote':
+              return 'Remote';
+            case 'Virtual':
+              return 'Virtual';
+            default:
+              return type.charAt(0).toUpperCase() + type.slice(1);
+          }
+        };
+
           return {
             showAdapterDetailsModal,
             showAssignGroupModal,
@@ -167,7 +181,8 @@ export default defineComponent({
             closeAssignGroupModal,
             getStatusClass,
             getStatusText,
-            getCapabilitiesCount
+            getCapabilitiesCount,
+            getAdapterTypeLabel
           };
    }
  });
@@ -195,7 +210,7 @@ export default defineComponent({
 
 .endpoints-table th,
 .endpoints-table td {
-  padding: 12px 16px;
+  padding: 8px 16px;
   text-align: left;
   border-bottom: 1px solid var(--border, #e5e7eb);
 }
@@ -208,6 +223,11 @@ export default defineComponent({
 
 .endpoints-table tbody tr:hover {
   background: var(--accent-bg, #f9fafb);
+}
+
+.name-column {
+  font-weight: 700;
+  color: var(--body-text, #111827);
 }
 
 .status-active {
@@ -255,8 +275,8 @@ export default defineComponent({
 
 .action-buttons {
   display: flex;
-  gap: 12px;
-  margin: 24px 0;
+  gap: 8px;
+  margin: 4px 0;
   flex-wrap: wrap;
 }
 </style>

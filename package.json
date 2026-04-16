@@ -1,6 +1,6 @@
 {
-  "name": "suse-ai-universal-proxy",
-  "version": "0.1.0",
+  "name": "suse-ai-universal-proxy-app",
+  "version": "0.1.2",
   "description": "Rancher UI Extension for SUSE AI",
   "private": false,
   "license": "Apache-2.0",
@@ -20,9 +20,9 @@
     "dev": "NODE_ENV=dev ./node_modules/.bin/vue-cli-service serve",
     "build": "./node_modules/.bin/vue-cli-service build",
     "clean": "./node_modules/@rancher/shell/scripts/clean",
-    "build-pkg": "./node_modules/@rancher/shell/scripts/build-pkg.sh suse-ai-universal-proxy",
-    "serve-pkgs": "./node_modules/@rancher/shell/scripts/serve-pkgs",
-    "publish-pkgs": "./node_modules/@rancher/shell/scripts/extension/publish",
+    "build-pkg": "./scripts/build-pkg.sh suse-ai-universal-proxy",
+    "serve-pkgs": "./scripts/serve-pkgs",
+    "publish-pkgs": "./scripts/publish-pkgs",
     "parse-tag-name": "./node_modules/@rancher/shell/scripts/extension/parse-tag-name"
   },
   "devDependencies": {

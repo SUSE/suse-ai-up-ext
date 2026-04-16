@@ -11,6 +11,8 @@ export interface Adapter {
   mcpServerId?: string
   name: string
   description?: string
+  connectionType?: 'StreamableHttp' | 'Remote' | 'Virtual'
+  sourceAdapters?: string[]
   environmentVariables?: Record<string, string>
   authentication?: AdapterAuthConfig
   mcpClientConfig?: MCPClientConfig
@@ -88,11 +90,18 @@ export interface MCPPrompt {
 }
 
 export interface CreateAdapterRequest {
-  mcpServerId: string
+  mcpServerId?: string
   name: string
   description?: string
+  connectionType?: 'StreamableHttp' | 'Remote' | 'Virtual'
+  sourceAdapters?: string[]
   environmentVariables?: Record<string, string>
-  authentication: AdapterAuthConfig
+  authentication?: AdapterAuthConfig
+  routeAssignments?: Array<{
+    group?: string
+    user?: string
+    permissions: string[]
+  }>
 }
 
 export interface UpdateAdapterRequest {
@@ -280,6 +289,21 @@ export class AdapterAPI extends BaseAPI {
        throw error
      }
    }
+
+   /**
+    * Get user-specific configuration for all adapters
+    */
+    async getUserConfig(userId: string = 'admin'): Promise<any> {
+      try {
+        logger.info('Getting user config', { userId })
+        const config = await this.get<any>('/api/v1/user/config', { headers: { 'X-User-ID': userId } })
+        logger.info('User config retrieved')
+        return config
+      } catch (error) {
+        logger.error('Failed to get user config', error)
+        throw error
+      }
+    }
 
    /**
     * Get adapter groups

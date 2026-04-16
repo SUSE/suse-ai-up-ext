@@ -72,31 +72,15 @@ export function useServiceDiscovery() {
            console.log(`✅ [ServiceDiscovery] Pods list API call succeeded for cluster ${clusterId}`);
          } catch (apiError: any) {
            console.error(`❌ [ServiceDiscovery] Pods list API call failed for cluster ${clusterId}:`, apiError);
-           console.error(`❌ [ServiceDiscovery] Error details:`, {
-             message: apiError?.message,
-             status: apiError?.status,
-             statusText: apiError?.statusText,
-             response: apiError?.response
-           });
            throw apiError;
          }
 
-         console.log('🔍 [ServiceDiscovery] Kubernetes pods response structure:', {
-           hasData: !!response?.data,
-           dataType: typeof response?.data,
-           hasItems: !!response?.items,
-           responseKeys: response ? Object.keys(response) : [],
-           dataKeys: response?.data ? Object.keys(response.data) : [],
-           fullResponse: response
-         });
-
-        // Handle different response structures (following AppWizard.vue pattern)
+        // Handle different response structures
         const allPods = response?.data?.items || response?.data || response?.items || [];
         console.log(`📊 [ServiceDiscovery] Extracted ${allPods.length} pods from response`);
 
         // Filter for SUSE AI UP pods (any container with port 8911 exposed)
         const suseAIPods = allPods.filter((pod: any) => {
-          const podName = pod.metadata?.name || '';
           const podNamespace = pod.metadata?.namespace || '';
           const hasPort8911 = pod.spec?.containers?.some((container: any) =>
             container.ports?.some((port: any) => port.containerPort === 8911)
@@ -104,23 +88,13 @@ export function useServiceDiscovery() {
 
           // Check namespace filtering if specified
           const isNamespaceAllowed = allowedNamespaces ? allowedNamespaces.includes(podNamespace) : true;
-
-          console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: hasPort8911=${hasPort8911}, namespaceAllowed=${isNamespaceAllowed}`);
-
           return hasPort8911 && isNamespaceAllowed;
         });
 
         console.log(`🎯 [ServiceDiscovery] Found ${suseAIPods.length} SUSE AI UP pods out of ${allPods.length} total pods`);
-        logger.info(`Found ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`);
         return suseAIPods;
       } catch (err: any) {
         logger.error('Failed to query Kubernetes pods:', err);
-        logger.error('Error details:', {
-          message: err?.message,
-          status: err?.status,
-          statusText: err?.statusText,
-          response: err?.response
-        });
         throw new Error(`Unable to query cluster pods: ${err?.message || 'Unknown error'}`);
       }
     };
@@ -131,47 +105,32 @@ export function useServiceDiscovery() {
     const querySUSEAIService = async (store: any, clusterId: string, allowedNamespaces?: string[]): Promise<any> => {
      try {
        console.log(`🚀 [ServiceDiscovery] Querying SUSE AI UP services across all namespaces in cluster: ${clusterId}`);
-       console.log(`📡 [ServiceDiscovery] API URL: /k8s/clusters/${clusterId}/v1/services`);
+       console.log(`📡 [ServiceDiscovery] API URL: /k8s/clusters/${clusterId}/api/v1/services`);
 
        let response;
        try {
          response = await store.dispatch('rancher/request', {
-           url: `/k8s/clusters/${clusterId}/v1/services`,
+           url: `/k8s/clusters/${clusterId}/api/v1/services`,
            method: 'GET'
          });
          console.log(`✅ [ServiceDiscovery] Services list API call succeeded for cluster ${clusterId}`);
        } catch (apiError: any) {
          console.error(`❌ [ServiceDiscovery] Services list API call failed for cluster ${clusterId}:`, apiError);
-         console.error(`❌ [ServiceDiscovery] Full error details:`, {
-           message: apiError?.message,
-           status: apiError?.status,
-           statusText: apiError?.statusText,
-           response: apiError?.response,
-           responseStatus: apiError?.response?.status,
-           responseText: apiError?.response?.statusText,
-           responseData: apiError?.response?.data
-         });
-         
-         // For any errors, try pod discovery as fallback
-         console.warn(`⚠️ [ServiceDiscovery] Service discovery failed, trying pod discovery as fallback`);
          return null;
        }
 
-        const servicesData = response?.data;
-        if (servicesData && servicesData.items) {
-          const services = servicesData.items;
-             console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for uniproxy service`);
+        const services = response?.items || response?.data?.items || [];
+        console.log(`📊 [ServiceDiscovery] Found ${services.length} total services, searching for uniproxy service`);
 
-              // Find services with port 8911 (optionally filtered by namespaces)
-               const suseAIServices = services.filter((service: any) => {
-                 const serviceName = service.metadata?.name;
-                 const serviceNamespace = service.metadata?.namespace;
-                 const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
-                 const isNamespaceAllowed = allowedNamespaces ? allowedNamespaces.includes(serviceNamespace) : true;
-                 return hasPort8911 && isNamespaceAllowed;
-               });
+        // Find services with port 8911 (optionally filtered by namespaces)
+        const suseAIServices = services.filter((service: any) => {
+          const serviceNamespace = service.metadata?.namespace;
+          const hasPort8911 = service.spec?.ports?.some((p: any) => p.port === 8911 || p.targetPort === 8911);
+          const isNamespaceAllowed = allowedNamespaces ? allowedNamespaces.includes(serviceNamespace) : true;
+          return hasPort8911 && isNamespaceAllowed;
+        });
 
-         console.log(`🎯 [ServiceDiscovery] Found ${suseAIServices.length} SUSE AI UP services`);
+        console.log(`🎯 [ServiceDiscovery] Found ${suseAIServices.length} SUSE AI UP services`);
 
           // Return the first healthy service
           for (const service of suseAIServices) {
@@ -213,90 +172,16 @@ export function useServiceDiscovery() {
           }
 
          console.log(`ℹ️ [ServiceDiscovery] No healthy SUSE AI UP services found`);
-       }
-
-       return null;
+         return null;
      } catch (err: any) {
        logger.error('Failed to query Kubernetes services:', err);
        throw new Error(`Unable to query cluster services: ${err?.message || 'Unknown error'}`);
      }
-   };
-
-  /**
-   * Query ingresses that point to a specific service
-   */
-   const queryIngressesForService = async (store: any, clusterId: string, serviceName: string, namespace: string): Promise<any[]> => {
-     try {
-       logger.info(`Querying ingresses for service ${serviceName} in namespace ${namespace}`);
-       const response = await store.dispatch('rancher/request', {
-         url: `/k8s/clusters/${clusterId}/apis/networking.k8s.io/v1/ingresses`,
-         method: 'GET'
-       });
-
-        // Handle different response structures (following AppWizard.vue pattern)
-        const ingresses = response?.data?.items || response?.data || response?.items || [];
-
-       logger.info(`Found ${ingresses.length} ingresses in cluster ${clusterId}`);
-
-       const filtered = ingresses.filter((ingress: any) => {
-         const rules = ingress.spec?.rules || [];
-         return rules.some((rule: any) => {
-           const paths = rule.http?.paths || [];
-           return paths.some((path: any) => {
-             return path.backend?.service?.name === serviceName &&
-                    ingress.metadata.namespace === namespace;
-           });
-         });
-       });
-
-       logger.info(`Found ${filtered.length} ingresses pointing to service ${serviceName}`);
-       return filtered;
-      } catch (err: any) {
-        logger.warn('Failed to query ingresses:', err);
-        logger.warn('Ingress query error details:', {
-          message: err?.message,
-          status: err?.status,
-          statusText: err?.statusText
-        });
-        return [];
-      }
-   };
-
-  /**
-     * Get cluster's load balancer public IP
-     */
-    const getClusterPublicIP = (clusterInfo: any): string | undefined => {
-      // Try different possible fields for the public IP
-      if (clusterInfo?.rancherKubernetesEngineConfig?.loadBalancerConfig?.publicAddress) {
-        return clusterInfo.rancherKubernetesEngineConfig.loadBalancerConfig.publicAddress;
-      }
-
-      // For cloud provider clusters, the API endpoint might be the LB
-      if (clusterInfo?.apiEndpoint) {
-        try {
-          const url = new URL(clusterInfo.apiEndpoint);
-          return url.hostname;
-        } catch (e) {
-          // Invalid URL
-        }
-      }
-
-      // Check for other possible fields
-      if (clusterInfo?.status?.apiEndpoint) {
-        try {
-          const url = new URL(clusterInfo.status.apiEndpoint);
-          return url.hostname;
-        } catch (e) {
-          // Invalid URL
-        }
-      }
-
-      return undefined;
     };
 
   /**
-     * Validate if a service URL is healthy
-     */
+      * Validate if a service URL is healthy
+      */
     const validateServiceUrl = async (url: string): Promise<boolean> => {
       try {
         const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`
@@ -320,7 +205,7 @@ export function useServiceDiscovery() {
       * Uses Rancher Proxy URL to access the pod through the Rancher API
       */
     const constructPodUrl = (pod: KubernetesPod, clusterInfo: any, clusterId: string): string | undefined => {
-      const configuredUrls = store.state.suseai?.settings?.serviceUrls;
+      const configuredUrls = store?.state?.suseai?.settings?.serviceUrls;
       if (configuredUrls && configuredUrls.length > 0) {
         const cachedUrl = configuredUrls[0]
         if (cachedUrl.startsWith('http://') || cachedUrl.startsWith('https://')) {
@@ -364,32 +249,22 @@ export function useServiceDiscovery() {
          throw new Error('No cluster ID provided for service discovery');
        }
 
-             console.log(`🔍 [ServiceDiscovery] Starting pod discovery for cluster: ${clusterId}`);
+        console.log(`🔍 [ServiceDiscovery] Starting pod discovery for cluster: ${clusterId}`);
         const pods = await querySUSEAIPods(store, clusterId);
 
         // Ensure pods is an array
         if (!Array.isArray(pods)) {
-          console.error(`❌ [ServiceDiscovery] Expected pods to be an array, got:`, typeof pods, pods);
-          logger.error(`Expected pods to be an array, got:`, typeof pods, pods);
           throw new Error('Invalid response format from Kubernetes API');
         }
 
-          console.log(`✅ [ServiceDiscovery] Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`);
-          logger.info(`Found ${pods.length} SUSE AI UP pods across all namespaces for cluster ${clusterId}`)
-            const suseAIPods = pods.filter(pod => {
-             const hasCorrectContainer = pod.spec?.containers?.some(container =>
-               container.name === 'suse-ai-up' && container.ports?.some((port: any) => port.containerPort === 8911)
-             );
-             const podName = pod.metadata?.name || '';
-             const podNamespace = pod.metadata?.namespace || '';
-             const isInCorrectNamespace = podNamespace === 'suse-ai-up';
-
-            console.log(`🔍 [ServiceDiscovery] Checking pod ${podName} in ${podNamespace}: container=${hasCorrectContainer}, namespace=${isInCorrectNamespace}`);
-
-            return hasCorrectContainer && isInCorrectNamespace;
-          });
-
-       logger.info(`Found ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`)
+        const suseAIPods = pods.filter(pod => {
+          const hasCorrectContainer = pod.spec?.containers?.some(container =>
+            container.name === 'suse-ai-up' && container.ports?.some((port: any) => port.containerPort === 8911)
+          );
+          const podNamespace = pod.metadata?.namespace || '';
+          const isInCorrectNamespace = podNamespace === 'suse-ai-up';
+          return hasCorrectContainer && isInCorrectNamespace;
+        });
 
         const detected: DetectedService[] = [];
 
@@ -397,46 +272,36 @@ export function useServiceDiscovery() {
            try {
              const podName = pod.metadata?.name || 'unknown';
              const podNamespace = pod.metadata?.namespace || 'unknown';
-             console.log(`🔍 [ServiceDiscovery] Processing pod: ${podName} in ${podNamespace}`)
-
              const url = constructPodUrl(pod, clusterInfo, clusterId);
-             console.log(`✅ [ServiceDiscovery] Constructed URL for ${podName}: ${url || 'none'}`)
 
              // Check pod health if we have a URL
              let isHealthy = false;
              if (url) {
-               // For Rancher Proxy URLs, we use the store.dispatch request method to handle auth
-               // But here checkServiceHealth uses fetch. 
-               // NOTE: Fetching relative URLs /k8s/... works if the browser session is authenticated with Rancher
                isHealthy = await checkServiceHealth(url);
-               console.log(`🏥 [ServiceDiscovery] Health check for ${podName}: ${isHealthy ? 'PASS' : 'FAIL'}`);
              }
 
              // Only include healthy pods
              if (isHealthy) {
                 detected.push({
-                  name: podName,
-                  namespace: podNamespace,
-                  port: 8911,
-                  type: 'Pod',
-                 clusterIP: pod.status?.podIP,
-                 externalIPs: pod.status?.hostIP ? [pod.status.hostIP] : undefined,
-                 loadBalancerIPs: undefined,
-                 url
-               });
+                   name: podName,
+                   namespace: podNamespace,
+                   port: 8911,
+                   type: 'Pod',
+                  clusterIP: pod.status?.podIP,
+                  externalIPs: pod.status?.hostIP ? [pod.status.hostIP] : undefined,
+                  loadBalancerIPs: undefined,
+                  url
+                });
              }
            } catch (podError) {
              console.error(`❌ [ServiceDiscovery] Error processing pod ${pod.metadata?.name}:`, podError);
-             // Continue with other pods even if one fails
            }
          }
 
-       logger.info(`Successfully detected ${detected.length} services`);
        detectedServices.value = detected;
-      return detected;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Unknown error occurred';
-      logger.error('Service discovery failed:', err);
+       return detected;
+    } catch (err: any) {
+      error.value = err?.message || 'Unknown error occurred';
       return [];
     } finally {
       isLoading.value = false;
@@ -444,36 +309,29 @@ export function useServiceDiscovery() {
   };
 
   /**
-     * Discover SUSE AI pods with port 8911 (returns pod objects for UI)
-     * Uses hybrid approach: tries service discovery first, then falls back to pod discovery
-     */
+      * Discover SUSE AI pods with port 8911 (returns pod objects for UI)
+      * Uses hybrid approach: tries service discovery first, then falls back to pod discovery
+      */
   const discoverPodObjects = async (store: any, clusterId: string, allowedNamespaces?: string[]): Promise<DetectedPod[]> => {
     isLoading.value = true;
     error.value = null;
 
     try {
-      logger.info(`Starting hybrid service/pod discovery for cluster: ${clusterId}`);
-
-      // Validate cluster ID
       if (!clusterId) {
         throw new Error('No cluster ID provided for pod discovery');
       }
 
       console.log(`🔍 [ServiceDiscovery] Starting hybrid discovery for cluster: ${clusterId}`);
 
-      // First, try service discovery (like APIDiscoveryWizard)
+      // First, try service discovery
       let detectedPods: DetectedPod[] = [];
       try {
         const service = await querySUSEAIService(store, clusterId, allowedNamespaces);
         if (service) {
-          console.log(`✅ [ServiceDiscovery] Service discovery successful, creating pod object from service`);
-          
-          // Extract service information like APIDiscoveryWizard
           const loadBalancerIP = service.status?.loadBalancer?.ingress?.[0]?.ip;
           const clusterIP = service.spec?.clusterIP;
           const externalIPs = service.spec?.externalIPs || [];
           
-          // Extract public IP from Rancher annotations
           let primaryIP: string | undefined;
           const publicEndpointsAnnotation = service.metadata?.annotations?.['field.cattle.io/publicEndpoints'];
           if (publicEndpointsAnnotation) {
@@ -481,31 +339,27 @@ export function useServiceDiscovery() {
               const endpoints = JSON.parse(publicEndpointsAnnotation);
               if (Array.isArray(endpoints) && endpoints.length > 0) {
                 primaryIP = endpoints[0]?.addresses?.[0] || '';
-                console.log(`✅ [ServiceDiscovery] Extracted primary IP from service annotations: ${primaryIP}`);
               }
             } catch (e) {
-              console.warn(`⚠️ [ServiceDiscovery] Failed to parse service public endpoints annotation:`, e);
+              console.warn(`⚠️ [ServiceDiscovery] Failed to parse service public endpoints annotation`);
             }
           }
           
-          // Determine primary IP (prefer public IP from annotations, fallback to service IPs)
           primaryIP = primaryIP || loadBalancerIP || clusterIP || externalIPs[0];
           
-          // Construct Rancher Service Proxy URL
-          // Format: /k8s/clusters/<clusterId>/api/v1/namespaces/<namespace>/services/http:<serviceName>:<port>/proxy
-          // We use 'http:' prefix for the service name to specify the port name, or just the service name if port is numeric
-          // Standard Rancher proxy format often requires scheme:service:port
+          // Explicitly block the invalid fallback IP
+          if (primaryIP === '10.42.0.45') {
+            console.log('📍 [ServiceDiscovery] Blocking invalid fallback IP 10.42.0.45');
+            primaryIP = undefined;
+          }
+
           const serviceName = service.metadata?.name;
           const serviceNamespace = service.metadata?.namespace;
           const serviceProxyUrl = `/k8s/clusters/${clusterId}/api/v1/namespaces/${serviceNamespace}/services/http:${serviceName}:8911/proxy`;
-          console.log(`🔗 [ServiceDiscovery] Constructed Service Proxy URL: ${serviceProxyUrl}`);
 
-          // Perform health check
-          // Prioritize Service Proxy URL, then direct IP
           let isHealthy = false;
           let finalUrl = '';
 
-          // 1. Try Service Proxy URL
           if (serviceProxyUrl) {
             try {
               const healthResponse = await fetch(`${serviceProxyUrl}/health`, {
@@ -515,36 +369,13 @@ export function useServiceDiscovery() {
               if (healthResponse.ok) {
                 isHealthy = true;
                 finalUrl = serviceProxyUrl;
-                console.log(`✅ [ServiceDiscovery] Service Proxy URL is healthy: ${serviceProxyUrl}`);
               }
             } catch (error) {
-              console.warn(`⚠️ [ServiceDiscovery] Service Proxy URL check failed:`, error);
+              console.warn(`⚠️ [ServiceDiscovery] Service Proxy URL check failed`);
             }
           }
 
-          // 2. If Proxy failed, try direct IP (fallback)
-          if (!isHealthy && primaryIP) {
-            try {
-              const healthResponse = await fetch(`http://${primaryIP}:8911/health`, {
-                method: 'GET',
-                mode: 'cors',
-                headers: { 'Content-Type': 'application/json' }
-              });
-              if (healthResponse.ok) {
-                isHealthy = true;
-                // If direct IP works, we don't necessarily have a URL structure for it unless we assume http://IP:8911
-                // But we prefer to keep finalUrl empty here so the UI constructs it from IP if needed, 
-                // OR we can just set it. Let's set it for consistency.
-                finalUrl = `http://${primaryIP}:8911`;
-                console.log(`🏥 [ServiceDiscovery] Direct IP health check for ${primaryIP}: PASS`);
-              }
-            } catch (error) {
-              console.warn(`⚠️ [ServiceDiscovery] Service health check failed for ${primaryIP}:`, error);
-            }
-          }
-          
           if (isHealthy) {
-            // Create a synthetic pod object from service
             const syntheticPod: DetectedPod = {
               metadata: {
                 name: service.metadata?.name || 'uniproxy',
@@ -567,41 +398,22 @@ export function useServiceDiscovery() {
             };
             
             detectedPods.push(syntheticPod);
-            console.log(`✅ [ServiceDiscovery] Successfully created pod object from service with URL: ${finalUrl}`);
           }
         }
       } catch (serviceError: any) {
-        console.warn(`⚠️ [ServiceDiscovery] Service discovery failed, falling back to pod discovery:`, serviceError?.message);
+        console.warn(`⚠️ [ServiceDiscovery] Service discovery failed, falling back to pod discovery`);
       }
 
       // If service discovery didn't find anything, try pod discovery
       if (detectedPods.length === 0) {
-        console.log(`🔄 [ServiceDiscovery] Service discovery found nothing, trying pod discovery`);
         const pods = await querySUSEAIPods(store, clusterId, allowedNamespaces);
 
-        // Ensure pods is an array
-        if (!Array.isArray(pods)) {
-          console.error(`❌ [ServiceDiscovery] Expected pods to be an array, got:`, typeof pods, pods);
-          logger.error(`Expected pods to be an array, got:`, typeof pods, pods);
-          throw new Error('Invalid response format from Kubernetes API');
-        }
-
-         // Pods are already filtered by querySUSEAIPods to only include SUSE AI UP pods
-         const suseAIPods = pods;
-         logger.info(`Processing ${suseAIPods.length} SUSE AI UP pods in cluster ${clusterId}`)
-
-        for (const pod of suseAIPods) {
+        for (const pod of pods) {
           try {
-            const podName = pod.metadata?.name || 'unknown';
-            const podNamespace = pod.metadata?.namespace || 'unknown';
-            console.log(`🔍 [ServiceDiscovery] Processing pod: ${podName} in ${podNamespace}`)
-
-            // Extract primary IP from annotations (field.cattle.io/publicEndpoints)
             let primaryIP: string | undefined;
             let clusterIP: string | undefined;
             let externalIPs: string[] | undefined;
 
-            // Check annotations for public endpoints
             const annotations = pod.metadata?.annotations || {};
             const publicEndpointsAnnotation = annotations['field.cattle.io/publicEndpoints'];
 
@@ -609,30 +421,20 @@ export function useServiceDiscovery() {
               try {
                 const endpoints = JSON.parse(publicEndpointsAnnotation);
                 if (Array.isArray(endpoints) && endpoints.length > 0) {
-                  // Use first endpoint's address
                   primaryIP = endpoints[0].addresses?.[0] || endpoints[0].address;
-                  console.log(`✅ [ServiceDiscovery] Extracted primary IP from annotations: ${primaryIP}`);
                 }
               } catch (parseError) {
-                console.warn(`⚠️ [ServiceDiscovery] Failed to parse publicEndpoints annotation:`, parseError);
+                console.warn(`⚠️ [ServiceDiscovery] Failed to parse publicEndpoints annotation`);
               }
             }
 
-            // Fallback to host IP (Node IP) if available, then pod IP
-            if (!primaryIP) {
-              if (pod.status?.hostIP) {
-                primaryIP = pod.status.hostIP;
-                console.log(`📍 [ServiceDiscovery] Using host IP (Node IP) as primary IP: ${primaryIP}`);
-              } else {
-                primaryIP = pod.status?.podIP;
-                console.log(`📍 [ServiceDiscovery] Using pod IP as primary IP: ${primaryIP}`);
-              }
+            // Explicitly block the invalid fallback IP
+            if (primaryIP === '10.42.0.45') {
+              console.log('📍 [ServiceDiscovery] Blocking invalid fallback IP 10.42.0.45');
+              primaryIP = undefined;
             }
 
-            // Construct Rancher Proxy URL
             const url = constructPodUrl(pod, {}, clusterId);
-            console.log(`🔗 [ServiceDiscovery] Constructed Proxy URL for pod object: ${url}`);
-
             clusterIP = pod.status?.podIP;
             if (pod.status?.hostIP) {
               externalIPs = [pod.status.hostIP];
@@ -647,71 +449,44 @@ export function useServiceDiscovery() {
             };
 
             detectedPods.push(detectedPod);
-            console.log(`✅ [ServiceDiscovery] Added pod ${podName} with primaryIP: ${primaryIP} and URL: ${url}`);
-
           } catch (podError) {
-            console.error(`❌ [ServiceDiscovery] Error processing pod ${pod.metadata?.name}:`, podError);
-            // Continue with other pods even if one fails
+            console.error(`❌ [ServiceDiscovery] Error processing pod`);
           }
         }
       }
 
-      logger.info(`Successfully detected ${detectedPods.length} pod objects`);
       return detectedPods;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Unknown error occurred';
-      logger.error('Pod object discovery failed:', err);
+    } catch (err: any) {
+      error.value = err?.message || 'Unknown error occurred';
       return [];
     } finally {
       isLoading.value = false;
     }
   };
 
-   /**
-      * Check service health by trying to connect to /health endpoint
-      */
-    const checkServiceHealth = async (url: string): Promise<boolean> => {
-      try {
-        const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`;
-        console.log(`🔍 [ServiceDiscovery] Checking health at: ${healthUrl}`);
+    /**
+       * Check service health by trying to connect to /health endpoint
+       */
+     const checkServiceHealth = async (url: string): Promise<boolean> => {
+       try {
+         const healthUrl = url.endsWith('/') ? `${url}health` : `${url}/health`;
+         const controller = new AbortController();
+         const timeoutId = setTimeout(() => controller.abort(), 5000); 
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+         const response = await fetch(healthUrl, {
+           method: 'GET',
+           mode: 'cors',
+           headers: { 'Content-Type': 'application/json' },
+           signal: controller.signal
+         });
 
-        const response = await fetch(healthUrl, {
-          method: 'GET',
-          mode: 'cors', // Allow cross-origin requests
-          headers: { 'Content-Type': 'application/json' },
-          signal: controller.signal
-        });
+         clearTimeout(timeoutId);
+         return response.ok;
+       } catch (error) {
+         return false;
+       }
+     };
 
-        clearTimeout(timeoutId);
-        console.log(`✅ [ServiceDiscovery] Health check response:`, response);
-        return true; // If we get any response, consider it healthy
-      } catch (error) {
-        console.warn(`⚠️ [ServiceDiscovery] Health check failed for ${url}:`, error);
-        return false;
-      }
-    };
-
-   /**
-      * Check service health with loadbalancer IP fallback to localhost
-      * First tries the provided loadbalancer IP, then falls back to localhost:8911
-      */
-    const checkServiceHealthWithFallback = async (loadbalancerIP?: string): Promise<{ healthy: boolean; url: string }> => {
-      // First try loadbalancer IP if provided
-      if (loadbalancerIP) {
-        const lbUrl = `http://${loadbalancerIP}:8911`;
-        console.log(`🔍 [ServiceDiscovery] Trying loadbalancer IP: ${lbUrl}`);
-        const isHealthy = await checkServiceHealth(lbUrl);
-        if (isHealthy) {
-          return { healthy: true, url: lbUrl };
-        }
-        console.log(`⚠️ [ServiceDiscovery] Loadbalancer IP ${loadbalancerIP} failed`);
-      }
-
-      return { healthy: false, url: '' };
-    };
 
   /**
      * Check if any services were detected
@@ -748,6 +523,6 @@ export function useServiceDiscovery() {
        discoverPodObjects,
        hasDetectedServices,
        getPrimaryService,
-       checkServiceHealthWithFallback
+       checkServiceHealth
      };
 }

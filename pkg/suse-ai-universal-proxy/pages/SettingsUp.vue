@@ -1,5 +1,6 @@
 <template>
   <div class="settings-page">
+    <ExperimentalBanner />
     <div class="fixed-header">
       <h1>SUSE AI Proxy Settings</h1>
       <p class="page-description">Configure the SUSE AI Universal Proxy</p>
@@ -95,6 +96,7 @@
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
+import { ExperimentalBanner } from '../components/MCPGateway'
 import UniversalProxyTab from '../components/settings/UniversalProxyTab.vue'
 import UsersTable from '../components/settings/UsersTable.vue'
 import GroupsTable from '../components/settings/GroupsTable.vue'
@@ -107,6 +109,7 @@ import { updateApiBaseUrls } from '../config/api-config'
 export default defineComponent({
   name: 'Settings',
   components: {
+    ExperimentalBanner,
     UniversalProxyTab,
     UsersTable,
     GroupsTable,

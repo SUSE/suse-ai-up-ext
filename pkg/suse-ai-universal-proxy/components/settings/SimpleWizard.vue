@@ -245,15 +245,15 @@ export default defineComponent({
       if (!selectedCluster.value) return
 
       // Use service discovery to find the correct IP or URL
-      let serviceBaseUrl = 'http://10.42.0.45:8911' // Default fallback
-      let loadBalancerIP = '10.42.0.45' // Keep for display/fallback
+      let serviceBaseUrl = '' 
+      let loadBalancerIP = '' 
 
       try {
         console.log('🔍 Discovering SUSE AI services...')
-        const discoveredPods = await discoverPodObjects(store, selectedCluster.value.id)
+        const detectedPods = await discoverPodObjects(store, selectedCluster.value.id)
 
-        if (discoveredPods.length > 0) {
-          const primaryPod = discoveredPods[0]
+        if (detectedPods.length > 0) {
+          const primaryPod = detectedPods[0]
           const primaryUrl = (primaryPod as any).url
           const primaryIP = primaryPod.primaryIP
 
@@ -270,17 +270,17 @@ export default defineComponent({
             serviceBaseUrl = `http://${loadBalancerIP}:8911`
             console.log('✅ Using discovered service IP:', loadBalancerIP)
             updateEndpoints(serviceBaseUrl)
-          } else {
-            console.log('⚠️ No primary IP or URL found in discovered services, using default:', serviceBaseUrl)
-            updateEndpoints(serviceBaseUrl)
           }
-        } else {
-          console.log('⚠️ No SUSE AI services discovered, using default:', serviceBaseUrl)
-          updateEndpoints(serviceBaseUrl)
         }
       } catch (error) {
-        console.warn('⚠️ Service discovery failed, using default:', error)
-        updateEndpoints(serviceBaseUrl)
+        console.warn('⚠️ Service discovery failed:', error)
+      }
+
+      if (!serviceBaseUrl) {
+        console.error('❌ Failed to discover service endpoint. Cannot proceed.')
+        // Mark all steps as error
+        activationSteps.value.forEach(s => s.status = 'error')
+        return
       }
 
       // Discovered services with URL info
@@ -455,9 +455,62 @@ const restartWizard = async () => {
     const loadClusters = async () => {
       try {
         isLoadingClusters.value = true
-        const clusters = await getAccessibleClusters(store)
-        availableClusters.value = clusters.filter(c => c.state === 'active')
-        console.log('Loaded clusters:', availableClusters.value.length)
+        const rawClusters = await getAccessibleClusters(store)
+        
+        console.log('Filtering clusters by searching for port 8911 service across all namespaces...')
+        const clusterChecks = await Promise.all(rawClusters.map(async (cluster: any) => {
+          try {
+            console.log(`🔍 Checking cluster ${cluster.name} (${cluster.id}) for port 8911 service...`)
+            
+            // Try different API paths for robust discovery, especially for 'local' cluster
+            const apiPaths = [
+              `/k8s/clusters/${cluster.id}/api/v1/services`
+            ]
+            
+            // For 'local' cluster, also try the direct Rancher management path
+            if (cluster.id === 'local') {
+              apiPaths.push('/v1/services')
+            }
+            
+            let hasPort8911 = false
+            
+            for (const path of apiPaths) {
+              try {
+                const response = await store.dispatch('rancher/request', {
+                  url: path,
+                  method: 'GET'
+                })
+                
+                const services = response?.items || response?.data?.items || []
+                console.log(`   Cluster ${cluster.id} at ${path} returned ${services.length} services`)
+                
+                if (services.some((service: any) => {
+                  const ports = service.spec?.ports || []
+                  return ports.some((p: any) => p.port === 8911 || p.targetPort === 8911)
+                })) {
+                  hasPort8911 = true
+                  break
+                }
+              } catch (e) {
+                // Silently try next path
+              }
+            }
+            
+            if (hasPort8911) {
+              console.log(`✅ Cluster ${cluster.name} (${cluster.id}) HAS service on port 8911`)
+              return cluster
+            }
+            
+            console.log(`❌ Cluster ${cluster.name} (${cluster.id}) does NOT have service on port 8911`)
+            return null
+          } catch (err: any) {
+            console.warn(`⚠️ Error checking cluster ${cluster.id}:`, err?.message || err)
+            return null
+          }
+        }))
+
+        availableClusters.value = clusterChecks.filter(c => c !== null) as any[]
+        console.log('Loaded and filtered clusters:', availableClusters.value.length)
       } catch (error) {
         console.error('Failed to load clusters:', error)
       } finally {

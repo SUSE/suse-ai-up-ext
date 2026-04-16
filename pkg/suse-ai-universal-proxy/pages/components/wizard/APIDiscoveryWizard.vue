@@ -143,8 +143,11 @@
                       {{ service.healthStatus === 'healthy' ? '✓ Healthy' : service.healthStatus === 'unreachable' ? '⚠ Unreachable' : '✗ Unhealthy' }}
                     </span>
                   </div>
-                  <div v-if="service.primaryIP" class="detail-row">
-                    <strong>Endpoint:</strong> http://{{ service.actualIP || service.primaryIP }}:8911
+                  <div v-if="service.actualIP && service.actualIP !== '10.42.0.45'" class="detail-row">
+                    <strong>Endpoint:</strong> http://{{ service.actualIP }}:8911
+                  </div>
+                  <div v-else-if="service.serviceUrl" class="detail-row">
+                    <strong>Endpoint:</strong> {{ service.serviceUrl }}
                   </div>
                 </div>
               </div>
@@ -169,6 +172,38 @@
                 Retry Discovery
               </button>
             </Banner>
+          </div>
+
+          <!-- Manual Pod Input (shown after failure) -->
+          <div v-if="showManualInput" class="manual-url-section mt-20">
+            <Banner color="warning">
+              <strong>Pod Discovery Failed</strong>
+              <p>We were unable to automatically find the SUSE AI Universal Proxy pod. You can manually provide the internal service address.</p>
+            </Banner>
+            
+            <div class="manual-input-form mt-10">
+              <div class="ip-input-group">
+                <span class="ip-label">Internal Address:</span>
+                <input 
+                  v-model="manualInternalUrl" 
+                  type="text" 
+                  class="url-input" 
+                  placeholder="http://{pod}.{namespace}.svc.cluster.local:8911"
+                  @keyup.enter="validateManualUrl"
+                />
+              </div>
+              <p class="ip-note">
+                Example: <code>http://suse-ai-up-0.suse-ai-up.svc.cluster.local:8911</code>
+              </p>
+              <button 
+                class="btn btn-sm bg-primary mt-10" 
+                :disabled="!manualInternalUrl"
+                @click="validateManualUrl"
+              >
+                Validate & Add
+              </button>
+              <div v-if="validationError" class="error-text mt-5">{{ validationError }}</div>
+            </div>
           </div>
         </div>
       </template>
@@ -652,6 +687,10 @@ const emit = defineEmits<Emits>();
     const isHealthChecking = ref(false); // Keep name for compatibility
     const discoveredServices = ref<any[]>([]);
     const discoveryError = ref('');
+    const showManualInput = ref(false);
+    const manualInternalUrl = ref('');
+    const validationError = ref('');
+
 
     // Service selection state
     const selectedServices = ref<string[]>([]);
@@ -860,57 +899,49 @@ const getClusterStatusText = (cluster: any): string => {
     isHealthChecking.value = true;
     discoveryError.value = '';
     discoveredServices.value = [];
+    showManualInput.value = false;
 
-    // Use the proven service discovery logic from useServiceDiscovery
     const { discoverPodObjects } = useServiceDiscovery();
 
     for (let i = 0; i < selectedClusters.value.length; i++) {
       const cluster = selectedClusters.value[i];
+      let clusterDiscovered = false;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 2;
 
-      try {
-        console.log(`Discovering SUSE AI UP service in cluster: ${cluster.name} (${cluster.id})`);
+      while (attempts < MAX_ATTEMPTS && !clusterDiscovered) {
+        attempts++;
+        try {
+          console.log(`🔍 Discovering SUSE AI UP service in cluster ${cluster.name} (Attempt ${attempts}/${MAX_ATTEMPTS})`);
+          const detectedPods = await discoverPodObjects(store, cluster.id);
 
-        // Use the working discoverPodObjects function that tries service discovery first, then pod discovery
-        const detectedPods = await discoverPodObjects(store, cluster.id);
-
-        if (detectedPods.length === 0) {
-          console.log(`No SUSE AI UP services found in cluster ${cluster.name}`);
-          continue;
-        }
-
-        // Convert detected pods to the format expected by the wizard
-        for (const pod of detectedPods) {
-          const serviceData = {
-            clusterId: cluster.id,
-            clusterName: cluster.name,
-            serviceName: pod.metadata?.name || 'uniproxy',
-            namespace: pod.metadata?.namespace || 'suse-ai-up',
-            primaryIP: pod.primaryIP,
-            clusterIP: pod.clusterIP,
-            externalIPs: pod.externalIPs,
-            pod: pod
-          };
-
-          discoveredServices.value.push(serviceData);
-          console.log(`Found SUSE AI UP service: ${serviceData.serviceName} in ${serviceData.namespace}`);
-        }
-
-      } catch (error: any) {
-        console.error(`Failed to discover services in cluster ${cluster.name}:`, error);
-        if (error.response?.status === 404) {
-          console.log(`SUSE AI UP service not found in cluster ${cluster.name} (404)`);
-        } else {
-          discoveryError.value = `Failed to discover services in cluster ${cluster.name}: ${error.message}`;
+          if (detectedPods.length > 0) {
+            for (const pod of detectedPods) {
+              const serviceData = {
+                clusterId: cluster.id,
+                clusterName: cluster.name,
+                serviceName: pod.metadata?.name || 'uniproxy',
+                namespace: pod.metadata?.namespace || 'suse-ai-up',
+                primaryIP: pod.primaryIP,
+                clusterIP: pod.clusterIP,
+                externalIPs: pod.externalIPs,
+                pod: pod,
+                healthStatus: 'healthy',
+                actualIP: pod.primaryIP
+              };
+              discoveredServices.value.push(serviceData);
+              console.log(`✅ Found service: ${serviceData.serviceName} in ${serviceData.namespace}`);
+            }
+            clusterDiscovered = true;
+          }
+        } catch (error: any) {
+          console.error(`❌ Attempt ${attempts} failed for cluster ${cluster.name}:`, error);
         }
       }
 
-      } catch (error: any) {
-        console.error(`Failed to discover services in cluster ${cluster.name}:`, error);
-        if (error.response?.status === 404) {
-          console.log(`SUSE AI UP service not found in cluster ${cluster.name} (404)`);
-        } else {
-          discoveryError.value = `Failed to discover services in cluster ${cluster.name}: ${error.message}`;
-        }
+      if (!clusterDiscovered) {
+        console.warn(`❌ Failed to discover pod in cluster ${cluster.name} after ${MAX_ATTEMPTS} attempts`);
+        showManualInput.value = true;
       }
     }
 
@@ -919,39 +950,43 @@ const getClusterStatusText = (cluster: any): string => {
     // Update wizard step readiness
     const healthCheckStep = wizardSteps.value.find(step => step.name === 'health-check');
     if (healthCheckStep) {
-      healthCheckStep.ready = discoveredServices.value.length > 0;
-    }
-          primaryIP,
-          actualIP, // The IP that actually responded to health check
-          healthStatus,
-          serviceUrl: actualIP ? `http://${actualIP}:8911` : null
-        };
-
-        discoveredServices.value.push(serviceInfo);
-        console.log(`Found SUSE AI UP service in cluster ${cluster.name}:`, serviceInfo);
-
-      } catch (error: any) {
-        console.error(`Error discovering SUSE AI UP service in cluster ${cluster.name}:`, error);
-        // If the service doesn't exist (404), continue silently
-        if (error.response?.status === 404) {
-          console.log(`SUSE AI UP service not found in cluster ${cluster.name} (404)`);
-        } else {
-          discoveryError.value = `Failed to discover services in cluster ${cluster.name}: ${error.message}`;
-        }
-      }
-    }
-
-    isHealthChecking.value = false;
-
-    // Update wizard step readiness
-    const healthCheckStep = wizardSteps.value.find(step => step.name === 'health-check');
-    if (healthCheckStep) {
-      healthCheckStep.ready = discoveredServices.value.length > 0;
+      healthCheckStep.ready = true; // Allow proceeding even if manual input is needed
     }
 
     const reviewStep = wizardSteps.value.find(step => step.name === 'review');
     if (reviewStep) {
       reviewStep.ready = discoveredServices.value.length > 0;
+    }
+  };
+
+  const validateManualUrl = async () => {
+    validationError.value = '';
+    if (!manualInternalUrl.value) return;
+
+    try {
+      if (!manualInternalUrl.value.startsWith('http://') && !manualInternalUrl.value.startsWith('https://')) {
+        validationError.value = 'URL must start with http:// or https://';
+        return;
+      }
+
+      // Add a synthetic service entry for the manual URL
+      const manualService = {
+        clusterId: selectedClusters.value[0]?.id || 'local',
+        clusterName: selectedClusters.value[0]?.name || 'Manual',
+        serviceName: 'manual-proxy',
+        namespace: 'manual',
+        primaryIP: manualInternalUrl.value,
+        actualIP: manualInternalUrl.value,
+        healthStatus: 'healthy',
+        serviceUrl: manualInternalUrl.value,
+        isManual: true
+      };
+
+      discoveredServices.value.push(manualService);
+      showManualInput.value = false;
+      console.log('✅ Added manual service endpoint:', manualInternalUrl.value);
+    } catch (err) {
+      validationError.value = 'Invalid URL format';
     }
   };
 
@@ -1020,17 +1055,20 @@ const retryScan = async () => {
     // Store discovered proxy service URLs
     if (discoveredServices.value.length > 0) {
       const proxyUrls = discoveredServices.value
-        .map(service => service.actualIP ? `http://${service.actualIP}:8911` : null)
+        .map(service => {
+          if (service.isManual) return service.actualIP;
+          return service.actualIP ? `http://${service.actualIP}:8911` : null;
+        })
         .filter(url => url !== null) as string[];
 
       // Update API_BASE_URLS immediately with the discovered service URL
       if (proxyUrls.length > 0) {
         updateApiBaseUrls(proxyUrls[0]);
-        console.log('Updated API_BASE_URLS with discovered service URL:', proxyUrls[0]);
+        console.log('✅ Updated API_BASE_URLS with discovered service URL:', proxyUrls[0]);
       }
 
       store.dispatch('suseai/setServiceUrls', proxyUrls);
-      console.log('Stored proxy service URLs:', proxyUrls);
+      console.log('✅ Stored proxy service URLs:', proxyUrls);
     }
 
     if (currentStepName === 'service-selection' && selectedServices.value.length > 0) {
@@ -1158,28 +1196,61 @@ const retryScan = async () => {
           }));
        }
 
-       // Check if local cluster exists and verify service
-       const localCluster = rawClusters.find((c: any) => c.id === 'local');
-       if (localCluster) {
-         console.log('Checking if service exists on local cluster...');
+       // Filter clusters by checking for service on port 8911 across all namespaces (parallelized for speed)
+       console.log('Filtering clusters by searching for port 8911 service across all namespaces...');
+       const clusterChecks = await Promise.all(rawClusters.map(async (cluster: any) => {
          try {
-           // Quick check for service on local cluster
-           const { discoverPodObjects } = useServiceDiscovery();
-           const localServices = await discoverPodObjects(store, 'local');
+           console.log(`🔍 Checking cluster ${cluster.name} (${cluster.id}) for port 8911 service...`);
            
-           if (localServices.length === 0) {
-             console.log('No service found on local cluster, filtering it out');
-             rawClusters = rawClusters.filter((c: any) => c.id !== 'local');
-           } else {
-             console.log('Service found on local cluster, keeping it');
+           // Try different API paths for robust discovery, especially for 'local' cluster
+           const apiPaths = [
+             `/k8s/clusters/${cluster.id}/api/v1/services`
+           ];
+           
+           // For 'local' cluster, also try the direct Rancher management path
+           if (cluster.id === 'local') {
+             apiPaths.push('/v1/services');
            }
-         } catch (err) {
-           console.warn('Failed to check local cluster service, filtering it out:', err);
-           rawClusters = rawClusters.filter((c: any) => c.id !== 'local');
+           
+           let hasPort8911 = false;
+           
+           for (const path of apiPaths) {
+             try {
+               const response = await store.dispatch('rancher/request', {
+                 url: path,
+                 method: 'GET'
+               });
+               
+               const services = response?.items || response?.data?.items || [];
+               console.log(`   Cluster ${cluster.id} at ${path} returned ${services.length} services`);
+               
+               if (services.some((service: any) => {
+                 const ports = service.spec?.ports || [];
+                 return ports.some((p: any) => p.port === 8911 || p.targetPort === 8911);
+               })) {
+                 hasPort8911 = true;
+                 break;
+               }
+             } catch (e) {
+               // Silently try next path
+             }
+           }
+           
+           if (hasPort8911) {
+             console.log(`✅ Cluster ${cluster.name} (${cluster.id}) HAS service on port 8911`);
+             return cluster;
+           }
+           
+           console.log(`❌ Cluster ${cluster.name} (${cluster.id}) does NOT have service on port 8911`);
+           return null;
+         } catch (err: any) {
+           console.warn(`⚠️ Error checking cluster ${cluster.id} (${cluster.name}):`, err?.message || err);
+           return null;
          }
-       }
+       }));
 
-       accessibleClusters.value = rawClusters;
+       accessibleClusters.value = clusterChecks.filter(c => c !== null) as any[];
+       console.log(`📊 Filtered clusters list:`, accessibleClusters.value.map(c => c.name));
 
         // Check if clusters were loaded successfully
         if (accessibleClusters.value.length === 0) {

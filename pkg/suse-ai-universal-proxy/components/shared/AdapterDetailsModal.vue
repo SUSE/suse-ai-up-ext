@@ -283,6 +283,11 @@ const publicIp = computed(() => {
 const mcpUrl = computed(() => {
   if (!adapter.value?.name) return '';
   
+  // If the adapter already has a computed httpUrl in mcpClientConfig (from user config), use it
+  if (adapter.value.mcpClientConfig?.gemini?.mcpServers?.[adapter.value.id]?.httpUrl) {
+    return adapter.value.mcpClientConfig.gemini.mcpServers[adapter.value.id].httpUrl;
+  }
+  
   let baseUrl = API_BASE_URLS.MCP_GATEWAY;
   
   // Prefer public IP if available for external clients
@@ -292,7 +297,12 @@ const mcpUrl = computed(() => {
     baseUrl = `http://${publicIp.value}:8911`;
   }
   
-  const url = `${baseUrl}/api/v1/adapters/${adapter.value.name}/mcp`;
+  // Distinguish between Virtual aggregators and standard sidecar adapters
+  const path = adapter.value.connectionType === 'Virtual' 
+    ? `/api/v1/mcp/${adapter.value.name}`
+    : `/api/v1/adapters/${adapter.value.name}/mcp`;
+    
+  const url = `${baseUrl}${path}`;
   console.log('AdapterDetailsModal mcpUrl:', url, 'PublicIP:', publicIp.value, 'ProxyURL:', API_BASE_URLS.MCP_GATEWAY);
   return url;
 });

@@ -222,7 +222,7 @@ const formatServerName = (name: string) => {
 .table th {
   background: #f8f9fa;
   border-bottom: 2px solid #dee2e6;
-  padding: 12px 16px;
+  padding: 8px 16px;
   font-weight: 600;
   color: #495057;
   text-align: left;
@@ -231,7 +231,7 @@ const formatServerName = (name: string) => {
 }
 
 .table td {
-  padding: 12px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid #dee2e6;
   vertical-align: middle;
 }

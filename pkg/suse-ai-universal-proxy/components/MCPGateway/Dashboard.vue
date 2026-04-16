@@ -189,20 +189,16 @@ export default defineComponent({
       initHealth();
     });
 
-    // Adapters management
+        // Adapters management
     const { deleteAdapter } = useAdapters();
 
     // Computed properties for metrics and data
     const discoveredCount = computed(() => servers.value.length);
     const adaptersData = computed(() => {
-      const adapters = props.adapters || []
-      console.log('Dashboard computed adaptersData:', adapters.length, 'items from props.adapters with', props.adapters?.length || 0, 'items')
-      return adapters
+      return props.adapters || []
     });
     const registeredCount = computed(() => {
-      const count = adaptersData.value.length
-      console.log('Dashboard registeredCount:', count, 'items')
-      return count
+      return adaptersData.value.length
     });
     const adaptersInErrorCount = computed(() => {
       return adaptersData.value.filter(adapter => adapter.status === 'error' || adapter.errorCount > 0).length;

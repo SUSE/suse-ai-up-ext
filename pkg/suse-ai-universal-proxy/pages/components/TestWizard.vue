@@ -1,5 +1,7 @@
 <template>
-  <div class="install-steps pt-20 outlet">
+  <div>
+    <ExperimentalBanner />
+    <div class="install-steps pt-20 outlet">
     <Wizard
       class="wizard windowsIncompatible"
       :steps="simpleSteps"
@@ -26,11 +28,13 @@
         </div>
       </template>
     </Wizard>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref } from 'vue';
+import { ExperimentalBanner } from '../../components/MCPGateway';
 import Wizard from '@shell/components/Wizard';
 
 const simpleSteps = ref([

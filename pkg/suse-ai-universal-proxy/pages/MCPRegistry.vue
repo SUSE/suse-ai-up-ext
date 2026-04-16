@@ -1,16 +1,13 @@
 <template>
-  <div v-if="!isEnabled" class="blank-page">
-    <div class="empty-state">
-      <h3>This service is not enabled</h3>
-      <p>Please enable it from the service selection page.</p>
+  <div>
+    <ExperimentalBanner />
+    <div v-if="!isEnabled" class="blank-page">
+      <div class="empty-state">
+        <h3>This service is not enabled</h3>
+        <p>Please enable it from the service selection page.</p>
+      </div>
     </div>
-  </div>
-  <div v-else>
-    <div class="experimental-banner">
-      <span class="banner-icon">⚠️</span>
-      <strong>Experimental Feature</strong>
-      <p>This SUSE AI Universal Proxy feature is experimental and may not be fully compatible with all providers. <a href="https://github.com/SUSE/suse-ai-up/issues" target="_blank">Report Issue</a> or <a href="https://github.com/SUSE/suse-ai-up/pulls" target="_blank">Submit PR</a> to help improve compatibility.</p>
-    </div>
+    <div v-else>
 
     <main>
       <div class="main-layout">
@@ -230,16 +227,17 @@
            :waiting-for-adapter="waitingForAdapter"
            :deploying="deployingAdapter"
            @close="closeDeployModal"
-           @deploy="executeDeploy"
-         />
-
-
-   </div>
+             @deploy="executeDeploy"
+           />
+    </div>
+  </div>
 </template>
+
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
+import { ExperimentalBanner } from '../components/MCPGateway'
 import { useRegistry } from '../composables/useRegistry'
 import { useAdapters } from '../composables/useAdapters'
 import type { MCPServer } from '../services/registry-api'
@@ -264,6 +262,7 @@ const genericMCPIcon = `<svg width="180" height="180" viewBox="0 0 180 180" fill
 export default defineComponent({
   name: 'MCPRegistry',
   components: {
+    ExperimentalBanner,
     ServerDetailsModal,
     DeployModal
   },
