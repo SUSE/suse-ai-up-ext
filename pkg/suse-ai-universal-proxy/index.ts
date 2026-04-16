@@ -8,9 +8,6 @@ export default function(plugin: IPlugin): void {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   plugin.metadata = require('./package.json');
 
-  // Register the icon
-  plugin.register('import', 'suseai', () => import('./assets/logo.svg'));
-
   // Pass the MODULE so Rancher finds `init`
   plugin.addProduct(productModule as any);
 
