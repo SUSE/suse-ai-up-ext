@@ -4,12 +4,12 @@
   "version": "0.1.2",
   "private": false,
   "rancher": {
-    "noCache": true
-  },
-  "annotations": {
-    "catalog.cattle.io/rancher-version": ">= 2.10.0",
-    "catalog.cattle.io/ui-extensions-version": ">= 3.0.0 < 4.0.0",
-    "catalog.cattle.io/display-name": "SUSE AI Universal Proxy"
+    "noCache": true,
+    "annotations": {
+      "catalog.cattle.io/rancher-version": ">= 2.10.0",
+      "catalog.cattle.io/ui-extensions-version": ">= 3.0.0 < 4.0.0",
+      "catalog.cattle.io/display-name": "SUSE AI Universal Proxy"
+    }
   },
   "scripts": {
     "typecheck": "vue-tsc --noEmit"
