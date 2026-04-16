@@ -13,12 +13,12 @@ entries:
       catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
     apiVersion: v2
     appVersion: 0.1.2
-    created: "2026-04-16T17:42:16.851971+02:00"
+    created: "2026-04-16T17:52:07.996538+02:00"
     description: suse-ai-universal-proxy plugin
-    digest: 75bacc692771bfb9dda60a58e9e49f37fdb938df01f95a1cfe2174e49eea7623
+    digest: e2330dcad582d7e79850bc04d8032a3b6c77f0c27f3e96abcf6b4b1904f01d61
     name: suse-ai-universal-proxy
     type: application
     urls:
     - assets/suse-ai-universal-proxy/suse-ai-universal-proxy-0.1.2.tgz
     version: 0.1.2
-generated: "2026-04-16T17:42:16.85156+02:00"
+generated: "2026-04-16T17:52:07.996114+02:00"
