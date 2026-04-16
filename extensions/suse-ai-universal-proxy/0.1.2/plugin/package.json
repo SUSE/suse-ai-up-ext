@@ -12,9 +12,6 @@
       "catalog.cattle.io/icon": "https://raw.githubusercontent.com/alessandro-festa/suse-ai-up-ui/dev/pkg/suse-ai-universal-proxy/assets/logo-icon.svg"
     }
   },
-  "scripts": {
-    "typecheck": "vue-tsc --noEmit"
-  },
   "engines": {
     "node": ">=16"
   },
@@ -28,9 +25,14 @@
     "@vue/cli-plugin-typescript": "~5.0.0",
     "vue-tsc": "^2.0.29"
   },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "not dead"
-  ]
+  "files": [
+    "**/*"
+  ],
+  "annotations": {
+    "catalog.cattle.io/rancher-version": ">= 2.10.0",
+    "catalog.cattle.io/ui-extensions-version": ">= 3.0.0 < 4.0.0",
+    "catalog.cattle.io/display-name": "SUSE AI Universal Proxy",
+    "catalog.cattle.io/icon": "https://raw.githubusercontent.com/alessandro-festa/suse-ai-up-ui/dev/pkg/suse-ai-universal-proxy/assets/logo-icon.svg"
+  },
+  "main": "suse-ai-universal-proxy-0.1.2.umd.min.js"
 }
