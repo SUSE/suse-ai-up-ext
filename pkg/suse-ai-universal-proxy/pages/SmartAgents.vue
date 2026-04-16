@@ -1,6 +1,8 @@
   <template>
-    <!-- Service not enabled message -->
-    <div v-if="!proxyInstalled" class="blank-page">
+    <div>
+      <ExperimentalBanner />
+      <!-- Service not enabled message -->
+      <div v-if="!proxyInstalled" class="blank-page">
       <div class="empty-state">
         <h3>This service is not enabled</h3>
         <p>Please enable it from the service selection page.</p>
@@ -17,11 +19,13 @@
         </div>
       </div>
     </div>
-  </template>
+  </div>
+</template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useStore } from 'vuex';
+import { ExperimentalBanner } from '../components/MCPGateway';
 
 const store = useStore();
 const proxyInstalled = computed(() => store.state.suseai.settings.proxyInstalled);

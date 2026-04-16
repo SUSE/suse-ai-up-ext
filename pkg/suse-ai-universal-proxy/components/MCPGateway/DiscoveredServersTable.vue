@@ -188,7 +188,7 @@ export default defineComponent({
 
 .servers-table th {
   background: var(--accent-bg, #f9fafb);
-  padding: 12px 16px;
+  padding: 8px 16px;
   text-align: left;
   font-weight: 600;
   color: var(--body-text, #111827);
@@ -196,7 +196,7 @@ export default defineComponent({
 }
 
 .servers-table td {
-  padding: 12px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border, #e5e7eb);
   vertical-align: middle;
 }
@@ -257,7 +257,7 @@ export default defineComponent({
 }
 
 .btn {
-  padding: 6px 10px;
+  padding: 4px 8px;
   border: 1px solid transparent;
   border-radius: 4px;
   font-size: 12px;
@@ -268,8 +268,8 @@ export default defineComponent({
   justify-content: center;
   gap: 4px;
   transition: all 0.2s ease;
-  min-width: 32px;
-  height: 32px;
+  min-width: 28px;
+  height: 28px;
 }
 
 .role-secondary {

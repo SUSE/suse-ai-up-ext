@@ -1,7 +1,7 @@
 // Adapters Composable
 // Provides state management and API integration for MCP adapters
 
-import { ref, readonly } from 'vue'
+import { ref, readonly, computed } from 'vue'
 import { adapterAPI, type Adapter, type CreateAdapterRequest, type UpdateAdapterRequest, type AdapterCapabilities } from '../services/adapter-api'
 import { logger } from '../utils/logger'
 
@@ -11,22 +11,37 @@ export function useAdapters() {
   const error = ref<string | null>(null)
   let pollInterval: NodeJS.Timeout | null = null
 
+  // Computed: Sorted Adapters (Alphabetical)
+  const sortedAdapters = computed(() => 
+    [...adapters.value].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  )
+
+  // Computed: Virtual Adapters (Aggregators)
+  const virtualAdapters = computed(() => 
+    adapters.value.filter(a => a.connectionType === 'Virtual')
+  )
+
+  // Computed: Sourceable Adapters (Available for aggregation)
+  const sourceableAdapters = computed(() => 
+    adapters.value.filter(a => a.connectionType !== 'Virtual' && a.status === 'ready')
+  )
+
   // Load all adapters
   const loadAdapters = async (): Promise<void> => {
     loading.value = true
     error.value = null
 
-      try {
-        logger.info('Loading adapters')
-        const adapterList = await adapterAPI.list()
-        adapters.value = adapterList
-        logger.info('Adapters loaded', { count: adapterList.length })
-      } catch (err: any) {
-        error.value = err.message || 'Failed to load adapters'
-        logger.error('Failed to load adapters', err)
-      } finally {
-        loading.value = false
-      }
+    try {
+      logger.info('Loading adapters')
+      const adapterList = await adapterAPI.list()
+      adapters.value = adapterList
+      logger.info('Adapters loaded', { count: adapterList.length })
+    } catch (err: any) {
+      error.value = err.message || 'Failed to load adapters'
+      logger.error('Failed to load adapters', err)
+    } finally {
+      loading.value = false
+    }
   }
 
   // Create new adapter
@@ -126,6 +141,16 @@ export function useAdapters() {
       return false
     } finally {
       loading.value = false
+    }
+  }
+
+  // Get user config
+  const getUserConfig = async (userId?: string): Promise<any> => {
+    try {
+      return await adapterAPI.getUserConfig(userId)
+    } catch (err: any) {
+      logger.error('Failed to get user config', err)
+      return null
     }
   }
 
@@ -234,10 +259,16 @@ export function useAdapters() {
     loading,
     error,
 
+    // Computed
+    virtualAdapters,
+    sourceableAdapters,
+    sortedAdapters,
+
     // Methods
     loadAdapters,
     createAdapter,
     getAdapter,
+    getUserConfig,
     updateAdapter,
     deleteAdapter,
     syncAdapter,

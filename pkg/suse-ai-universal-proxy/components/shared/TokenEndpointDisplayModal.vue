@@ -2,11 +2,11 @@
   <div v-if="isVisible" class="modal-overlay" @click="closeModal">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h3>Adapter Created Successfully</h3>
+        <h3>{{ title || 'Adapter Details' }}</h3>
         <button class="btn btn-sm btn-secondary" @click="closeModal">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="success-message">
+        <div v-if="!hideSuccess" class="success-message">
           <i class="icon icon-check-circle" aria-hidden="true"></i>
           <h4>Adapter "{{ adapterName }}" has been created!</h4>
         </div>
@@ -57,23 +57,84 @@
             <h5>Note</h5>
             <p class="note">{{ creationResponse.note }}</p>
           </div>
+
+          <!-- Management Info (for Virtual/Existing Adapters) -->
+          <div class="detail-section management-section">
+            <h5>Management</h5>
+            <p>This Virtual MCP aggregator is managed by the SUSE AI Universal Proxy. You can use the <strong>MCP Gateway menu</strong> to manage the deployment, monitor metrics, and configure access for this and other adapters.</p>
+            <button class="btn btn-sm btn-outline mt-10" @click="goToGateway">
+              <i class="icon icon-external-link mr-5"></i>
+              Go to MCP Gateway
+            </button>
+          </div>
+
+          <!-- Client Configuration Section -->
+          <div class="detail-section client-config-section">
+             <h5>Client Configuration</h5>
+             <p class="section-description">
+               Copy and paste these configurations into your preferred MCP client.
+             </p>
+             <div class="client-config-buttons">
+               <button
+                 class="btn btn-sm btn-outline client-config-btn"
+                 @click="showClientConfig('google-gemini')"
+               >
+                 <i class="icon icon-copy"></i>
+                 Google Gemini Config
+               </button>
+               <button
+                 class="btn btn-sm btn-outline client-config-btn"
+                 @click="showClientConfig('vscode')"
+               >
+                 <i class="icon icon-copy"></i>
+                 VSCode Config
+               </button>
+             </div>
+           </div>
         </div>
 
-        <div class="instructions">
+        <div v-if="!hideSuccess" class="instructions">
           <h5>Next Steps</h5>
           <ol>
             <li>Use the MCP endpoint URL above to connect your MCP client</li>
             <li v-if="creationResponse?.token_info">Include the authentication token in your requests</li>
             <li>Check the adapter status in the MCP Gateway dashboard</li>
-            <li>Test the connection using the adapter's test functionality</li>
           </ol>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="closeModal">Close</button>
-        <button class="btn btn-primary" @click="goToGateway">
-          Go to MCP Gateway
+      </div>
+    </div>
+  </div>
+
+  <!-- Client Configuration Modal -->
+  <div v-if="showClientConfigModal" class="modal-overlay" @click="closeClientConfigModal">
+    <div class="modal-content client-config-modal" @click.stop>
+      <div class="modal-header">
+        <h3>
+          <i class="icon icon-settings"></i>
+          {{ selectedClientConfig === 'google-gemini' ? 'Google Gemini' : 'VSCode' }} MCP Configuration
+        </h3>
+        <button class="btn btn-sm btn-secondary" @click="closeClientConfigModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="config-instructions">
+          <p><strong>Instructions:</strong> Copy the configuration below and use it in your {{ selectedClientConfig === 'google-gemini' ? 'Google Gemini' : 'VSCode' }} MCP client settings.</p>
+        </div>
+        <div class="config-display">
+          <pre class="config-json">{{ getClientConfig(selectedClientConfig) }}</pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button
+          class="btn btn-primary"
+          @click="copyToClipboard(getClientConfig(selectedClientConfig))"
+        >
+          <i class="icon icon-copy"></i>
+          Copy Configuration
         </button>
+        <button class="btn btn-secondary" @click="closeClientConfigModal">Close</button>
       </div>
     </div>
   </div>
@@ -97,6 +158,9 @@ interface Props {
     };
   };
   adapterName?: string;
+  show?: boolean;
+  title?: string;
+  hideSuccess?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -108,6 +172,59 @@ const emit = defineEmits<{
 
 const router = useRouter();
 const isVisible = ref(false);
+const showClientConfigModal = ref(false);
+const selectedClientConfig = ref<string>('');
+
+const showClientConfig = (type: string) => {
+  selectedClientConfig.value = type;
+  showClientConfigModal.value = true;
+};
+
+const closeClientConfigModal = () => {
+  showClientConfigModal.value = false;
+};
+
+const getClientConfig = (clientType: string): string => {
+  if (!props.creationResponse) return '';
+
+  const adapterName = props.adapterName || 'unified-mcp';
+  const endpoint = props.creationResponse.mcp_endpoint;
+  const token = props.creationResponse.token_info?.token || '';
+
+  if (clientType === 'google-gemini') {
+    return JSON.stringify({
+      mcpServers: {
+        [adapterName]: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          httpUrl: endpoint
+        }
+      }
+    }, null, 2);
+  } else {
+    return JSON.stringify({
+      inputs: [],
+      servers: {
+        [adapterName]: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          type: 'http',
+          url: endpoint
+        }
+      }
+    }, null, 2);
+  }
+};
+
+// Watch for show prop changes
+import { watch } from 'vue';
+watch(() => props.show, (newVal) => {
+  if (newVal !== undefined) {
+    isVisible.value = newVal;
+  }
+}, { immediate: true });
 
 // Methods
 const openModal = () => {
@@ -309,6 +426,61 @@ defineExpose({
   margin-bottom: 8px;
   color: var(--body-text, #374151);
   line-height: 1.5;
+}
+
+.client-config-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-color: var(--info, #0ea5e9);
+  margin-top: 20px;
+}
+
+.management-section {
+  background: #f8f9fa;
+  border-left: 4px solid var(--primary);
+}
+
+.section-description {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.client-config-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.client-config-modal {
+  max-width: 700px;
+  width: 90%;
+}
+
+.config-instructions {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--accent-bg, #f9fafb);
+  border-radius: 6px;
+  border-left: 4px solid var(--primary);
+}
+
+.config-display {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.config-json {
+  margin: 0;
+  padding: 16px;
+  background: #f9fafb;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .btn {

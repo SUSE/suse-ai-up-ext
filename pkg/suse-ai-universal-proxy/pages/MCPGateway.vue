@@ -1,17 +1,18 @@
 <template>
-  <div v-if="!isEnabled" class="blank-page">
-    <div class="empty-state">
-      <h3>This service is not enabled</h3>
-      <p>Please enable it from the service selection page.</p>
-    </div>
-  </div>
-
-  <div v-else>
+  <div>
     <ExperimentalBanner />
+    <div v-if="!isEnabled" class="blank-page">
+      <div class="empty-state">
+        <h3>This service is not enabled</h3>
+        <p>Please enable it from the service selection page.</p>
+      </div>
+    </div>
+
+    <div v-else>
 
       <Dashboard
         v-if="proxyInstalled && isEnabled"
-        :adapters="adapters"
+        :adapters="sortedAdapters"
         :adapters-error="adaptersError || undefined"
         :adapters-loading="adaptersLoading"
         :discovered-servers="Array.from(discoveredServers)"
@@ -53,6 +54,7 @@
       :server="selectedServer"
       @close="closeServerDetailsModal"
     />
+    </div>
   </div>
 </template>
 
@@ -103,6 +105,7 @@ export default defineComponent({
 
     const {
       adapters,
+      sortedAdapters,
       loading: adaptersLoading,
       error: adaptersError,
       loadAdapters,
@@ -160,7 +163,7 @@ export default defineComponent({
       // Load discovered servers
       await loadDiscoveredServers()
 
-      // Load adapters
+      // Load adapters - ensure this completes before starting polling
       console.log('MCPGateway onMounted: Loading adapters')
       await loadAdapters()
 
@@ -293,6 +296,7 @@ export default defineComponent({
 
       // Adapters data
       adapters,
+      sortedAdapters,
       adaptersLoading,
       adaptersError,
 
